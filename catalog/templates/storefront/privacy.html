@@ -1,0 +1,242 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Политика конфиденциальности — Ai-Dent{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/product.css' %}">
+<style>
+  .product-page__tooth {
+    opacity: 0.28 !important;
+  }
+
+  .legal-page {
+    position: relative;
+    z-index: 2;
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 64px 24px 120px;
+  }
+
+  .legal-hero__eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-family: "Instrument Sans", sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .22em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 18px;
+  }
+
+  .legal-hero__eyebrow::before {
+    content: "";
+    width: 28px;
+    height: 1px;
+    background: var(--muted-light);
+  }
+
+  .legal-hero__title {
+    font-family: var(--font);
+    font-size: clamp(28px, 4.5vw, 44px);
+    font-weight: 800;
+    letter-spacing: -.03em;
+    line-height: 1.1;
+    color: var(--text);
+    margin: 0 0 14px;
+  }
+
+  .legal-hero__date {
+    font-size: 13.5px;
+    color: var(--muted);
+    margin: 0 0 44px;
+  }
+
+  .legal-block {
+    background: rgba(255, 255, 255, .72);
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-lg);
+    padding: 34px 32px;
+    margin-bottom: 18px;
+    box-shadow: var(--shadow-glass);
+  }
+
+  .legal-block h2 {
+    font-family: var(--font);
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: -.02em;
+    color: var(--text);
+    margin: 0 0 14px;
+  }
+
+  .legal-block p {
+    font-size: 14.5px;
+    line-height: 1.65;
+    color: var(--muted);
+    margin: 0 0 12px;
+  }
+
+  .legal-block p:last-child { margin-bottom: 0; }
+
+  .legal-block ul,
+  .legal-block ol {
+    margin: 0 0 12px;
+    padding-left: 20px;
+    font-size: 14.5px;
+    line-height: 1.65;
+    color: var(--muted);
+  }
+
+  .legal-block ul:last-child,
+  .legal-block ol:last-child { margin-bottom: 0; }
+
+  .legal-block li { margin-bottom: 6px; }
+  .legal-block li:last-child { margin-bottom: 0; }
+
+  .legal-block strong { color: var(--text); font-weight: 700; }
+
+  .legal-req dl {
+    display: grid;
+    grid-template-columns: 160px 1fr;
+    row-gap: 8px;
+    margin: 0;
+  }
+
+  .legal-req dt { font-size: 12.5px; color: var(--muted-light); }
+  .legal-req dd { margin: 0; font-size: 13.5px; font-weight: 700; color: var(--text); }
+
+  @media (max-width: 560px) {
+    .legal-page { padding: 40px 16px 80px; }
+    .legal-block { padding: 24px 20px; }
+    .legal-req dl { grid-template-columns: 1fr; row-gap: 3px; }
+    .legal-req dt { margin-top: 10px; }
+    .legal-req dt:first-child { margin-top: 0; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="product-page__tooth">
+  <img src="{% static 'img/teeth.png' %}" alt="">
+</div>
+
+<section class="legal-page">
+
+  <div class="legal-hero__eyebrow">Правовая информация</div>
+  <h1 class="legal-hero__title">Политика конфиденциальности</h1>
+  <p class="legal-hero__date">Действует с {% now "d.m.Y" %}</p>
+
+  <div class="legal-block">
+    <h2>1. Общие положения</h2>
+    <p>
+      Настоящая Политика конфиденциальности (далее — «Политика») определяет порядок обработки
+      и защиты персональных данных пользователей сайта Ai-Dent (далее — «Сайт»), которые
+      могут быть получены Оператором в процессе использования Сайта, оформления заказов
+      и обращения в службу поддержки.
+    </p>
+    <p>
+      Оператором персональных данных является Индивидуальный предприниматель
+      Мелихов Владимир Семёнович (далее — «Оператор», «мы»). Используя Сайт, пользователь
+      выражает согласие с условиями настоящей Политики.
+    </p>
+  </div>
+
+  <div class="legal-block">
+    <h2>2. Какие данные мы обрабатываем</h2>
+    <ul>
+      <li>Номер телефона — для входа и регистрации, связи по заказу;</li>
+      <li>Имя и адрес электронной почты — если указаны при оформлении заказа;</li>
+      <li>Данные заказа: состав корзины, способ оплаты, реквизиты для выставления счёта;</li>
+      <li>Технические данные: cookie, данные о сессии, IP-адрес, сведения о браузере и устройстве.</li>
+    </ul>
+  </div>
+
+  <div class="legal-block">
+    <h2>3. Цели обработки персональных данных</h2>
+    <p>Мы обрабатываем персональные данные для того, чтобы:</p>
+    <ul>
+      <li>идентифицировать пользователя при входе по номеру телефона (код подтверждения);</li>
+      <li>оформить и исполнить заказ, выставить счёт, организовать доставку;</li>
+      <li>связаться с пользователем по вопросам, касающимся заказа;</li>
+      <li>обеспечить корректную работу и безопасность Сайта.</li>
+    </ul>
+  </div>
+
+  <div class="legal-block">
+    <h2>4. Правовые основания обработки</h2>
+    <p>
+      Обработка персональных данных осуществляется в соответствии с Федеральным законом
+      от 27.07.2006 № 152-ФЗ «О персональных данных» на основании согласия пользователя,
+      а также в целях исполнения договора (заказа), стороной которого является пользователь.
+    </p>
+  </div>
+
+  <div class="legal-block">
+    <h2>5. Cookie и аналитика</h2>
+    <p>
+      Сайт использует файлы cookie и аналогичные технологии для сохранения состояния
+      корзины и избранного, авторизации и улучшения работы Сайта. Продолжая использовать
+      Сайт и подтвердив согласие в баннере cookie, пользователь соглашается с их применением.
+      Отключить cookie можно в настройках браузера — это может ограничить часть функций Сайта.
+    </p>
+  </div>
+
+  <div class="legal-block">
+    <h2>6. Передача данных третьим лицам</h2>
+    <p>
+      Мы не передаём персональные данные третьим лицам, за исключением случаев,
+      необходимых для исполнения заказа (например, транспортным компаниям — для доставки,
+      платёжным системам — для приёма оплаты), а также случаев, предусмотренных
+      законодательством РФ.
+    </p>
+  </div>
+
+  <div class="legal-block">
+    <h2>7. Хранение и защита данных</h2>
+    <p>
+      Персональные данные хранятся не дольше, чем это необходимо для целей обработки,
+      либо в течение сроков, установленных законодательством РФ. Оператор принимает
+      необходимые организационные и технические меры для защиты данных от несанкционированного
+      доступа, изменения, раскрытия или уничтожения.
+    </p>
+  </div>
+
+  <div class="legal-block">
+    <h2>8. Права пользователя</h2>
+    <p>Пользователь вправе:</p>
+    <ul>
+      <li>получить информацию об обработке своих персональных данных;</li>
+      <li>потребовать уточнения, блокирования или уничтожения данных, если они неполны, устарели или неточны;</li>
+      <li>отозвать согласие на обработку персональных данных;</li>
+      <li>удалить свой аккаунт через личный кабинет на Сайте.</li>
+    </ul>
+  </div>
+
+  <div class="legal-block">
+    <h2>9. Изменения Политики</h2>
+    <p>
+      Оператор вправе вносить изменения в настоящую Политику. Новая редакция вступает
+      в силу с момента её размещения на Сайте, если иное не предусмотрено новой редакцией.
+    </p>
+  </div>
+
+  <div class="legal-block legal-req">
+    <h2>10. Реквизиты оператора</h2>
+    <dl>
+      <dt>Оператор</dt>
+      <dd>ИП Мелихов Владимир Семёнович</dd>
+      <dt>ИНН</dt>
+      <dd>616808573750</dd>
+      <dt>Расчётный счёт</dt>
+      <dd>40802810120000943056</dd>
+    </dl>
+  </div>
+
+</section>
+{% endblock %}

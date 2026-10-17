@@ -1,0 +1,13 @@
+{% extends "admin/change_form.html" %}
+{% comment %}Статус меняется только этими кнопками (ТЗ §10.5); правки состава сохраняются вместе с нажатием{% endcomment %}
+
+{% block submit_buttons_bottom %}
+  {% if status_buttons %}
+  <div class="submit-row order-status-row">
+    {% for name, label in status_buttons %}
+      <input type="submit" name="{{ name }}" value="{{ label }}"{% if name == "_status_cancelled" %} class="deletelink"{% endif %}>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {{ block.super }}
+{% endblock %}

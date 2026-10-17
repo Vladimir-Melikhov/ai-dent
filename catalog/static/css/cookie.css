@@ -1,0 +1,65 @@
+/* ============================================================
+   AI-DENT — COOKIE BANNER
+   ============================================================ */
+
+.cookie-banner {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  z-index: 150;
+  max-width: 760px;
+  margin: 0 auto;
+  background: rgba(255, 255, 255, .92);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-hover);
+  padding: 18px 20px;
+}
+
+.cookie-banner[hidden] { display: none; }
+
+.cookie-banner__inner {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.cookie-banner__text {
+  flex: 1 1 260px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.cookie-banner__text a {
+  color: var(--text);
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+.cookie-banner__accept {
+  flex: 0 0 auto;
+  height: 40px;
+  padding: 0 22px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background .2s ease;
+}
+
+.cookie-banner__accept:hover { background: var(--accent-hover); }
+
+@media (max-width: 560px) {
+  .cookie-banner { left: 10px; right: 10px; bottom: 10px; padding: 16px; }
+  .cookie-banner__inner { flex-direction: column; align-items: stretch; }
+  .cookie-banner__accept { width: 100%; }
+}

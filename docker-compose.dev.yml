@@ -1,0 +1,21 @@
+# Локальная проверка чата без ключа API: подменная модель вместо Claude API.
+# В прод не идёт. Запуск:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+services:
+  fake-model:
+    build: ./api
+    command: ["uvicorn", "devtools.fake_model_server:app", "--host", "0.0.0.0", "--port", "8100"]
+    volumes:
+      - ./api/devtools:/app/devtools:ro
+    networks: [dent-ai]
+
+  api:
+    environment:
+      ANTHROPIC_API_KEY: fake-local
+      ANTHROPIC_BASE_URL: http://fake-model:8100
+    depends_on:
+      fake-model: { condition: service_started }
+
+  catalog:
+    environment:
+      CHAT_WIDGET_ENABLED: "True"

@@ -1,0 +1,61 @@
+/* ============================================================
+   AI-DENT — FOOTER (компактный)
+   ============================================================ */
+
+.site-footer {
+  position: relative;
+  z-index: 2;
+  margin-top: 40px;
+  border-top: 1px solid var(--border-soft);
+  background: rgba(255, 255, 255, .55);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+}
+
+.site-footer__inner {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 20px 40px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+}
+
+.site-footer__logo { display: inline-flex; flex: 0 0 auto; }
+.site-footer__logo img { height: 20px; width: auto; display: block; }
+
+.site-footer__links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 18px;
+  margin-right: auto;
+}
+
+.site-footer__links a {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-soft);
+  text-decoration: none;
+  transition: color .2s ease;
+}
+
+.site-footer__links a:hover { color: var(--text); }
+
+.site-footer__meta {
+  flex: 0 0 auto;
+  font-size: 11.5px;
+  color: var(--muted-light);
+  white-space: nowrap;
+}
+
+@media (max-width: 700px) {
+  .site-footer__inner {
+    padding: 18px 20px;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .site-footer__links { margin-right: 0; }
+  .site-footer__meta { white-space: normal; }
+}

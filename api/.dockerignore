@@ -1,0 +1,17 @@
+# Секреты и локальные данные не должны попадать в образ (ТЗ §15, T19)
+.env
+.env.*
+!.env.example
+media/
+staticfiles/
+__pycache__/
+*.pyc
+venv/
+.venv/
+.pytest_cache/
+.DS_Store
+tests/
+conftest.py
+pytest.ini
+requirements-dev.txt
+devtools/

@@ -1,0 +1,237 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Пользовательское соглашение — Ai-Dent{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/product.css' %}">
+<style>
+  .product-page__tooth {
+    opacity: 0.28 !important;
+  }
+
+  .legal-page {
+    position: relative;
+    z-index: 2;
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 64px 24px 120px;
+  }
+
+  .legal-hero__eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-family: "Instrument Sans", sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .22em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 18px;
+  }
+
+  .legal-hero__eyebrow::before {
+    content: "";
+    width: 28px;
+    height: 1px;
+    background: var(--muted-light);
+  }
+
+  .legal-hero__title {
+    font-family: var(--font);
+    font-size: clamp(28px, 4.5vw, 44px);
+    font-weight: 800;
+    letter-spacing: -.03em;
+    line-height: 1.1;
+    color: var(--text);
+    margin: 0 0 14px;
+  }
+
+  .legal-hero__date {
+    font-size: 13.5px;
+    color: var(--muted);
+    margin: 0 0 44px;
+  }
+
+  .legal-block {
+    background: rgba(255, 255, 255, .72);
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-lg);
+    padding: 34px 32px;
+    margin-bottom: 18px;
+    box-shadow: var(--shadow-glass);
+  }
+
+  .legal-block h2 {
+    font-family: var(--font);
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: -.02em;
+    color: var(--text);
+    margin: 0 0 14px;
+  }
+
+  .legal-block p {
+    font-size: 14.5px;
+    line-height: 1.65;
+    color: var(--muted);
+    margin: 0 0 12px;
+  }
+
+  .legal-block p:last-child { margin-bottom: 0; }
+
+  .legal-block ul,
+  .legal-block ol {
+    margin: 0 0 12px;
+    padding-left: 20px;
+    font-size: 14.5px;
+    line-height: 1.65;
+    color: var(--muted);
+  }
+
+  .legal-block ul:last-child,
+  .legal-block ol:last-child { margin-bottom: 0; }
+
+  .legal-block li { margin-bottom: 6px; }
+  .legal-block li:last-child { margin-bottom: 0; }
+
+  .legal-block strong { color: var(--text); font-weight: 700; }
+
+  .legal-req dl {
+    display: grid;
+    grid-template-columns: 160px 1fr;
+    row-gap: 8px;
+    margin: 0;
+  }
+
+  .legal-req dt { font-size: 12.5px; color: var(--muted-light); }
+  .legal-req dd { margin: 0; font-size: 13.5px; font-weight: 700; color: var(--text); }
+
+  @media (max-width: 560px) {
+    .legal-page { padding: 40px 16px 80px; }
+    .legal-block { padding: 24px 20px; }
+    .legal-req dl { grid-template-columns: 1fr; row-gap: 3px; }
+    .legal-req dt { margin-top: 10px; }
+    .legal-req dt:first-child { margin-top: 0; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="product-page__tooth">
+  <img src="{% static 'img/teeth.png' %}" alt="">
+</div>
+
+<section class="legal-page">
+
+  <div class="legal-hero__eyebrow">Правовая информация</div>
+  <h1 class="legal-hero__title">Пользовательское соглашение</h1>
+  <p class="legal-hero__date">Действует с 30.09.2026 · является публичной офертой</p>
+
+  <div class="legal-block">
+    <h2>1. Общие положения</h2>
+    <p>
+      Настоящее Пользовательское соглашение (далее — «Соглашение») регулирует отношения между
+      Индивидуальным предпринимателем Мелиховым Владимиром Семёновичем (далее — «Продавец»)
+      и пользователем сайта Ai-Dent (далее — «Покупатель») при использовании сайта
+      и оформлении заказов на оборудование и инструмент для стоматологии.
+    </p>
+    <p>
+      Соглашение является публичной офертой в соответствии со статьёй 437 Гражданского
+      кодекса РФ. Оформление заказа на Сайте означает полное и безоговорочное принятие
+      Покупателем условий настоящего Соглашения.
+    </p>
+  </div>
+
+  <div class="legal-block">
+    <h2>2. Термины</h2>
+    <ul>
+      <li><strong>Сайт</strong> — интернет-сайт Ai-Dent со всеми разделами и сервисами;</li>
+      <li><strong>Товар</strong> — оборудование и инструмент, представленные в каталоге Сайта;</li>
+      <li><strong>Заказ</strong> — оформленный Покупателем на Сайте запрос на приобретение Товара;</li>
+      <li><strong>Личный кабинет</strong> — раздел Сайта, доступный Покупателю после входа по номеру телефона.</li>
+    </ul>
+  </div>
+
+  <div class="legal-block">
+    <h2>3. Регистрация и вход</h2>
+    <p>
+      Вход и регистрация на Сайте осуществляются по номеру телефона с использованием
+      одноразового кода подтверждения (SMS). Указывая номер телефона и подтверждая код,
+      Покупатель гарантирует, что данные являются достоверными и принадлежат ему.
+    </p>
+    <p>
+      Оформление заказа возможно как авторизованным Покупателем, так и без регистрации —
+      в качестве гостя.
+    </p>
+  </div>
+
+  <div class="legal-block">
+    <h2>4. Оформление и оплата заказа</h2>
+    <p>
+      Заказ оформляется через корзину на Сайте. Покупатель указывает контактные данные,
+      выбирает способ оплаты (по счёту для юридических лиц и ИП или онлайн-оплата картой)
+      и подтверждает заказ. После оформления заказа с Покупателем связывается менеджер
+      для подтверждения наличия, сроков и условий доставки.
+    </p>
+    <p>
+      Цены на Товары указаны в рублях РФ и могут быть изменены Продавцом в одностороннем
+      порядке до момента подтверждения заказа менеджером.
+    </p>
+  </div>
+
+  <div class="legal-block">
+    <h2>5. Доставка</h2>
+    <p>
+      Доставка осуществляется способом, согласованным Продавцом и Покупателем: курьером,
+      транспортной компанией или самовывозом. Сроки и стоимость доставки уточняются
+      менеджером при подтверждении заказа. Подробные условия — на странице «Доставка».
+    </p>
+  </div>
+
+  <div class="legal-block">
+    <h2>6. Гарантия и возврат</h2>
+    <p>
+      На Товары распространяется гарантия производителя. Возврат и обмен Товара
+      надлежащего качества осуществляются в соответствии с Законом РФ «О защите прав
+      потребителей» и договорённостью сторон. Возврат Товара ненадлежащего качества
+      осуществляется в порядке, установленном законодательством РФ.
+    </p>
+  </div>
+
+  <div class="legal-block">
+    <h2>7. Ответственность сторон</h2>
+    <p>
+      Продавец не несёт ответственности за невозможность исполнения заказа по причинам,
+      не зависящим от Продавца (форс-мажор, сбои в работе транспортных и платёжных
+      систем). Покупатель несёт ответственность за достоверность указанных при
+      оформлении заказа данных.
+    </p>
+  </div>
+
+  <div class="legal-block">
+    <h2>8. Изменение условий Соглашения</h2>
+    <p>
+      Продавец вправе изменять условия настоящего Соглашения в одностороннем порядке.
+      Новая редакция вступает в силу с момента размещения на Сайте.
+    </p>
+  </div>
+
+  <div class="legal-block legal-req">
+    <h2>9. Реквизиты продавца</h2>
+    <dl>
+      <dt>Продавец</dt>
+      <dd>ИП Мелихов Владимир Семёнович</dd>
+      <dt>ИНН</dt>
+      <dd>616808573750</dd>
+      <dt>Расчётный счёт</dt>
+      <dd>40802810120000943056</dd>
+    </dl>
+  </div>
+
+</section>
+{% endblock %}

@@ -1,0 +1,491 @@
+{% load humanize %}
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width">
+  <meta name="x-apple-disable-message-reformatting">
+  <title>Заказ успешно оформлен — Ai-Dent</title>
+</head>
+
+<body style="margin:0; padding:0; background:#eef1f4; color:#17222c; font-family:Arial,Helvetica,sans-serif; -webkit-font-smoothing:antialiased;">
+
+  <table
+    width="100%"
+    cellpadding="0"
+    cellspacing="0"
+    border="0"
+    style="width:100%; background:#eef1f4; margin:0; padding:36px 12px;"
+  >
+    <tr>
+      <td align="center">
+
+        <!-- ======================================================
+             MAIN CONTAINER
+             ====================================================== -->
+
+        <table
+          width="620"
+          cellpadding="0"
+          cellspacing="0"
+          border="0"
+          style="width:100%; max-width:620px; background:#ffffff; border:1px solid #d7dde3; border-radius:22px; overflow:hidden;"
+        >
+
+          <!-- ====================================================
+               TOP LINE
+               ==================================================== -->
+
+          <tr>
+            <td style="height:4px; background:#17222c; font-size:0; line-height:0;">
+              &nbsp;
+            </td>
+          </tr>
+
+
+          <!-- ====================================================
+               HEADER
+               ==================================================== -->
+
+          <tr>
+            <td style="padding:28px 36px 24px; border-bottom:1px solid #e1e5e9;">
+
+              <table
+                width="100%"
+                cellpadding="0"
+                cellspacing="0"
+                border="0"
+              >
+                <tr>
+
+                  <td
+                    style="font-size:12px; font-weight:800; letter-spacing:.24em; text-transform:uppercase; color:#17222c;"
+                  >
+                    AI-DENT
+                  </td>
+
+                  <td
+                    align="right"
+                    style="font-size:9px; font-weight:700; letter-spacing:.16em; text-transform:uppercase; color:#8995a2;"
+                  >
+                    ЗАКАЗ
+                  </td>
+
+                </tr>
+              </table>
+
+            </td>
+          </tr>
+
+
+          <!-- ====================================================
+               HERO
+               ==================================================== -->
+
+          <tr>
+            <td style="padding:42px 36px 34px;">
+
+              <table
+                width="100%"
+                cellpadding="0"
+                cellspacing="0"
+                border="0"
+              >
+
+                <tr>
+                  <td style="padding-bottom:15px;">
+
+                    <span
+                      style="display:inline-block; width:34px; height:1px; background:#aeb8c2; vertical-align:middle; margin-right:10px;"
+                    ></span>
+
+                    <span
+                      style="font-size:9px; font-weight:700; letter-spacing:.26em; text-transform:uppercase; color:#596672;"
+                    >
+                      ОФОРМЛЕНИЕ ЗАКАЗА
+                    </span>
+
+                  </td>
+                </tr>
+
+                <tr>
+                  <td>
+
+                    <h1
+                      style="margin:0; padding:0; color:#17222c; font-size:48px; line-height:.94; font-weight:300; letter-spacing:-.055em;"
+                    >
+                      Спасибо за
+                      <br>
+                      <span style="font-weight:800;">доверие</span>
+                    </h1>
+
+                  </td>
+                </tr>
+
+                <tr>
+                  <td style="padding-top:18px;">
+
+                    <p
+                      style="margin:0; color:#71808e; font-size:13px; line-height:1.6; font-weight:400;"
+                    >
+                      Ваш заказ успешно оформлен.
+                      <br>
+                      Мы свяжемся с вами для подтверждения деталей.
+                    </p>
+
+                  </td>
+                </tr>
+
+              </table>
+
+            </td>
+          </tr>
+
+
+          <!-- ====================================================
+               ORDER META
+               ==================================================== -->
+
+          <tr>
+            <td style="padding:0 36px 26px;">
+
+              <table
+                width="100%"
+                cellpadding="0"
+                cellspacing="0"
+                border="0"
+                style="border-top:1px solid #e0e5e9; border-bottom:1px solid #e0e5e9;"
+              >
+
+                <tr>
+
+                  <td
+                    width="50%"
+                    style="padding:17px 0; vertical-align:top;"
+                  >
+                    <div
+                      style="font-size:8px; font-weight:700; letter-spacing:.2em; text-transform:uppercase; color:#929eaa; margin-bottom:6px;"
+                    >
+                      НОМЕР ЗАКАЗА
+                    </div>
+
+                    <div
+                      style="font-size:14px; font-weight:700; color:#17222c; letter-spacing:-.01em;"
+                    >
+                      {{ order.number }}
+                    </div>
+                  </td>
+
+                  <td
+                    width="50%"
+                    align="right"
+                    style="padding:17px 0; vertical-align:top;"
+                  >
+                    <div
+                      style="font-size:8px; font-weight:700; letter-spacing:.2em; text-transform:uppercase; color:#929eaa; margin-bottom:6px;"
+                    >
+                      ДАТА
+                    </div>
+
+                    <div
+                      style="font-size:14px; font-weight:500; color:#4f5d6a;"
+                    >
+                      {{ order.created_at|date:"d.m.Y H:i" }}
+                    </div>
+                  </td>
+
+                </tr>
+
+              </table>
+
+            </td>
+          </tr>
+
+
+          <!-- ====================================================
+               TOTAL
+               ==================================================== -->
+
+          <tr>
+            <td style="padding:0 36px 28px;">
+
+              <table
+                width="100%"
+                cellpadding="0"
+                cellspacing="0"
+                border="0"
+                style="background:#f3f5f7; border:1px solid #dbe1e6; border-radius:18px;"
+              >
+
+                <tr>
+
+                  <td style="padding:24px 22px;">
+
+                    <div
+                      style="font-size:8px; font-weight:700; letter-spacing:.22em; text-transform:uppercase; color:#7f8b97; margin-bottom:8px;"
+                    >
+                      К ОПЛАТЕ
+                    </div>
+
+                    <div
+                      style="font-size:13px; font-weight:400; color:#697784;"
+                    >
+                      Итоговая сумма заказа
+                    </div>
+
+                  </td>
+
+                  <td
+                    align="right"
+                    style="padding:24px 22px;"
+                  >
+
+                    <div
+                      style="font-size:29px; line-height:1; font-weight:800; letter-spacing:-.045em; color:#17222c; white-space:nowrap;"
+                    >
+                      {{ order.total_amount|floatformat:0 }} ₽
+                    </div>
+
+                  </td>
+
+                </tr>
+
+              </table>
+
+            </td>
+          </tr>
+
+
+          <!-- ====================================================
+               DETAILS TITLE
+               ==================================================== -->
+
+          <tr>
+            <td style="padding:0 36px 14px;">
+
+              <div
+                style="font-size:9px; font-weight:700; letter-spacing:.24em; text-transform:uppercase; color:#8995a1;"
+              >
+                ДАННЫЕ ЗАКАЗА
+              </div>
+
+            </td>
+          </tr>
+
+
+          <!-- ====================================================
+               CONTACT DETAILS
+               ==================================================== -->
+
+          <tr>
+            <td style="padding:0 36px 28px;">
+
+              <table
+                width="100%"
+                cellpadding="0"
+                cellspacing="0"
+                border="0"
+                style="border:1px solid #dce2e7; border-radius:17px;"
+              >
+
+                {% if order.contact_name %}
+                <tr>
+                  <td
+                    width="38%"
+                    style="padding:14px 18px; border-bottom:1px solid #e7eaed; color:#8995a1; font-size:10px; font-weight:500;"
+                  >
+                    Имя
+                  </td>
+
+                  <td
+                    style="padding:14px 18px; border-bottom:1px solid #e7eaed; color:#17222c; font-size:12px; font-weight:600;"
+                  >
+                    {{ order.contact_name }}
+                  </td>
+                </tr>
+                {% endif %}
+
+                <tr>
+                  <td
+                    width="38%"
+                    style="padding:14px 18px; border-bottom:1px solid #e7eaed; color:#8995a1; font-size:10px; font-weight:500;"
+                  >
+                    Телефон
+                  </td>
+
+                  <td
+                    style="padding:14px 18px; border-bottom:1px solid #e7eaed; color:#17222c; font-size:12px; font-weight:600;"
+                  >
+                    {{ order.contact_phone }}
+                  </td>
+                </tr>
+
+                {% if order.contact_email %}
+                <tr>
+                  <td
+                    width="38%"
+                    style="padding:14px 18px; border-bottom:1px solid #e7eaed; color:#8995a1; font-size:10px; font-weight:500;"
+                  >
+                    Email
+                  </td>
+
+                  <td
+                    style="padding:14px 18px; border-bottom:1px solid #e7eaed; color:#17222c; font-size:12px; font-weight:600;"
+                  >
+                    {{ order.contact_email }}
+                  </td>
+                </tr>
+                {% endif %}
+
+                <tr>
+                  <td
+                    width="38%"
+                    style="padding:14px 18px; color:#8995a1; font-size:10px; font-weight:500;"
+                  >
+                    Оплата
+                  </td>
+
+                  <td
+                    style="padding:14px 18px; color:#17222c; font-size:12px; font-weight:600;"
+                  >
+                    {{ order.get_payment_method_display }}
+                  </td>
+                </tr>
+
+              </table>
+
+            </td>
+          </tr>
+
+
+          <!-- ====================================================
+               REQUISITES
+               ==================================================== -->
+
+          {% if order.requisites %}
+          <tr>
+            <td style="padding:0 36px 30px;">
+
+              <div
+                style="font-size:9px; font-weight:700; letter-spacing:.24em; text-transform:uppercase; color:#8995a1; margin-bottom:12px;"
+              >
+                РЕКВИЗИТЫ КОМПАНИИ
+              </div>
+
+              <table
+                width="100%"
+                cellpadding="0"
+                cellspacing="0"
+                border="0"
+                style="background:#f6f7f8; border-radius:16px;"
+              >
+                <tr>
+                  <td
+                    style="padding:18px; color:#586674; font-size:11px; line-height:1.65; font-weight:400; white-space:pre-wrap;"
+                  >
+                    {{ order.requisites }}
+                  </td>
+                </tr>
+              </table>
+
+            </td>
+          </tr>
+          {% endif %}
+
+
+          <!-- ====================================================
+               MANAGER NOTE
+               ==================================================== -->
+
+          <tr>
+            <td style="padding:0 36px 36px;">
+
+              <table
+                width="100%"
+                cellpadding="0"
+                cellspacing="0"
+                border="0"
+              >
+                <tr>
+
+                  <td
+                    width="8"
+                    valign="top"
+                    style="padding-top:5px;"
+                  >
+                    <span
+                      style="display:block; width:6px; height:6px; border-radius:50%; background:#17222c;"
+                    ></span>
+                  </td>
+
+                  <td
+                    style="padding-left:12px; color:#7b8895; font-size:11px; line-height:1.6; font-weight:400;"
+                  >
+                    Наш менеджер свяжется с вами в ближайшее время
+                    для подтверждения заказа и дальнейших деталей.
+                  </td>
+
+                </tr>
+              </table>
+
+            </td>
+          </tr>
+
+
+          <!-- ====================================================
+               FOOTER
+               ==================================================== -->
+
+          <tr>
+            <td style="background:#17222c; padding:25px 36px;">
+
+              <table
+                width="100%"
+                cellpadding="0"
+                cellspacing="0"
+                border="0"
+              >
+
+                <tr>
+
+                  <td
+                    style="font-size:11px; font-weight:800; letter-spacing:.22em; color:#ffffff;"
+                  >
+                    AI-DENT
+                  </td>
+
+                  <td
+                    align="right"
+                    style="font-size:8px; font-weight:600; letter-spacing:.16em; text-transform:uppercase; color:#8996a3;"
+                  >
+                    ПРОФЕССИОНАЛЬНОЕ<br>
+                    ОБОРУДОВАНИЕ
+                  </td>
+
+                </tr>
+
+              </table>
+
+              <div
+                style="height:1px; background:#34404b; margin:20px 0 16px;"
+              ></div>
+
+              <p
+                style="margin:0; color:#8794a1; font-size:9px; line-height:1.6; font-weight:400;"
+              >
+                Это автоматическое уведомление о статусе вашего заказа.
+                <br>
+                Пожалуйста, сохраните письмо для дальнейшей связи.
+              </p>
+
+            </td>
+          </tr>
+
+        </table>
+
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>

@@ -1,0 +1,514 @@
+/* ============================================================
+   ИИ-консультант: плавающая кнопка и панель чата (ТЗ §11)
+   Слои: кнопка 90 — под модалкой входа (100) и cookie-баннером (150);
+   панель 160 — над cookie-баннером, чтобы он не закрывал поле ввода, но под корзиной (200)
+   ============================================================ */
+
+.chat__fab {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 90;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 20px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: #fff;
+  font: 600 15px/1 var(--font);
+  box-shadow: var(--shadow-hover);
+  cursor: pointer;
+  transition: background .2s ease, transform .2s ease;
+}
+.chat__fab:hover { background: var(--accent-hover); transform: translateY(-1px); }
+.chat__fab svg { width: 20px; height: 20px; }
+.chat__fab[hidden] { display: none; }
+
+.chat__panel {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 160;
+  width: 400px;
+  height: min(640px, calc(100vh - 48px));
+  display: flex;
+  flex-direction: column;
+  background: rgba(255, 255, 255, .94);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-hover);
+  overflow: hidden;
+  overflow: clip; /* фокус внутри ленты не должен прокручивать саму панель */
+  font-family: var(--font);
+  color: var(--text);
+}
+.chat__panel[hidden] { display: none; }
+
+.chat__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 16px 12px 20px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.chat__title { flex: 1; min-width: 0; font-weight: 700; font-size: 16px; }
+.chat__status { display: block; margin-top: 2px; font-weight: 500; font-size: 12px; color: var(--muted); min-height: 15px; }
+.chat__new,
+.chat__x {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font: 600 13px/1 var(--font);
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.chat__new:hover,
+.chat__x:hover { background: var(--bg); color: var(--text); }
+.chat__x { font-size: 16px; }
+
+.chat__feed {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.chat__empty { margin: auto 8px; text-align: center; color: var(--muted); font-size: 14px; line-height: 1.5; }
+
+.chat-msg {
+  max-width: 85%;
+  padding: 10px 14px;
+  border-radius: 18px;
+  font-size: 14px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.chat-msg--user {
+  align-self: flex-end;
+  background: var(--accent);
+  color: #fff;
+  border-bottom-right-radius: 6px;
+  white-space: pre-wrap;
+}
+.chat-msg--assistant {
+  align-self: flex-start;
+  background: var(--surface-solid);
+  border: 1px solid var(--border-soft);
+  border-bottom-left-radius: 6px;
+}
+.chat-msg--assistant p { margin: 0 0 8px; }
+.chat-msg--assistant p:last-child { margin-bottom: 0; }
+.chat-msg--assistant ul,
+.chat-msg--assistant ol { margin: 0 0 8px; padding-left: 20px; }
+.chat-msg--assistant a { color: inherit; text-decoration: underline; }
+.chat-msg--streaming::after {
+  content: "▍";
+  margin-left: 2px;
+  animation: chat-caret 1s steps(2) infinite;
+}
+@keyframes chat-caret { 50% { opacity: 0; } }
+
+.chat-event {
+  align-self: stretch;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text-soft);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.chat-event strong { color: var(--text); }
+.chat-event a { color: var(--text); font-weight: 600; }
+
+.chat__notice {
+  margin: 0 16px 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: #fff4e5;
+  color: #7a4b00;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.chat__notice[hidden] { display: none; }
+
+.chat__form {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 8px 12px 4px 16px;
+  border-top: 1px solid var(--border-soft);
+}
+.chat__input {
+  flex: 1;
+  resize: none;
+  max-height: 140px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  font: 14px/1.45 var(--font);
+  color: var(--text);
+}
+.chat__input:focus { outline: none; border-color: var(--accent); }
+.chat__send,
+.chat__stop {
+  flex: 0 0 auto;
+  height: 42px;
+  border: none;
+  border-radius: var(--radius-sm);
+  font: 600 13px/1 var(--font);
+  cursor: pointer;
+}
+.chat__send { width: 42px; background: var(--accent); color: #fff; display: grid; place-items: center; }
+.chat__send svg { width: 18px; height: 18px; }
+.chat__send:disabled { opacity: .4; cursor: default; }
+.chat__stop { padding: 0 14px; background: var(--bg-deep); color: var(--text); }
+.chat__stop[hidden],
+.chat__send[hidden] { display: none; }
+
+.chat__hint { margin: 0; padding: 4px 16px 12px; font-size: 11px; line-height: 1.4; color: var(--muted-light); }
+
+/* Телефон: панель на весь экран; кнопка — круглая, без подписи, чтобы не закрывать «В корзину» у карточек */
+@media (max-width: 640px) {
+  .chat__fab { right: 16px; bottom: 16px; width: 56px; height: 56px; padding: 0; justify-content: center; }
+  .chat__fab svg { width: 24px; height: 24px; }
+  .chat__fab-label { display: none; }
+  .chat__panel {
+    inset: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+    height: 100dvh;
+    border-radius: 0;
+    border: none;
+  }
+  .chat-msg { max-width: 90%; }
+}
+
+/* Главная: агент недоступен — запасной поиск (ТЗ §11) */
+.agent-down {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 14px;
+  font: 500 14px/1.4 var(--font);
+  color: var(--text-soft);
+}
+.agent-down[hidden] { display: none; }
+.agent-down__search {
+  padding: 9px 16px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  text-decoration: none;
+}
+.agent-down__search:hover { background: var(--accent-hover); }
+
+/* Виджеты в ленте: карточки товаров (общая разметка с витриной) и сравнение */
+.chat-widget { align-self: stretch; }
+.chat-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+/* Стили карточки витрины лежат в catalog.css, который есть только на странице каталога, —
+   здесь их компактная копия для чата, чтобы карточки выглядели одинаково на любой странице */
+.chat-cards .product-card {
+  position: relative; display: flex; flex-direction: column; min-width: 0;
+  background: #fff; box-shadow: 0 8px 30px rgba(31, 43, 54, .05); overflow: hidden;
+}
+.chat-cards .product-card__link { display: flex; flex-direction: column; flex: 1; color: inherit; text-decoration: none; }
+.chat-cards .product-card__media { position: relative; height: 120px; background: #f4f6f8; overflow: hidden; }
+.chat-cards .product-card__media img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.chat-cards .product-card__badge {
+  position: absolute; top: 8px; left: 8px; z-index: 2; padding: 4px 7px; border-radius: 4px;
+  background: #10171d; color: #fff; font-size: 8px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+}
+.chat-cards .product-card__fav {
+  position: absolute; top: 6px; right: 6px; z-index: 2; width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 50%; background: rgba(255, 255, 255, .9); color: #8a959f; cursor: pointer;
+}
+.chat-cards .product-card__fav svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+.chat-cards .product-card__fav.is-active { color: #e25555; }
+.chat-cards .product-card__fav.is-active svg { fill: currentColor; }
+.chat-cards .product-card__body { display: flex; flex-direction: column; flex: 1; padding: 10px 10px 8px; }
+.chat-cards .product-card__brand {
+  margin: 0 0 4px; color: #9aa5af; font-size: 9px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase;
+}
+.chat-cards .product-card__name {
+  color: #1a242d; font-size: 12px; font-weight: 500; line-height: 1.35;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.chat-cards .product-card__footer { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px; margin-top: 8px; }
+.chat-cards .product-card__price { color: #10171d; font-size: 13px; font-weight: 700; letter-spacing: -.02em; }
+.chat-cards .product-card__stock { font-size: 10px; font-weight: 500; }
+.chat-cards .product-card__stock--yes { color: #2f9e6a; }
+.chat-cards .product-card__stock--no { color: #a3adb6; }
+.chat-cards .product-card__cart {
+  display: flex; align-items: center; justify-content: center; width: 100%; height: 36px;
+  border: 0; background: #10171d; color: #fff; font: 600 11px/1 var(--font); letter-spacing: .06em; cursor: pointer;
+}
+.chat-cards .product-card__cart:hover { background: #1c252e; }
+.chat-cards .product-card__cart.is-in-cart { background: #eef1f4; color: #17222c; padding: 0; }
+.chat-cards .product-card__cart-minus,
+.chat-cards .product-card__cart-plus {
+  flex: 0 0 36px; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 16px; cursor: pointer;
+}
+.chat-cards .product-card__cart-quantity { flex: 1; text-align: center; font-size: 13px; font-weight: 600; }
+
+.chat-compare__scroll { overflow-x: auto; border: 1px solid var(--border-soft); border-radius: var(--radius-sm); background: #fff; }
+.chat-compare table { border-collapse: collapse; min-width: 100%; font-size: 12px; line-height: 1.4; }
+.chat-compare th,
+.chat-compare td { padding: 8px 10px; border-bottom: 1px solid var(--border-soft); text-align: left; vertical-align: top; }
+.chat-compare thead th { min-width: 140px; font-weight: 700; color: var(--text); }
+.chat-compare tbody td + td { min-width: 140px; max-width: 220px; }
+.chat-compare thead th a { color: inherit; text-decoration: none; }
+.chat-compare thead th a:hover { text-decoration: underline; }
+.chat-compare thead th span { display: block; margin-top: 2px; font-weight: 500; color: var(--muted); }
+.chat-compare tbody td:first-child { color: var(--muted); white-space: nowrap; }
+.chat-compare tbody tr:last-child td { border-bottom: none; }
+
+.chat__lead-btn {
+  display: block;
+  margin-top: 8px;
+  padding: 8px 14px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: #fff;
+  font: 600 13px/1 var(--font);
+  cursor: pointer;
+}
+.chat-cards .product-card__price-source { flex-basis: 100%; color: #9aa5af; font-size: 10px; }
+
+/* Карточка КП и форма заявки в ленте */
+.chat-quote {
+  padding: 12px 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: #fff;
+}
+.chat-quote__title { font-weight: 700; font-size: 14px; }
+.chat-quote__meta { margin-top: 4px; color: var(--muted); font-size: 12px; }
+.chat-quote__download {
+  display: inline-block;
+  margin-top: 10px;
+  padding: 8px 14px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: #fff;
+  font: 600 13px/1 var(--font);
+  text-decoration: none;
+}
+
+.chat-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: #fff;
+}
+.chat-form__title { margin: 0 0 2px; font-weight: 700; font-size: 14px; }
+.chat-form__input {
+  padding: 9px 11px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  font: 14px/1.4 var(--font);
+}
+.chat-form__input:focus { outline: none; border-color: var(--accent); }
+.chat-form__consent { display: flex; gap: 8px; align-items: flex-start; font-size: 12px; line-height: 1.4; color: var(--text-soft); }
+.chat-form__consent a { color: inherit; }
+.chat-form__submit {
+  padding: 10px 14px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: #fff;
+  font: 600 13px/1 var(--font);
+  cursor: pointer;
+}
+.chat-form__submit:disabled { opacity: .5; cursor: default; }
+.chat-form__error { margin: 0; min-height: 0; color: #b42318; font-size: 12px; }
+.chat-form__error:empty { display: none; }
+
+/* Форма заказа: состав корзины, тип покупателя, поля по типу (ТЗ §10.2) */
+.chat-form__input[hidden] { display: none; }
+textarea.chat-form__input { resize: vertical; min-height: 40px; }
+.chat-order__items { display: flex; flex-direction: column; gap: 4px; font-size: 13px; line-height: 1.4; color: var(--text-soft); }
+.chat-order__line { display: flex; justify-content: space-between; gap: 12px; }
+.chat-order__line span:last-child { flex: 0 0 auto; white-space: nowrap; color: var(--text); }
+.chat-order__total { padding-top: 6px; margin-top: 2px; border-top: 1px solid var(--border-soft); font-weight: 700; color: var(--text); }
+.chat-order__note { margin: 0; padding: 8px 10px; border-radius: var(--radius-sm); background: #fff4e5; color: #7a4b00; font-size: 12px; line-height: 1.4; }
+.chat-order__note[hidden] { display: none; }
+.chat-order__types { display: flex; flex-wrap: wrap; gap: 6px; }
+.chat-order__types label {
+  position: relative;
+  display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px;
+  border: 1px solid var(--border-strong); border-radius: var(--radius-pill); font-size: 13px; cursor: pointer;
+}
+.chat-order__types label:has(input:checked) { border-color: var(--accent); background: var(--accent); color: #fff; }
+/* Радиокнопка внутри своей подписи: иначе при фокусе браузер прокручивает саму панель */
+.chat-order__types input { position: absolute; inset: 0; margin: 0; opacity: 0; pointer-events: none; }
+.chat-order__types label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ============================================================
+   Главная: чат на первом экране (ТЗ §11, D1).
+   До первого сообщения — заголовок и строка ввода. После него строка превращается
+   в стеклянное окно фиксированной высоты: лента листается внутри окна, строка ввода — внизу,
+   высота страницы не меняется. Цвета окна — переменными.
+   ============================================================ */
+.chat--inline {
+  --glass-bg: rgba(255, 255, 255, .58);
+  --glass-border: rgba(255, 255, 255, .75);
+  --glass-line: rgba(15, 20, 28, .08);
+  --glass-shadow: 0 30px 70px -20px rgba(15, 20, 28, .28), 0 8px 24px -8px rgba(15, 20, 28, .10);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, .7);
+  --chat-text: #10171d;
+  --chat-muted: #6b7682;
+  --bubble-bg: rgba(255, 255, 255, .9);
+  --bubble-border: rgba(15, 20, 28, .06);
+  --user-bg: #10171d;
+  --user-text: #fff;
+  --event-bg: rgba(255, 255, 255, .55);
+  --input-bg: #fff;
+  --scrollbar: rgba(15, 20, 28, .18);
+  position: relative;
+  text-align: left;
+  color: var(--chat-text);
+}
+/* --- окно: появляется с первым сообщением */
+.chat--inline.is-active {
+  display: flex;
+  flex-direction: column;
+  max-width: 1040px;
+  margin: 0 auto;
+  /* Вместе с уменьшенным заголовком укладывается в высоту первого экрана (.hero — 78vh) */
+  height: clamp(360px, calc(78vh - 108px), 860px);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(24px) saturate(150%);
+  backdrop-filter: blur(24px) saturate(150%);
+  border: 1px solid var(--glass-border);
+  border-radius: 28px;
+  box-shadow: var(--glass-shadow), var(--glass-highlight);
+  overflow: hidden;
+  overflow: clip; /* фокус внутри окна не прокручивает само окно */
+  animation: chat-window-in .35s cubic-bezier(.16, 1, .3, 1);
+}
+@keyframes chat-window-in {
+  from { opacity: .4; transform: translateY(8px) scale(.985); }
+}
+
+.chat--inline .chat__feed { display: none; }
+.chat--inline.is-active .chat__feed {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 22px 24px 12px;
+  gap: 14px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar) transparent;
+}
+.chat--inline .chat-msg { font-size: 14px; max-width: 78%; }
+.chat--inline .chat-msg--assistant {
+  background: var(--bubble-bg);
+  border-color: var(--bubble-border);
+  color: var(--chat-text);
+}
+.chat--inline .chat-msg--user { background: var(--user-bg); color: var(--user-text); }
+.chat--inline .chat-event { background: var(--event-bg); color: var(--chat-muted); }
+.chat--inline .chat-event strong,
+.chat--inline .chat-event a { color: var(--chat-text); }
+.chat--inline .chat-cards { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+.chat--inline .chat-form { max-width: 420px; }
+.chat--inline .chat-form.chat-order { max-width: 480px; }
+.chat--inline .chat-quote { max-width: 420px; }
+
+/* --- строка ввода: «пилюля» поиска; в окне — внизу, на всю ширину */
+.chat--inline .chat__composer { position: relative; z-index: 2; }
+.chat--inline.is-active .chat__composer {
+  flex: 0 0 auto;
+  padding: 12px 16px 10px;
+  border-top: 1px solid var(--glass-line);
+}
+.chat--inline .chat__notice { margin: 0 0 10px; }
+.chat--inline .chat__form {
+  align-items: flex-end;
+  padding: 8px 8px 8px 24px;
+  border-top: 1px solid rgba(255, 255, 255, .9);
+}
+.chat--inline.is-active .chat__form {
+  background: var(--input-bg);
+  border-color: var(--glass-border);
+  box-shadow: 0 6px 18px -6px rgba(15, 20, 28, .16);
+  transform: none;
+}
+.chat--inline .chat__input {
+  flex: 1;
+  min-width: 0;
+  max-height: 160px;
+  padding: 13px 4px;
+  border: none;
+  background: transparent;
+  font: 700 16px/22px var(--font);
+  letter-spacing: -0.015em;
+  color: #0f1419;
+}
+.chat--inline .chat__input::placeholder { color: #525c6d; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chat--inline .search__actions button { border: none; cursor: pointer; }
+.chat--inline .search__actions button[hidden] { display: none; }
+.chat--inline .chat__stop svg { width: 16px; height: 16px; }
+
+.chat--inline .chat__meta {
+  display: none;
+  margin: 8px 0 0;
+  align-items: center;
+  gap: 12px;
+  padding: 0 10px;
+}
+.chat--inline.is-active .chat__meta { display: flex; }
+.chat--inline .chat__status { flex: 0 0 auto; margin: 0; min-height: 0; color: var(--chat-muted); }
+.chat--inline .chat__status:empty { display: none; }
+.chat--inline .chat__hint { flex: 1; padding: 0; color: var(--chat-muted); }
+.chat--inline .chat__new { flex: 0 0 auto; margin-left: auto; color: var(--chat-muted); }
+.chat--inline .chat__new:hover { background: var(--event-bg); color: var(--chat-text); }
+
+/* Переписка началась: заголовок меньше, подсказки и картинка фона уходят — высота страницы та же */
+.hero:has(.chat--inline.is-active) .hero__title {
+  font-size: clamp(26px, 3.2vw, 36px);
+  margin-bottom: 10px;
+}
+.hero:has(.chat--inline.is-active) .hero__title br { display: none; }
+/* Подложка строки поиска не добавляет отступов вокруг окна — место отдано окну */
+.hero:has(.chat--inline.is-active) .search-block-glow { max-width: 1040px; margin-bottom: 12px; padding: 0; }
+.hero:has(.chat--inline.is-active) .search-wrap { margin-bottom: 0; }
+.hero:has(.chat--inline.is-active) .chips { display: none; }
+.hero:has(.chat--inline.is-active) .hero__tooth { opacity: .35; }
+
+@media (max-width: 1024px) {
+  .chat--inline .chat__form { height: auto; min-height: 50px; padding: 4px 6px 4px 16px; }
+}
+/* Телефон: окно на 65% экрана — сверху видны логотип и меню, снизу — начало следующего блока */
+@media (max-width: 640px) {
+  .chat--inline.is-active { height: 65vh; height: 65dvh; min-height: 320px; border-radius: 22px; }
+  .chat--inline.is-active .chat__feed { padding: 16px 14px 10px; }
+  .chat--inline.is-active .chat__composer { padding: 10px 10px 8px; }
+  .chat--inline .chat__input { font-size: 15px; padding: 10px 2px; }
+  .chat--inline .chat-msg { max-width: 90%; }
+  .chat--inline .chat-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .chat--inline .chat__hint { display: none; }
+  .hero:has(.chat--inline.is-active) .hero__title { display: none; }
+}

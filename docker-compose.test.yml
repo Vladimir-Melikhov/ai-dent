@@ -1,0 +1,15 @@
+# Окружение для scripts/run_tests.sh: данные в памяти, порты не пересекаются с рабочими
+services:
+  postgres-test:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "127.0.0.1:55432:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+
+  redis-test:
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:56379:6379"

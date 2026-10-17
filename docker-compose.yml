@@ -1,0 +1,111 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks: [dent-ai]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}"]
+    volumes:
+      - redis_data:/data
+    networks: [dent-ai]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a $$REDIS_PASSWORD ping | grep PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+
+  catalog:
+    build: ./catalog
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - media:/app/media
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    networks: [dent-ai]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 8000), 2)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  api:
+    build: ./api
+    restart: unless-stopped
+    # Только свои переменные: секреты Django и почты в контейнер api не попадают (ТЗ §15)
+    environment:
+      # Отдельная роль без доступа к ПДн; права выдаёт catalog при старте (manage.py grant_api_role)
+      DATABASE_URL: postgresql+asyncpg://${API_DB_USER}:${API_DB_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: ${REDIS_URL}
+      SITE_ORIGIN: ${SITE_ORIGIN}
+      DEBUG: ${DEBUG:-False}
+      # Лимиты и бюджет (ТЗ §7.8): пусто — значения по умолчанию из api/app/config.py
+      CHAT_MAX_MESSAGE_LENGTH: ${CHAT_MAX_MESSAGE_LENGTH:-}
+      CHAT_MESSAGES_PER_MINUTE: ${CHAT_MESSAGES_PER_MINUTE:-}
+      CHAT_MESSAGES_PER_DAY: ${CHAT_MESSAGES_PER_DAY:-}
+      CHAT_MESSAGES_PER_CONVERSATION: ${CHAT_MESSAGES_PER_CONVERSATION:-}
+      CHAT_DAILY_BUDGET_USD: ${CHAT_DAILY_BUDGET_USD:-}
+      # Claude API (ТЗ §7): пустые переменные прокси — прямое подключение
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-}
+      ANTHROPIC_PROXY_URL: ${ANTHROPIC_PROXY_URL:-}
+      ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL:-}
+      AGENT_EFFORT: ${AGENT_EFFORT:-}
+      AGENT_MAX_TOKENS: ${AGENT_MAX_TOKENS:-}
+      AGENT_MAX_TOOL_ROUNDS: ${AGENT_MAX_TOOL_ROUNDS:-}
+      AGENT_PREFIX_MISMATCH: ${AGENT_PREFIX_MISMATCH:-}
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      # Роль БД для api создаёт catalog после migrate
+      catalog: { condition: service_healthy }
+    networks: [dent-ai]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=2)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - media:/srv/media:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      catalog: { condition: service_healthy }
+      api: { condition: service_healthy }
+    networks: [dent-ai]
+
+networks:
+  dent-ai:
+
+volumes:
+  postgres_data:
+  redis_data:
+  media:
+  caddy_data:
+  caddy_config:

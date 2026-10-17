@@ -1,0 +1,24 @@
+Заказ оформлен — Ai-Dent
+
+Номер заказа: {{ order.number }}
+Дата: {{ order.created_at|date:"d.m.Y H:i" }}
+
+Позиции:
+{% for item in items %}
+- {{ item.product_name }} × {{ item.quantity }} = {{ item.line_total|floatformat:0 }} ₽
+{% endfor %}
+
+Итого: {{ order.total_amount|floatformat:0 }} ₽
+
+Контактные данные:
+{% if order.contact_name %}Имя: {{ order.contact_name }}{% endif %}
+Телефон: {{ order.contact_phone }}
+{% if order.contact_email %}Email: {{ order.contact_email }}{% endif %}
+Способ оплаты: {{ order.get_payment_method_display }}
+{% if order.requisites %}
+Реквизиты:
+{{ order.requisites }}
+{% endif %}
+
+Наш менеджер свяжется с вами для подтверждения заказа.
+Ai-Dent · Точность имеет значение.

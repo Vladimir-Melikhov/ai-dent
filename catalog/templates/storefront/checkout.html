@@ -1,0 +1,321 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Оформление заказа — Ai-Dent{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/checkout.css' %}">
+{% endblock %}
+
+{% block content %}
+
+<section class="checkout-page">
+
+  <div class="checkout-page__inner">
+
+    <!-- ====================================================
+         CHECKOUT
+         ==================================================== -->
+
+    <div class="checkout-layout" id="checkout-main-layout">
+
+      <!-- LEFT / FORM -->
+
+      <div class="checkout-main">
+
+        <!-- HERO -->
+
+        <header class="checkout-hero">
+
+          <div class="checkout-hero__eyebrow">
+            ОФОРМЛЕНИЕ ЗАКАЗА
+          </div>
+
+          <h1 class="checkout-hero__title">
+            Оформление
+            <strong>заказа</strong>
+          </h1>
+
+          <p class="checkout-hero__text">
+            Проверьте данные и подтвердите покупку.
+            <br>
+            Медицинское оборудование для профессиональной работы.
+          </p>
+
+        </header>
+
+
+        <!-- FORM -->
+
+        <div class="checkout-form" id="checkout-form">
+
+          <!-- CONTACTS -->
+
+          <section class="checkout-section">
+
+            <div class="checkout-section__top">
+              <div>
+                <h2 class="checkout-section__title">
+                  Куда отправить подтверждение
+                </h2>
+              </div>
+            </div>
+
+            <div class="checkout-fields checkout-fields--two">
+
+              <label class="checkout-field">
+                <span>Имя</span>
+
+                <input
+                  type="text"
+                  id="co-name"
+                  placeholder="Иван"
+                  autocomplete="given-name"
+                >
+              </label>
+
+              <label class="checkout-field">
+                <span>Телефон *</span>
+
+                <input
+                  type="tel"
+                  id="co-phone"
+                  placeholder="+7 (___) ___-__-__"
+                  autocomplete="tel"
+                >
+              </label>
+
+            </div>
+
+            <label class="checkout-field">
+
+              <span>Email</span>
+
+              <input
+                type="email"
+                id="co-email"
+                placeholder="example@mail.ru"
+                autocomplete="email"
+              >
+
+            </label>
+
+          </section>
+
+
+          <!-- PAYMENT -->
+
+          <section class="checkout-section checkout-section--payment">
+
+            <div class="checkout-section__top">
+              <div>
+
+                <h2 class="checkout-section__title">
+                  Способ расчёта
+                </h2>
+
+              </div>
+            </div>
+
+            <div class="checkout-payment">
+
+              <label class="checkout-payment__option">
+
+                <input
+                  type="radio"
+                  name="pay"
+                  value="invoice"
+                  checked
+                >
+
+                <span class="checkout-payment__radio"></span>
+
+                <span class="checkout-payment__text">
+                  <strong>Счёт по реквизитам</strong>
+                  <small>Для юридических лиц</small>
+                </span>
+
+              </label>
+
+
+              {% comment %}
+              Онлайн-оплата выключена до интеграции провайдера и кассы 54-ФЗ.
+              Включить вместе с ENABLED_PAYMENT_METHODS в apps/orders/views.py.
+              <label class="checkout-payment__option">
+
+                <input
+                  type="radio"
+                  name="pay"
+                  value="online"
+                >
+
+                <span class="checkout-payment__radio"></span>
+
+                <span class="checkout-payment__text">
+                  <strong>Онлайн-оплата</strong>
+                  <small>Банковской картой</small>
+                </span>
+
+              </label>
+              {% endcomment %}
+
+            </div>
+
+          </section>
+
+
+          <!-- DETAILS -->
+
+          <section class="checkout-section checkout-section--requisites">
+
+            <div class="checkout-section__top">
+              <div>
+
+                <h2 class="checkout-section__title">
+                  Реквизиты компании
+                </h2>
+
+              </div>
+            </div>
+
+            <label class="checkout-field checkout-field--textarea">
+
+              <span>
+                Данные для выставления счёта
+              </span>
+
+              <textarea
+                id="co-req"
+                rows="2"
+                placeholder="Название компании, ИНН, КПП, юридический адрес"
+              ></textarea>
+
+            </label>
+
+            <label class="auth-consent">
+              <input type="checkbox" id="co-consent">
+              <span>
+                Соглашаюсь с <a href="{% url 'storefront:privacy' %}" target="_blank" rel="noopener">политикой конфиденциальности</a>
+                и <a href="{% url 'storefront:terms' %}" target="_blank" rel="noopener">пользовательским соглашением</a>
+              </span>
+            </label>
+
+            <p
+              class="checkout-error"
+              id="co-error"
+            ></p>
+
+            <div class="checkout-submit-area">
+
+              <button
+                type="button"
+                id="co-submit"
+                class="checkout-submit"
+              >
+                <span>Подтвердить заказ</span>
+                <span class="checkout-submit__arrow">→</span>
+              </button>
+
+              <a
+                href="{% url 'storefront:catalog' %}"
+                class="checkout-back"
+              >
+                ← Вернуться в каталог
+              </a>
+
+            </div>
+
+          </section>
+
+        </div>
+
+      </div>
+
+
+      <!-- RIGHT / ORDER SUMMARY -->
+
+      <aside class="checkout-summary">
+
+        <div class="checkout-summary__head">
+
+          <div>
+
+            <span class="checkout-summary__eyebrow">
+              СОСТАВ ЗАКАЗА
+            </span>
+
+            <h2 class="checkout-summary__title">
+              Ваш выбор
+            </h2>
+
+          </div>
+
+        </div>
+
+        <div
+          class="checkout-summary__items"
+          id="co-items"
+        ></div>
+
+        <div class="checkout-summary__total">
+          <span>К оплате</span>
+          <strong id="co-total">0 ₽</strong>
+        </div>
+
+      </aside>
+
+    </div>
+
+
+    <!-- ====================================================
+         SUCCESS SCREEN
+         ==================================================== -->
+    <div class="checkout-success" id="checkout-success" hidden>
+
+      <!-- Узор оптики на фоне вместо зуба -->
+      <div class="checkout-success__pattern">
+        <div class="optics-light optics-light--one"></div>
+        <div class="optics-light optics-light--two"></div>
+        <div class="optics-light optics-light--three"></div>
+      </div>
+    
+      <div class="checkout-success__content">
+    
+        <h2>
+          Спасибо
+          <strong>за заказ</strong>
+        </h2>
+    
+        <p class="checkout-success__number">
+          Номер заказа: <strong id="co-number" style="color: #17222c;"></strong>
+        </p>
+    
+        <p class="checkout-success__desc">
+          Мы уже обрабатываем вашу заявку и свяжемся с вами в ближайшее время.
+        </p>
+
+        <p class="checkout-success__desc">
+          Счёт появится после подтверждения заказа менеджером. Если вы указали email, мы пришлём его на почту.
+        </p>
+    
+        <div class="checkout-success__actions">
+            <a href="{% url 'storefront:catalog' %}" class="checkout-submit checkout-submit--success">
+              Вернуться в каталог
+            </a>
+          </div>
+      </div>
+    
+    </div>
+
+  </div>
+
+</section>
+
+{% endblock %}
+
+{% block scripts %}
+<script
+  type="module"
+  src="{% static 'js/checkout.js' %}"
+></script>
+{% endblock %}

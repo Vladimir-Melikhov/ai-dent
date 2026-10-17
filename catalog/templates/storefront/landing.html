@@ -1,0 +1,392 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+
+<section class="hero">
+  <div
+    class="hero__tooth"
+    aria-hidden="true"
+    style="pointer-events: none; position: absolute;"
+  >
+    <img src="{% static 'img/teeth.png' %}" alt="">
+  </div>
+
+  <div
+    class="hero__content"
+    style="position: relative; z-index: 10;"
+  >
+    <h1 class="hero__title">
+      ИИ подберёт<br>
+      для вас оборудование
+    </h1>
+
+    <div
+      class="search-block-glow"
+      style="position: relative; z-index: 20;"
+    >
+      <div class="search-wrap">
+
+        {% if chat_widget_enabled and not agent_unavailable %}
+        <!-- ИИ-консультант на первом экране: строка ввода, после первого сообщения — лента прямо на странице (ТЗ §11, D1) -->
+        <div class="chat chat--inline" id="chat-widget" data-mode="inline"
+             data-has-dialog="{% if chat_has_dialog %}1{% else %}0{% endif %}">
+          {% csrf_token %}
+          <div class="chat__feed" id="chat-feed" aria-live="polite"></div>
+          <div class="chat__composer">
+            <div class="chat__notice" id="chat-notice" role="status" hidden></div>
+            <form class="search chat__form" id="chat-form" action="{% url 'storefront:catalog' %}" method="get">
+              <textarea class="chat__input" id="chat-input" name="q" rows="1" maxlength="2000"
+                        placeholder="Опишите задачу — например, микроскоп для эндодонтии"
+                        aria-label="Вопрос консультанту" autocomplete="off"></textarea>
+              <div class="search__actions">
+                <button type="submit" class="chat__send" id="chat-send" aria-label="Отправить">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M5 12h14M13 6l6 6-6 6"></path>
+                  </svg>
+                </button>
+                <button type="button" class="chat__stop" id="chat-stop" aria-label="Остановить ответ" hidden>
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor"></rect></svg>
+                </button>
+              </div>
+            </form>
+            <div class="chat__meta">
+              <span class="chat__status" id="chat-status" aria-live="polite"></span>
+              <span class="chat__hint">Не указывайте в чате телефон и другие личные данные — для них есть форма.</span>
+              <button type="button" class="chat__new" id="chat-new">Новый диалог</button>
+            </div>
+          </div>
+        </div>
+        {% else %}
+        <form
+          class="search"
+          id="hero-search"
+          action="{% url 'storefront:catalog' %}"
+          method="get"
+        >
+          <span class="search__icon" aria-hidden="true">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <circle cx="11" cy="11" r="7"></circle>
+              <path d="M21 21l-4.3-4.3"></path>
+            </svg>
+          </span>
+
+          <input
+            type="text"
+            name="q"
+            id="search-input"
+            placeholder="Найти оборудование, инструмент, материалы…"
+            aria-label="Поиск"
+            autocomplete="off"
+          >
+
+          <div class="search__actions">
+            <button
+              type="submit"
+              aria-label="Искать"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M5 12h14M13 6l6 6-6 6"></path>
+              </svg>
+            </button>
+          </div>
+        </form>
+        {% endif %}
+
+        {% if chat_widget_enabled %}
+        <!-- Агент недоступен — запасной поиск по каталогу (ТЗ §11) -->
+        <div class="agent-down" id="agent-down" {% if not agent_unavailable %}hidden{% endif %}>
+          <span class="agent-down__text">Агент временно не работает</span>
+          <a class="agent-down__search" id="agent-down-search" href="{% url 'storefront:catalog' %}">Поиск по каталогу</a>
+        </div>
+        {% endif %}
+
+      </div>
+
+      <div
+        class="chips"
+        style="position: relative; z-index: 30;"
+      >
+        <button
+          type="button"
+          class="chip"
+          data-q="наконечник"
+        >
+          Наконечники
+        </button>
+
+        <button
+          type="button"
+          class="chip"
+          data-q="установка"
+        >
+          Установки
+        </button>
+
+        <button
+          type="button"
+          class="chip"
+          data-q="рентген"
+        >
+          Рентген и диагностика
+        </button>
+
+        <button
+          type="button"
+          class="chip"
+          data-q="стерилиз"
+        >
+          Стерилизация
+        </button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     01 — ОПТИКА (НЕ ТРОГАЕМ)
+     ============================================================ -->
+
+     <section
+     class="cat-section cat-section--feature"
+     data-category="optika"
+   >
+   
+     <div class="cat-panel cat-panel--feature">
+   
+       <!-- Световые линии -->
+       <div class="optics-light optics-light--one" aria-hidden="true"></div>
+       <div class="optics-light optics-light--two" aria-hidden="true"></div>
+       <div class="optics-light optics-light--three" aria-hidden="true"></div>
+   
+       <!-- Контент -->
+       <div class="optics-content">
+   
+         <div class="optics-copy">
+           <div class="optics-eyebrow">
+             ТОЧНОСТЬ. ЧЁТКОСТЬ. КАЖДАЯ ДЕТАЛЬ.
+           </div>
+           <h3 class="optics-heading">
+             Оптика
+           </h3>
+           <p class="optics-description">
+             Современные оптические решения
+             для максимальной точности диагностики
+             и комфорта в работе.
+           </p>
+           <a href="{% url 'storefront:catalog' %}?category=optika" class="optics-button">
+             <span>Перейти к категории</span>
+             <span class="optics-button__arrow">→</span>
+           </a>
+         </div>
+   
+         <div class="optics-product" aria-hidden="true">
+           <img src="{% static 'img/micro.png' %}" alt="">
+         </div>
+   
+         <div class="optics-side">
+           <div class="optics-side__line"></div>
+           <div class="optics-side__title">Решения</div>
+           <a href="{% url 'storefront:catalog' %}?category=optika&q=микроскоп" class="optics-side__item">Микроскопы</a>
+           <a href="{% url 'storefront:catalog' %}?category=optika&q=лупы" class="optics-side__item">Лупы</a>
+           <a href="{% url 'storefront:catalog' %}?category=optika&q=освещение" class="optics-side__item">Освещение</a>
+           <a href="{% url 'storefront:catalog' %}?category=optika&q=аксессуары" class="optics-side__item">Аксессуары</a>
+         </div>
+   
+       </div>
+   
+     </div>
+   
+   </section>
+
+
+<!-- ============================================================
+     НАКОНЕЧНИКИ
+     ============================================================ -->
+
+<section
+     class="cat-section cat-section--feature"
+     data-category="nakonechniki"
+   >
+   
+     <div class="cat-panel cat-panel--feature">
+   
+       <!-- Уникальные световые линии для Наконечников -->
+       <div class="optics-light optics-light--one" aria-hidden="true"></div>
+       <div class="optics-light optics-light--two" aria-hidden="true"></div>
+       <div class="optics-light optics-light--three" aria-hidden="true"></div>
+   
+       <div class="optics-content">
+   
+         <div class="optics-copy">
+           <div class="optics-eyebrow">
+             СКОРОСТЬ. НАДЕЖНОСТЬ. ЭРГОНОМИКА.
+           </div>
+           <h3 class="optics-heading">
+             Наконечники
+           </h3>
+           <p class="optics-description">
+             Надежные наконечники для препарирования
+             и эндодонтии с безупречной эргономикой.
+           </p>
+           <a href="{% url 'storefront:catalog' %}?category=nakonechniki" class="optics-button">
+             <span>Перейти к категории</span>
+             <span class="optics-button__arrow">→</span>
+           </a>
+         </div>
+   
+         <div class="optics-product" aria-hidden="true">
+           <img src="{% static 'img/nsk.png' %}" alt="">
+         </div>
+   
+         <div class="optics-side">
+           <div class="optics-side__line"></div>
+           <div class="optics-side__title">Решения</div>
+           <a href="{% url 'storefront:catalog' %}?category=nakonechniki&q=турбинные" class="optics-side__item">Турбинные</a>
+           <a href="{% url 'storefront:catalog' %}?category=nakonechniki&q=понижающие" class="optics-side__item">Понижающие</a>
+           <a href="{% url 'storefront:catalog' %}?category=nakonechniki&q=хирургические" class="optics-side__item">Хирургические</a>
+           <a href="{% url 'storefront:catalog' %}?category=nakonechniki&q=аксессуары" class="optics-side__item">Аксессуары</a>
+         </div>
+   
+       </div>
+   
+     </div>
+   
+   </section>
+
+
+<!-- ============================================================
+     УСТАНОВКИ
+     ============================================================ -->
+
+<section
+     class="cat-section cat-section--feature"
+     data-category="ustanovki"
+   >
+   
+     <div class="cat-panel cat-panel--feature">
+   
+       <!-- Уникальные световые линии для Установок -->
+       <div class="optics-light optics-light--one" aria-hidden="true"></div>
+       <div class="optics-light optics-light--two" aria-hidden="true"></div>
+       <div class="optics-light optics-light--three" aria-hidden="true"></div>
+   
+       <div class="optics-content">
+   
+         <div class="optics-copy">
+           <div class="optics-eyebrow">
+             КОМФОРТ. СТИЛЬ. ИНТЕГРАЦИЯ.
+           </div>
+           <h3 class="optics-heading">
+             Установки
+           </h3>
+           <p class="optics-description">
+             Современные стоматологические установки
+             для комфорта врача и пациента.
+           </p>
+           <a href="{% url 'storefront:catalog' %}?category=ustanovki" class="optics-button">
+             <span>Перейти к категории</span>
+             <span class="optics-button__arrow">→</span>
+           </a>
+         </div>
+   
+         <div class="optics-product" aria-hidden="true">
+           <img src="{% static 'img/sirona.png' %}" alt="">
+         </div>
+   
+         <div class="optics-side">
+           <div class="optics-side__line"></div>
+           <div class="optics-side__title">Решения</div>
+           <a href="{% url 'storefront:catalog' %}?category=ustanovki&q=премиум" class="optics-side__item">Премиум класс</a>
+           <a href="{% url 'storefront:catalog' %}?category=ustanovki&q=стандарт" class="optics-side__item">Стандарт</a>
+           <a href="{% url 'storefront:catalog' %}?category=ustanovki&q=хирургия" class="optics-side__item">Хирургические</a>
+           <a href="{% url 'storefront:catalog' %}?category=ustanovki&q=модули" class="optics-side__item">Модули</a>
+         </div>
+   
+       </div>
+   
+     </div>
+   
+   </section>
+
+
+<!-- ============================================================
+     ЦИФРОВОЙ ОТДЕЛ
+     ============================================================ -->
+
+<section
+     class="cat-section cat-section--feature"
+     data-category="skanery"
+   >
+   
+     <div class="cat-panel cat-panel--feature">
+   
+       <!-- Уникальные световые линии для Цифрового отдела -->
+       <div class="optics-light optics-light--one" aria-hidden="true"></div>
+       <div class="optics-light optics-light--two" aria-hidden="true"></div>
+       <div class="optics-light optics-light--three" aria-hidden="true"></div>
+   
+       <div class="optics-content">
+   
+         <div class="optics-copy">
+           <div class="optics-eyebrow">
+             ИННОВАЦИИ. СКАНИРОВАНИЕ. БУДУЩЕЕ.
+           </div>
+           <h3 class="optics-heading">
+             Цифровой отдел
+           </h3>
+           <p class="optics-description">
+             Интраоральные сканеры и цифровые системы
+             для моделирования и точной диагностики.
+           </p>
+           <a href="{% url 'storefront:catalog' %}?category=skanery" class="optics-button">
+             <span>Весь отдел</span>
+             <span class="optics-button__arrow">→</span>
+           </a>
+         </div>
+   
+         <div class="optics-product" aria-hidden="true">
+           <img src="{% static 'img/scaner.png' %}" alt="">
+         </div>
+   
+         <div class="optics-side">
+           <div class="optics-side__line"></div>
+           <div class="optics-side__title">Решения</div>
+           <a href="{% url 'storefront:catalog' %}?category=skanery&q=сканеры" class="optics-side__item">Сканеры</a>
+           <a href="{% url 'storefront:catalog' %}?category=skanery&q=принтеры" class="optics-side__item">3D Принтеры</a>
+           <a href="{% url 'storefront:catalog' %}?category=skanery&q=софт" class="optics-side__item">ПО и софт</a>
+           <a href="{% url 'storefront:catalog' %}?category=skanery&q=аксессуары" class="optics-side__item">Аксессуары</a>
+         </div>
+   
+       </div>
+   
+     </div>
+   
+   </section>
+
+
+<div class="catalog-end-line"></div>
+
+{% endblock %}
+
+
+{% block scripts %}
+
+<script
+  type="module"
+  src="{% static 'js/landing.js' %}"
+></script>
+
+{% endblock %}

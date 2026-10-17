@@ -1,0 +1,231 @@
+{% load static %}
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="only light">
+  <title>{% block title %}Ai-Dent — оборудование для стоматологии{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'css/fonts.css' %}">
+  <link rel="stylesheet" href="{% static 'css/main.css' %}">
+  <link rel="stylesheet" href="{% static 'css/auth.css' %}">
+  <link rel="stylesheet" href="{% static 'css/drawer.css' %}">
+  <link rel="stylesheet" href="{% static 'css/footer.css' %}">
+  <link rel="stylesheet" href="{% static 'css/cookie.css' %}">
+  {% if chat_widget_enabled %}<link rel="stylesheet" href="{% static 'css/chat.css' %}">{% endif %}
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+  <div class="bg" aria-hidden="true"></div>
+
+  <header class="header">
+    <a href="{% url 'storefront:landing' %}" class="header__logo">
+      <img src="{% static 'img/logo.png' %}" alt="Ai-Dent">
+    </a>
+
+    <nav class="header__nav">
+      <a href="{% url 'storefront:catalog' %}">Каталог</a>
+      <a href="{% url 'storefront:delivery' %}">Доставка</a>
+      <a href="{% url 'storefront:about' %}">О нас</a>
+    </nav>
+
+    <div class="header__actions">
+      {% if request.user.is_authenticated %}
+        <span class="header__user">{{ request.user.phone }}</span>
+        <form method="post" action="{% url 'accounts:logout' %}">
+          {% csrf_token %}
+          <button type="submit" class="header__auth">Выйти</button>
+        </form>
+      {% else %}
+        <button type="button" class="header__auth" id="auth-open">Войти</button>
+      {% endif %}
+
+      <button type="button" class="header__cart" id="cart-open" aria-label="Корзина">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="9" cy="21" r="1"></circle><circle cx="18" cy="21" r="1"></circle>
+          <path d="M3 3h2l2.4 12.2a2 2 0 0 0 2 1.8h8.2a2 2 0 0 0 2-1.6L21 8H6"></path>
+        </svg>
+        <span class="header__cart-badge" id="cart-badge" hidden>0</span>
+      </button>
+    </div>
+
+    <button type="button" class="header__burger" id="nav-toggle" aria-label="Меню" aria-expanded="false" hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 6h18M3 12h18M3 18h18"></path>
+      </svg>
+    </button>
+  </header>
+
+  <!-- Мобильное меню (выезжающая панель) -->
+  <div class="mobnav" id="mobnav" hidden>
+    <div class="mobnav__overlay" id="mobnav-overlay"></div>
+    <aside class="mobnav__panel">
+      <div class="mobnav__head">
+        <a href="{% url 'storefront:landing' %}" class="mobnav__logo">
+          <img src="{% static 'img/logo.png' %}" alt="Ai-Dent">
+        </a>
+        <button type="button" class="mobnav__x" id="mobnav-x" aria-label="Закрыть">✕</button>
+      </div>
+      <nav class="mobnav__links">
+        <a href="{% url 'storefront:catalog' %}">Каталог</a>
+        <a href="{% url 'storefront:delivery' %}">Доставка</a>
+        <a href="{% url 'storefront:about' %}">О нас</a>
+      </nav>
+      <div class="mobnav__foot">Ai-Dent — оборудование для стоматологии</div>
+    </aside>
+  </div>
+
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="site-footer">
+    <div class="site-footer__inner">
+      <a href="{% url 'storefront:landing' %}" class="site-footer__logo">
+        <img src="{% static 'img/logo.png' %}" alt="Ai-Dent">
+      </a>
+
+      <nav class="site-footer__links">
+        <a href="{% url 'storefront:catalog' %}">Каталог</a>
+        <a href="{% url 'storefront:delivery' %}">Доставка</a>
+        <a href="{% url 'storefront:about' %}">О нас</a>
+        <a href="{% url 'storefront:privacy' %}">Политика конфиденциальности</a>
+        <a href="{% url 'storefront:terms' %}">Пользовательское соглашение</a>
+      </nav>
+
+      <div class="site-footer__meta">© {% now "Y" %} Ai-Dent · ИП Мелихов В.С. · ИНН 616808573750</div>
+    </div>
+  </footer>
+
+  <!-- Cookie-баннер -->
+  <div class="cookie-banner" id="cookie-banner" hidden>
+    <div class="cookie-banner__inner">
+      <p class="cookie-banner__text">
+        Мы используем cookie для работы сайта и улучшения сервиса. Продолжая пользоваться сайтом, вы соглашаетесь
+        с <a href="{% url 'storefront:privacy' %}">Политикой конфиденциальности</a>
+        и <a href="{% url 'storefront:terms' %}">Пользовательским соглашением</a>.
+      </p>
+      <button type="button" class="cookie-banner__accept" id="cookie-accept">Принять</button>
+    </div>
+  </div>
+
+  <!-- Панель: корзина + избранное -->
+  <div class="drawer" id="drawer" hidden data-auth="{% if request.user.is_authenticated %}1{% else %}0{% endif %}" data-phone="{{ request.user.phone|default:'' }}">
+    <div class="drawer__overlay" id="drawer-close"></div>
+    <aside class="drawer__panel">
+      {% if request.user.is_authenticated %}
+      <div class="drawer__account" id="drawer-account">
+        <span class="drawer__account-phone">{{ request.user.phone }}</span>
+        <div class="drawer__account-actions">
+          <form method="post" action="{% url 'accounts:logout' %}" class="drawer__account-form">
+            {% csrf_token %}
+            <button type="submit" class="drawer__account-logout">Выйти</button>
+          </form>
+          <button type="button" class="drawer__account-delete" id="account-delete">Удалить аккаунт</button>
+        </div>
+      </div>
+      {% endif %}
+      <div class="drawer__head">
+        <div class="drawer__tabs">
+          <button class="drawer__tab is-active" data-tab="cart" id="tab-cart">Корзина</button>
+          <button class="drawer__tab" data-tab="fav" id="tab-fav">Избранное</button>
+          {% if request.user.is_authenticated %}
+          <button class="drawer__tab" data-tab="orders" id="tab-orders">Мои заказы</button>
+          {% endif %}
+        </div>
+        <button class="drawer__x" id="drawer-x" aria-label="Закрыть">✕</button>
+      </div>
+      <div class="drawer__body">
+        <div class="drawer__pane" id="pane-cart"></div>
+        <div class="drawer__pane" id="pane-fav" hidden></div>
+        {% if request.user.is_authenticated %}
+        <div class="drawer__pane" id="pane-orders" hidden></div>
+        {% endif %}
+      </div>
+      <div class="drawer__foot" id="drawer-foot" hidden>
+        <div class="drawer__total"><span>Итого</span><span id="cart-total">0 ₽</span></div>
+        <button class="drawer__checkout" id="cart-checkout">Оформить заказ</button>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Модалка входа -->
+  {% if not request.user.is_authenticated %}
+  <div class="auth-modal" id="auth-modal" hidden>
+    <div class="auth-modal__overlay" id="auth-close"></div>
+    <div class="auth-modal__card">
+      {% csrf_token %}
+      <button type="button" class="auth-modal__x" id="auth-x">✕</button>
+      <div class="auth-step" id="auth-step-phone">
+        <h2 class="auth-modal__title">Вход или регистрация</h2>
+        <p class="auth-modal__sub">Введите номер телефона — вышлем код</p>
+        <input type="tel" id="auth-phone" class="auth-input" placeholder="+7 999 123 45 67" autocomplete="tel">
+        <label class="auth-consent">
+          <input type="checkbox" id="auth-consent">
+          <span>
+            Соглашаюсь с <a href="{% url 'storefront:privacy' %}" target="_blank" rel="noopener">политикой конфиденциальности</a>
+            и <a href="{% url 'storefront:terms' %}" target="_blank" rel="noopener">пользовательским соглашением</a>
+          </span>
+        </label>
+        <button type="button" id="auth-send" class="auth-btn">Получить код</button>
+        <p class="auth-error" id="auth-error-phone"></p>
+      </div>
+      <div class="auth-step" id="auth-step-code" hidden>
+        <h2 class="auth-modal__title">Введите код</h2>
+        <p class="auth-modal__sub" id="auth-code-sub">Код отправлен на телефон</p>
+        <input type="text" id="auth-code" class="auth-input" placeholder="0000" inputmode="numeric" maxlength="4">
+        <button type="button" id="auth-verify" class="auth-btn">Войти</button>
+        <button type="button" id="auth-back" class="auth-link">Изменить номер</button>
+        <p class="auth-error" id="auth-error-code"></p>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if chat_widget_enabled and not chat_inline %}
+  <!-- ИИ-консультант (ТЗ §11); на главной чат встроен в страницу -->
+  <div class="chat" id="chat-widget">
+    {% csrf_token %}
+    <button type="button" class="chat__fab" id="chat-open" aria-controls="chat-panel" aria-expanded="false" aria-label="Консультант">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-4.9A8 8 0 1 1 21 12z"></path>
+      </svg>
+      <span class="chat__fab-label">Консультант</span>
+    </button>
+    <section class="chat__panel" id="chat-panel" role="dialog" aria-label="ИИ-консультант" hidden>
+      <header class="chat__head">
+        <div class="chat__title">
+          Консультант Ai-Dent
+          <span class="chat__status" id="chat-status" aria-live="polite"></span>
+        </div>
+        <button type="button" class="chat__new" id="chat-new">Новый диалог</button>
+        <button type="button" class="chat__x" id="chat-close" aria-label="Закрыть">✕</button>
+      </header>
+      <div class="chat__feed" id="chat-feed" aria-live="polite"></div>
+      <div class="chat__notice" id="chat-notice" role="status" hidden></div>
+      <form class="chat__form" id="chat-form">
+        <textarea class="chat__input" id="chat-input" rows="1" maxlength="2000"
+                  placeholder="Спросите о подборе оборудования" aria-label="Сообщение консультанту"></textarea>
+        <button type="submit" class="chat__send" id="chat-send" aria-label="Отправить">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 19V5M5 12l7-7 7 7"></path>
+          </svg>
+        </button>
+        <button type="button" class="chat__stop" id="chat-stop" hidden>Остановить</button>
+      </form>
+      <p class="chat__hint">Не указывайте в чате телефон и другие личные данные — для них есть форма.</p>
+    </section>
+  </div>
+  {% endif %}
+
+  {% block scripts %}{% endblock %}
+
+  <script type="module" src="{% static 'js/drawer.js' %}"></script>
+  {% if chat_widget_enabled %}<script type="module" src="{% static 'js/chat.js' %}"></script>{% endif %}
+  <script src="{% static 'js/cookie.js' %}"></script>
+  <script src="{% static 'js/nav.js' %}"></script>
+  {% if not request.user.is_authenticated %}
+  <script src="{% static 'js/auth.js' %}"></script>
+  {% endif %}
+</body>
+</html>

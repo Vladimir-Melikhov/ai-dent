@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Товар — Ai-Dent{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/product.css' %}">
+{% endblock %}
+
+{% block content %}
+
+<!-- ЭТОТ БЛОК ОБЯЗАТЕЛЬНО -->
+<div class="bg"></div>
+
+<main
+  id="product-root"
+  class="product-page"
+  data-slug="{{ slug }}"
+>
+  <div class="product-page__tooth">
+    <img src="{% static 'img/teeth.png' %}" alt="">
+  </div>
+
+  <div class="product-loading">
+    <span></span>
+    <span>Загрузка</span>
+  </div>
+</main>
+
+{% endblock %}
+
+{% block scripts %}
+<script type="module" src="{% static 'js/product.js' %}"></script>
+{% endblock %}

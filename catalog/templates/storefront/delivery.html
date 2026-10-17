@@ -1,0 +1,334 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Доставка и оплата — Ai-Dent{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/product.css' %}">
+<style>
+  .product-page__tooth {
+    opacity: 0.28 !important;
+  }
+
+  .info-page {
+    position: relative;
+    z-index: 2;
+    max-width: 1040px;
+    margin: 0 auto;
+    padding: 64px 24px 120px;
+  }
+
+  .info-hero__eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-family: "Instrument Sans", sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .22em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 18px;
+  }
+
+  .info-hero__eyebrow::before {
+    content: "";
+    width: 28px;
+    height: 1px;
+    background: var(--muted-light);
+  }
+
+  .info-hero__title {
+    font-family: var(--font);
+    font-size: clamp(32px, 5vw, 52px);
+    font-weight: 200;
+    letter-spacing: -.045em;
+    line-height: 1.08;
+    color: var(--text);
+    margin: 0 0 18px;
+  }
+
+  .info-hero__title strong {
+    font-weight: 600;
+    font-style: italic;
+    color: var(--text);
+  }
+
+  .info-hero__lead {
+    font-size: 16.5px;
+    line-height: 1.65;
+    font-weight: 550;
+    color: #2a313c;
+    max-width: 620px;
+    margin: 0 0 52px;
+  }
+
+  .info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 18px;
+    margin-bottom: 52px;
+  }
+
+  .info-card {
+    background: rgba(255, 255, 255, .72);
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-md);
+    padding: 28px 26px;
+    box-shadow: var(--shadow-glass);
+    transition: transform .28s cubic-bezier(.16,1,.3,1), box-shadow .28s ease, background .28s ease;
+  }
+
+  .info-card:hover {
+    transform: translateY(-4px);
+    background: rgba(255, 255, 255, .92);
+    box-shadow: var(--shadow-hover);
+  }
+
+  .info-card__icon {
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-sm);
+    display: grid;
+    place-items: center;
+    background: rgba(15, 20, 28, .06);
+    color: var(--text);
+    margin-bottom: 18px;
+  }
+
+  .info-card__icon svg { width: 22px; height: 22px; }
+
+  .info-card__title {
+    font-family: var(--font);
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--text);
+    margin: 0 0 8px;
+  }
+
+  .info-card__text {
+    font-size: 14.5px;
+    line-height: 1.55;
+    color: var(--muted);
+    margin: 0;
+  }
+
+  .info-block {
+    background: rgba(255, 255, 255, .72);
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-lg);
+    padding: 34px 32px;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow-glass);
+  }
+
+  .info-block__title {
+    font-family: var(--font);
+    font-size: 21px;
+    font-weight: 800;
+    letter-spacing: -.02em;
+    color: var(--text);
+    margin: 0 0 18px;
+  }
+
+  .info-steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 16px;
+  }
+
+  .info-steps li {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+  }
+
+  .info-steps__num {
+    flex: 0 0 auto;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    font-weight: 700;
+    font-size: 13px;
+    display: grid;
+    place-items: center;
+  }
+
+  .info-steps__body b {
+    display: block;
+    color: var(--text);
+    font-weight: 700;
+    margin-bottom: 2px;
+  }
+
+  .info-steps__body span {
+    color: var(--muted);
+    font-size: 14.5px;
+    line-height: 1.5;
+  }
+
+  .info-note {
+    font-size: 13.5px;
+    color: var(--muted-light);
+    margin-top: 22px;
+    padding-top: 18px;
+    border-top: 1px solid var(--border-soft);
+  }
+
+  .info-cta {
+    text-align: center;
+    padding: 12px 0 0;
+  }
+
+  .info-cta a {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--accent);
+    color: #fff;
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 13.5px;
+    letter-spacing: -.01em;
+    padding: 14px 28px;
+    border-radius: var(--radius-pill);
+    box-shadow: 0 12px 28px rgba(15, 20, 28, .18);
+    transition: transform .2s ease, background .2s ease, box-shadow .2s ease;
+  }
+
+  .info-cta a:hover { transform: translateY(-2px); background: var(--accent-hover); }
+
+  @media (max-width: 640px) {
+    .info-page { padding: 40px 16px 72px; }
+    .info-hero__lead { margin-bottom: 32px; }
+    .info-grid { margin-bottom: 32px; }
+    .info-card { padding: 22px 20px; }
+    .info-block { padding: 24px 20px; }
+    .product-page__tooth { opacity: .35; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="product-page__tooth">
+  <img src="{% static 'img/teeth.png' %}" alt="">
+</div>
+
+<section class="info-page">
+
+  <div class="info-hero__eyebrow">Доставка и оплата</div>
+  <h1 class="info-hero__title">Доставим оборудование<br><strong>по всей России</strong></h1>
+  <p class="info-hero__lead">
+    Работаем с клиниками и частными кабинетами.
+    Аккуратная упаковка, страхование груза и сопровождение заказа — от оформления до получения.
+  </p>
+
+  <div class="info-grid">
+
+    <div class="info-card">
+      <div class="info-card__icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 6L9 17l-5-5"></path>
+        </svg>
+      </div>
+      <div class="info-card__title">Самовывоз</div>
+      <p class="info-card__text">Забрать заказ можно в Москве после подтверждения и оплаты. Будни до 17:30 — адрес и время согласуем с менеджером.</p>
+    </div>
+
+    <div class="info-card">
+      <div class="info-card__icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="1" y="3" width="15" height="13"></rect>
+          <path d="M16 8h4l3 3v5h-7V8z"></path>
+          <circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle>
+        </svg>
+      </div>
+      <div class="info-card__title">Курьер по Москве</div>
+      <p class="info-card__text">Доставка курьером на следующий рабочий день. Разгрузка и подъём — по согласованию.</p>
+    </div>
+
+    <div class="info-card">
+      <div class="info-card__icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <path d="M2 12h20M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20z"></path>
+        </svg>
+      </div>
+      <div class="info-card__title">Транспортная компания</div>
+      <p class="info-card__text">СДЭК, ПЭК, Деловые линии — до терминала или до двери по всей России.</p>
+    </div>
+
+  </div>
+
+  <div class="info-block">
+    <h2 class="info-block__title">Как проходит заказ</h2>
+    <ol class="info-steps">
+      <li>
+        <span class="info-steps__num">1</span>
+        <div class="info-steps__body">
+          <b>Оформление</b>
+          <span>Добавляете товары в корзину и оставляете контакты на странице оформления.</span>
+        </div>
+      </li>
+      <li>
+        <span class="info-steps__num">2</span>
+        <div class="info-steps__body">
+          <b>Подтверждение</b>
+          <span>Менеджер связывается с вами, уточняет наличие, сроки и способ доставки.</span>
+        </div>
+      </li>
+      <li>
+        <span class="info-steps__num">3</span>
+        <div class="info-steps__body">
+          <b>Оплата</b>
+          <span>По счёту для юридических лиц или онлайн картой для физических лиц.</span>
+        </div>
+      </li>
+      <li>
+        <span class="info-steps__num">4</span>
+        <div class="info-steps__body">
+          <b>Отправка</b>
+          <span>Отгружаем заказ, передаём трек-номер и остаёмся на связи до получения.</span>
+        </div>
+      </li>
+    </ol>
+  </div>
+
+  <div class="info-block">
+    <h2 class="info-block__title">Способы оплаты</h2>
+    <ol class="info-steps">
+      <li>
+        <span class="info-steps__num">₽</span>
+        <div class="info-steps__body">
+          <b>По счёту</b>
+          <span>Для юридических лиц и ИП — выставляем счёт по реквизитам, работаем с НДС и без.</span>
+        </div>
+      </li>
+      <li>
+        <span class="info-steps__num">₽</span>
+        <div class="info-steps__body">
+          <b>Онлайн-оплата</b>
+          <span>Банковской картой для физических лиц — быстро и безопасно.</span>
+        </div>
+      </li>
+    </ol>
+  </div>
+
+  <div class="info-cta">
+    <a href="{% url 'storefront:catalog' %}">
+      Перейти в каталог
+      <span aria-hidden="true">→</span>
+    </a>
+  </div>
+
+</section>
+{% endblock %}

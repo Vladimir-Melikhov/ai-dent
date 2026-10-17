@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Каталог — Ai-Dent{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/catalog.css' %}">
+{% endblock %}
+
+{% block content %}
+
+<section class="catalog-hero">
+
+  <div class="catalog-hero__content">
+    <div class="catalog-hero__label">КАТАЛОГ</div>
+    <h1 class="catalog-hero__title">
+      <span>Найди своё</span>
+      <em>оборудование.</em>
+    </h1>
+  </div>
+
+  <div class="catalog-hero__microscope">
+    <div class="optics-light optics-light--one" aria-hidden="true"></div>
+    <div class="optics-light optics-light--two" aria-hidden="true"></div>
+    <div class="optics-light optics-light--three" aria-hidden="true"></div>
+    <img src="{% static 'img/micro.png' %}" alt="Стоматологический микроскоп">
+  </div>
+
+</section>
+
+
+<section class="catalog-section">
+
+  <div class="catalog-tools">
+
+    <!-- SEARCH -->
+    <form
+      class="catalog-search"
+      id="catalog-search-form"
+      action="{% url 'storefront:catalog' %}"
+      method="get"
+    >
+      <svg class="catalog-search__icon" viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="11" cy="11" r="7"></circle>
+        <path d="M20 20L16.5 16.5"></path>
+      </svg>
+
+      <input
+        id="f-q"
+        type="search"
+        name="q"
+        placeholder="Поиск оборудования..."
+        autocomplete="off"
+      >
+
+      <button type="button" id="catalog-search-submit">
+        <span>ПОИСК</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M5 12H19"></path>
+          <path d="M13 6L19 12L13 18"></path>
+        </svg>
+      </button>
+    </form>
+
+
+    <!-- FILTERS -->
+    <div class="catalog-filters">
+
+      <div class="catalog-filter">
+        <span class="catalog-filter__label">КАТЕГОРИЯ</span>
+        <div class="catalog-select-wrap">
+          <select id="f-category">
+            <option value="">Все категории</option>
+          </select>
+          <svg class="catalog-select-arrow" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M6 9L12 15L18 9"></path>
+          </svg>
+        </div>
+      </div>
+
+      <div class="catalog-filter">
+        <span class="catalog-filter__label">БРЕНД</span>
+        <div class="catalog-select-wrap">
+          <select id="f-brand">
+            <option value="">Все бренды</option>
+          </select>
+          <svg class="catalog-select-arrow" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M6 9L12 15L18 9"></path>
+          </svg>
+        </div>
+      </div>
+
+      <div class="catalog-filter">
+        <span class="catalog-filter__label">ЦЕНА</span>
+        <div class="catalog-price">
+          <div class="catalog-price__field">
+            <input id="f-price-min" type="number" placeholder="От" min="0">
+            <span>₽</span>
+          </div>
+          <span class="catalog-price__dash">—</span>
+          <div class="catalog-price__field">
+            <input id="f-price-max" type="number" placeholder="До" min="0">
+            <span>₽</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="catalog-stock">
+        <span class="catalog-filter__label">НАЛИЧИЕ</span>
+        <div class="catalog-stock__row">
+          <input id="f-instock" type="checkbox">
+          <label class="catalog-toggle" for="f-instock">
+            <span></span>
+          </label>
+        </div>
+      </div>
+
+      <button class="catalog-filters__advanced" type="button" aria-label="Дополнительные фильтры">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+
+    </div>
+  </div>
+
+
+  <!-- RESULTS -->
+  <div class="catalog-results">
+
+    <!-- SIDEBAR -->
+    <aside class="catalog-sidebar">
+      <span class="catalog-sidebar__line"></span>
+      <div class="catalog-sidebar__title">КАТЕГОРИИ</div>
+
+      <nav class="catalog-categories" aria-label="Категории товаров" id="catalog-categories">
+        <a href="#" class="catalog-category catalog-category--active" data-category="">
+          <span>Все оборудование</span>
+          <strong></strong>
+        </a>
+        <!-- остальные категории подставятся из JS -->
+      </nav>
+    </aside>
+
+
+    <!-- PRODUCTS -->
+    <div class="catalog-products-area">
+
+      <div class="catalog-products-head">
+        <div>
+          <div class="catalog-products-kicker">КАТАЛОГ</div>
+          <h2 class="catalog-products-title" id="c-title">Оборудование</h2>
+        </div>
+
+        <div class="catalog-products-tools">
+          <div class="catalog-sort">
+            <span>СОРТИРОВКА</span>
+            <div class="catalog-sort__select">
+              <select id="f-sort">
+                <option value="priority">По популярности</option>
+                <option value="price_asc">Сначала дешевле</option>
+                <option value="price_desc">Сначала дороже</option>
+                <option value="name">По названию</option>
+              </select>
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M6 9L12 15L18 9"></path>
+              </svg>
+            </div>
+          </div>
+
+          <button class="catalog-view catalog-view--active" type="button" aria-label="Сетка">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="4" y="4" width="6" height="6"></rect>
+              <rect x="14" y="4" width="6" height="6"></rect>
+              <rect x="4" y="14" width="6" height="6"></rect>
+              <rect x="14" y="14" width="6" height="6"></rect>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="catalog-products" id="c-products"></div>
+      <div class="catalog-pager" id="c-pager"></div>
+      <span id="c-count" hidden>0</span>
+
+    </div>
+  </div>
+
+</section>
+
+{% endblock %}
+
+
+{% block scripts %}
+<script type="module" src="{% static 'js/catalog.js' %}"></script>
+{% endblock %}

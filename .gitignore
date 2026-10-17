@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+.env
+.env.*
+!.env.example
+/catalog/media/
+/catalog/staticfiles/
+.venv/
+venv/
+*.log
+.DS_Store
+# Дампы базы: в них персональные данные клиентов
+/backups/

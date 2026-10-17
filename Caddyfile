@@ -1,0 +1,49 @@
+{
+    auto_https off
+}
+
+:80 {
+    encode gzip
+
+    header {
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Content-Security-Policy "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; font-src 'self'; script-src 'self' https://cdn.tailwindcss.com 'unsafe-inline' 'unsafe-eval'; connect-src 'self' blob: data: ws: wss:;"
+    }
+
+    # Явные MIME-типы для 3D-моделей
+    @gltf path *.gltf *.glb
+    header @gltf Content-Type application/octet-stream
+
+    # FastAPI (внутри контейнера порт 8000, имя сервиса api)
+    handle /api/* {
+        reverse_proxy api:8000
+    }
+    handle /ws {
+        reverse_proxy api:8000
+    }
+    handle /ws/* {
+        reverse_proxy api:8000
+    }
+
+    # Счета и КП — только через Django с проверкой владельца
+    # (/cart/invoice/<номер>/ и /chat/quote/<id>/)
+    handle /media/invoices/* {
+        respond 404
+    }
+    handle /media/quotes/* {
+        respond 404
+    }
+
+    # Media — Caddy отдаёт из смонтированного тома (быстрее, чем через Django)
+    handle /media/* {
+        root * /srv
+        file_server
+    }
+
+    # Всё остальное — Django (имя сервиса catalog, порт 8000)
+    handle {
+        reverse_proxy catalog:8000
+    }
+}
