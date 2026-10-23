@@ -1,4 +1,4 @@
-"""Протокол чата (ТЗ §6) на заглушке ответа: T4, T5, T14 и «Стоп»."""
+"""Протокол чата на заглушке ответа."""
 
 import json
 import time
@@ -16,7 +16,7 @@ def assert_closed_with(ws, code):
     assert exc.value.code == code
 
 
-# --- T4: тикет и Origin
+# --- тикет и Origin
 
 
 def test_history_on_connect(client, redis_sync, conversation):
@@ -111,7 +111,7 @@ def test_daily_limit_shows_lead_button(client, redis_sync, conversation, chat_se
     assert answer["code"] == "limit_reached" and answer["show_lead_button"] is True
 
 
-# --- T5: один ход на диалог
+# --- один ход на диалог
 
 
 def test_second_message_during_turn_is_busy(client, redis_sync, conversation, fake_model):
@@ -128,7 +128,7 @@ def test_second_message_during_turn_is_busy(client, redis_sync, conversation, fa
     assert [m["content"] for m in messages_in_db(conversation["id"])] == ["первая"]
 
 
-# --- «Стоп» (ТЗ §7.11)
+# --- «Стоп»
 
 
 def test_stop_discards_current_answer(client, redis_sync, conversation, fake_model):
@@ -146,7 +146,7 @@ def test_stop_discards_current_answer(client, redis_sync, conversation, fake_mod
     assert [m["role"] for m in messages_in_db(conversation["id"])] == ["user", "user", "assistant"]
 
 
-# --- T14: несколько вкладок
+# --- несколько вкладок
 
 
 def test_both_tabs_see_the_turn(client, redis_sync, conversation):

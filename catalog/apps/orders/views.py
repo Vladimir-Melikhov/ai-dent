@@ -51,7 +51,7 @@ def cart_add(request):
     product = Product.objects.filter(id=product_id, is_active=True).first()
     if product is None:
         return JsonResponse({"error": "Товар не найден"}, status=404)
-    # Правило допуска одно для витрины и агента; остаток не проверяется — «под заказ» можно (D16)
+    # Правило допуска одно для витрины и агента; остаток не проверяется — «под заказ» можно
     reason = cart_item_allowed(product)
     if reason:
         return _bad_request(f"Нельзя добавить в корзину: {reason}")
@@ -80,7 +80,7 @@ def cart_list(request):
             "product_id": p.id,
             "name": p.name,
             "brand": p.brand.name,
-            # Цена за единицу в рублях — по единой формуле, та же, что попадёт в заказ (ТЗ §10.1)
+            # Цена за единицу в рублях — по единой формуле, та же, что попадёт в заказ
             "price": float(line.unit_price) if line.unit_price is not None else None,
             "currency": p.currency,
             "quantity": line.item.quantity,
@@ -184,7 +184,7 @@ def checkout(request):
     contact_phone = normalize_phone(data.get("contact_phone"))
     if not contact_phone:
         return _bad_request("Телефон обязателен")
-    # Согласие на обработку ПДн — как у заказа из чата: без него заказ не создаётся, время сохраняется (ТЗ §10.2)
+    # Согласие на обработку ПДн — как у заказа из чата: без него заказ не создаётся, время сохраняется
     if data.get("consent") is not True:
         return _bad_request("Подтвердите согласие с политикой конфиденциальности и соглашением")
 
@@ -220,7 +220,7 @@ def checkout(request):
     except CartInvalid as error:
         return _bad_request(str(error))
 
-    # Счёт выставляется при подтверждении менеджером, а не здесь (ТЗ §10.5)
+    # Счёт выставляется при подтверждении менеджером, а не здесь
     # письмо и telegram — только после успешного коммита заказа
     transaction.on_commit(lambda: _send_order_notifications(order.pk))
 
@@ -271,7 +271,7 @@ def invoice_download(request, number):
     order = Order.objects.filter(number=number).first()
     if not order or not _is_order_owner(request, order):
         raise Http404("Счёт не найден")
-    # До подтверждения и у отменённого заказа счёта нет (ТЗ §10.5)
+    # До подтверждения и у отменённого заказа счёта нет
     if not invoice_available(order):
         raise Http404("Счёт не найден")
     return FileResponse(
@@ -282,7 +282,7 @@ def invoice_download(request, number):
     )
 
 
-# --- заказ из чата (ТЗ §10.2): данные покупателя идут в Django и в модель не попадают
+# --- заказ из чата: данные покупателя идут в Django и в модель не попадают
 
 CHAT_ORDER_LIMITS = {
     "company_name": 255, "buyer_name": 255, "contact_name": 255, "contact_email": 254,
@@ -361,7 +361,7 @@ def _chat_order_data(data: dict) -> dict:
 @require_POST
 @transaction.atomic
 def chat_order(request):
-    """Заказ из формы в чате: статус pending_confirmation, created_by = ai, связь с диалогом (ТЗ §10.2)."""
+    """Заказ из формы в чате: статус pending_confirmation, created_by = ai, связь с диалогом."""
     from apps.chat.models import Message
     from apps.chat.services import add_event, current_conversation
 
@@ -392,7 +392,7 @@ def chat_order(request):
         return _bad_request(str(error))
 
     if conversation:
-        # В диалог — только номер и сумма: данные покупателя модели не нужны (ТЗ §6.3)
+        # В диалог — только номер и сумма: данные покупателя модели не нужны
         add_event(conversation, Message.EventType.ORDER_CREATED,
                   {"number": order.number, "total": float(order.total_amount)}, content=f"Заказ № {order.number}")
     transaction.on_commit(lambda: _send_order_notifications(order.pk))

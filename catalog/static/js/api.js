@@ -98,7 +98,7 @@ export function formatPrice(value) {
 
 const CURRENCY_SIGN = { USD: "$", EUR: "€" };
 
-/* Цена в рублях — та, что попадёт в корзину и счёт; у валютных товаров ниже — исходная (ТЗ §10.7) */
+/* Цена в рублях, у валютных товаров ниже — исходная */
 export function priceHTML(p) {
   const rub = p.price_rub ?? (p.currency && p.currency !== "RUB" ? null : p.price);
   if (rub == null) return '<span class="product-card__price">Цена по запросу</span>';
@@ -130,21 +130,9 @@ export function imageUrl(path) {
    СОСТОЯНИЕ КОРЗИНЫ
    ============================================================ */
 
-/*
- * productId -> {
- *   quantity,
- *   itemId
- * }
- */
-
 const cartState = new Map();
 
 
-/*
- * Загружаем реальное состояние корзины.
- */
-
-/* Обновить состояние кнопок из корзины на сервере — например, после изменения корзины в чате */
 export function refreshCartState() {
   return loadCartState();
 }
@@ -189,10 +177,6 @@ async function loadCartState() {
 }
 
 
-/*
- * Получить состояние конкретного товара.
- */
-
 function getCartItem(productId) {
   return cartState.get(Number(productId)) || null;
 }
@@ -209,17 +193,6 @@ function getCartQuantity(productId) {
    КНОПКА / СЧЁТЧИК КОРЗИНЫ
    ============================================================ */
 
-/*
- * Когда товара нет:
- *
- *       В корзину
- *
- * Когда товар есть:
- *
- *       −      1      +
- *
- */
-
 function renderCartControl(btn) {
   if (!btn) return;
 
@@ -228,10 +201,6 @@ function renderCartControl(btn) {
 
   const quantity = item ? item.quantity : 0;
 
-
-  /*
-   * Товар ещё не добавлен.
-   */
 
   if (quantity <= 0) {
 
@@ -247,10 +216,6 @@ function renderCartControl(btn) {
     return;
   }
 
-
-  /*
-   * Товар уже находится в корзине.
-   */
 
   btn.classList.add("is-in-cart");
 
@@ -284,10 +249,6 @@ function renderCartControl(btn) {
   );
 }
 
-
-/*
- * Обновляем все карточки.
- */
 
 function updateAllCartControls() {
   document
@@ -331,11 +292,6 @@ export function productCard(p) {
       ? "В наличии"
       : "Под заказ";
 
-
-  /*
-   * Смотрим, есть ли товар уже в корзине
-   * на момент построения карточки.
-   */
 
   const cartItem = getCartItem(p.id);
   const quantity = cartItem ? cartItem.quantity : 0;
@@ -481,11 +437,6 @@ async function changeCartQuantity(
   }
 
 
-  /*
-   * Если количество стало 0 —
-   * удаляем товар из корзины.
-   */
-
   if (newQuantity <= 0) {
 
     await postJSON("/cart/remove/", {
@@ -500,10 +451,6 @@ async function changeCartQuantity(
   }
 
 
-  /*
-   * Обычное изменение количества.
-   */
-
   const data = await postJSON(
     "/cart/update/",
     {
@@ -513,27 +460,14 @@ async function changeCartQuantity(
   );
 
 
-  /*
-   * Сохраняем новое количество.
-   */
-
   cartState.set(productId, {
     quantity: newQuantity,
     itemId: item.itemId,
   });
 
 
-  /*
-   * Обновляем именно эту кнопку.
-   */
-
   renderCartControl(btn);
 
-
-  /*
-   * Если backend вернул count —
-   * обновляем глобальный бейдж.
-   */
 
   if (
     data &&
@@ -550,10 +484,6 @@ async function changeCartQuantity(
    ============================================================ */
 
 export function bindCartButtons() {
-
-  /*
-   * Сначала получаем реальное состояние корзины.
-   */
 
   loadCartState();
 
@@ -586,11 +516,6 @@ export function bindCartButtons() {
           }
 
 
-          /*
-           * Проверяем, по какой части кнопки
-           * нажали.
-           */
-
           const actionElement =
             event.target.closest(
               "[data-cart-action]"
@@ -598,10 +523,6 @@ export function bindCartButtons() {
 
 
           try {
-
-            /*
-             * Нажатие на "-".
-             */
 
             if (
               actionElement &&
@@ -616,12 +537,6 @@ export function bindCartButtons() {
                 return;
               }
 
-
-              /*
-               * Временно блокируем кнопку,
-               * чтобы быстрые клики не отправили
-               * несколько конфликтующих запросов.
-               */
 
               btn.disabled = true;
 
@@ -638,10 +553,6 @@ export function bindCartButtons() {
               return;
             }
 
-
-            /*
-             * Нажатие на "+".
-             */
 
             if (
               actionElement &&
@@ -673,19 +584,9 @@ export function bindCartButtons() {
             }
 
 
-            /*
-             * Если это обычное "В корзину",
-             * добавляем первую единицу.
-             */
-
             const current =
               getCartItem(productId);
 
-
-            /*
-             * Защита от повторного
-             * срабатывания во время запроса.
-             */
 
             btn.disabled = true;
 
@@ -702,11 +603,7 @@ export function bindCartButtons() {
                 );
 
 
-              /*
-               * После добавления снова читаем корзину,
-               * чтобы получить реальный item_id.
-               */
-
+              // /cart/add/ не возвращает item_id
               const cartResponse =
                 await fetch("/cart/");
 
@@ -734,10 +631,6 @@ export function bindCartButtons() {
 
               } else {
 
-                /*
-                 * Запасной вариант.
-                 */
-
                 cartState.set(productId, {
                   quantity: 1,
                   itemId: null,
@@ -745,17 +638,8 @@ export function bindCartButtons() {
               }
 
 
-              /*
-               * Сразу превращаем кнопку
-               * в счётчик.
-               */
-
               renderCartControl(btn);
 
-
-              /*
-               * Обновляем бейдж корзины.
-               */
 
               if (
                 data &&
@@ -780,11 +664,6 @@ export function bindCartButtons() {
 
             btn.disabled = false;
 
-
-            /*
-             * Если что-то пошло не так —
-             * синхронизируемся с сервером.
-             */
 
             await loadCartState();
           }

@@ -1,4 +1,4 @@
-"""Приёмочные диалоги ТЗ §17.1 — одной командой, с отчётом по каждому (M5).
+"""Приёмочные диалоги одной командой, с отчётом по каждому.
 
 Сценарий ведёт диалог как клиент: тикет у Django, WebSocket к api, формы — через эндпоинты сайта.
 Автоматические проверки — по базе (вызовы инструментов в chat_message.api_content, заказы, счета,
@@ -498,7 +498,7 @@ def d8(run: Run, r: Result):
     r.check("в истории статусов — ИИ", order.status_history.filter(actor=OrderStatusHistory.Actor.AI).exists())
     r.check("уведомления о новом заказе: письмо и Telegram",
             any(order.number in m.subject for m in mail.outbox) and telegram.called,
-            "Telegram без ПДн — после отдельной правки владельца (ТЗ §10.6)")
+            "Telegram без ПДн — после отдельной правки владельца")
     r.check("событие order_created в диалоге",
             Message.objects.filter(conversation_id=v.conversation_id, event_type="order_created").exists())
     r.manual.append("Ответ агента на оформленный заказ: благодарит, говорит, что менеджер свяжется в рабочее время")
@@ -725,7 +725,7 @@ def cleanup() -> dict:
     return counts
 
 
-# --- T2: кэш (ТЗ §7.9, §17.2)
+# --- кэш
 
 
 def cache_checks(results: list[Result]) -> list[Check]:
@@ -769,7 +769,7 @@ def report(results: list[Result], model_note: str) -> str:
             f"{format(cost['cache_share'], '.0%') if cost else '—'} |"
         )
     total = sum((res.cost.get("cost", Decimal(0)) for res in results), Decimal(0))
-    lines += ["", f"Всего на модель: **${total:.3f}**", "", "## T2 — системная часть читается из кэша", ""]
+    lines += ["", f"Всего на модель: **${total:.3f}**", "", "## Кэш — системная часть читается из кэша", ""]
     for c in cache_checks(results):
         mark = {True: "✅", False: "❌", None: "👀"}[c.ok]
         lines.append(f"- {mark} {c.name}" + (f" — {c.details}" if c.details else ""))

@@ -164,14 +164,14 @@ EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default=EMAIL_HOST_USER)
 
 MANAGER_EMAIL = env("MANAGER_EMAIL", default="")
-# Рассылка для писем со счётом и о смене статуса (ТЗ §10.6), через запятую
+# Рассылка для писем со счётом и о смене статуса, через запятую
 NOTIFY_EMAILS = env_list("NOTIFY_EMAILS")
 
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
-# Ссылки в админку в уведомлениях Telegram (Q6): путь админки становится известен Telegram
+# Ссылки в админку в уведомлениях Telegram: путь админки становится известен Telegram
 TELEGRAM_ADMIN_LINKS = env("TELEGRAM_ADMIN_LINKS", default="True") == "True"
-# Ссылка на оплату в событии order_confirmed — после подключения провайдера (ТЗ §10.5, D14)
+# Ссылка на оплату в событии order_confirmed — после подключения провайдера
 PAYMENT_LINK_ENABLED = env("PAYMENT_LINK_ENABLED", default="False") == "True"
 
 LOGGING = {

@@ -1,4 +1,4 @@
-"""Цены моделей, $ за 1 млн токенов (ТЗ §7.9)."""
+"""Цены моделей, $ за 1 млн токенов."""
 
 from dataclasses import dataclass
 from decimal import Decimal

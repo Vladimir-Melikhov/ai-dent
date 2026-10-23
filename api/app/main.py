@@ -30,7 +30,7 @@ async def lifespan(app: FastAPI):
     app.state.chat = ChatService(redis, hub, settings, agent)
     background = [asyncio.create_task(app.state.chat.listen())]
     if settings.anthropic_api_key:
-        # Размер версий базы знаний в токенах — для админки (ТЗ §9)
+        # Размер версий базы знаний в токенах — для админки
         background.append(asyncio.create_task(count_tokens_forever(client, settings.anthropic_model)))
     else:
         logger.warning("ANTHROPIC_API_KEY не задан: агент будет отвечать ошибкой «модель недоступна»")

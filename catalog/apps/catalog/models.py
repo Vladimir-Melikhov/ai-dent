@@ -83,7 +83,7 @@ class Product(models.Model):
     category = models.ForeignKey(Category, on_delete=models.PROTECT, related_name="products", verbose_name="Категория")
     price = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="Цена")
     currency = models.CharField(max_length=3, choices=Currency.choices, default=Currency.RUB, verbose_name="Валюта")
-    # Цена в рублях по текущему курсу ЦБ; пусто — курса для валюты нет (ТЗ §10.7)
+    # Цена в рублях по текущему курсу ЦБ; пусто — курса для валюты нет
     price_rub = models.DecimalField(
         max_digits=12, decimal_places=2, null=True, blank=True, editable=False, verbose_name="Цена, ₽"
     )
@@ -110,7 +110,7 @@ class Product(models.Model):
     def save(self, *args, **kwargs):
         if not self.slug:
             self.slug = transliterate_slug(self.name)
-        # Цена в рублях по текущему курсу ЦБ; без курса — пусто, товар не продаётся (ТЗ §10.7)
+        # Цена в рублях по текущему курсу ЦБ; без курса — пусто, товар не продаётся
         from .currency import price_rub
 
         self.price_rub = price_rub(self)
@@ -184,7 +184,7 @@ class ProductContentBlock(models.Model):
     
 
 class CurrencyRate(models.Model):
-    """Официальный курс ЦБ РФ: рублей за одну единицу валюты (ТЗ §10.7)."""
+    """Официальный курс ЦБ РФ: рублей за одну единицу валюты."""
 
     currency = models.CharField(max_length=3, verbose_name="Валюта")
     date = models.DateField(verbose_name="Дата")

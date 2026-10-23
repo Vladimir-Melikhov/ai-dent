@@ -187,7 +187,7 @@ function getCookie(name) {
     updateBadge(data.count);
   })();
 
-  // Корзину изменили не здесь (например, консультант в чате) — обновить открытую панель
+  // Корзину изменил консультант в чате
   document.addEventListener("cart:changed", () => {
     if (!drawer.hidden && !paneCart.hidden) loadCart();
   });

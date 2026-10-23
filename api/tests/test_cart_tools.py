@@ -1,4 +1,4 @@
-"""Корзина, КП и заявка глазами агента (ТЗ §8, D16, D17, T7)."""
+"""Корзина, КП и заявка глазами агента."""
 
 import datetime
 import json
@@ -53,7 +53,7 @@ def test_set_item_is_idempotent_and_zero_removes(owner, conversation, catalog):
 
 
 def test_out_of_stock_allowed_with_delivery_note(owner, catalog):
-    """«Под заказ» можно положить (D16) — агент предупреждает о сроке поставки."""
+    """«Под заказ» можно положить — агент предупреждает о сроке поставки."""
     result = run_tool(owner, "cart_set_item", {"product_id": catalog["pico"], "quantity": 1}).result
     assert result["items"][0]["availability"] == "под заказ"
     assert "срок" in result["note"]
@@ -82,7 +82,7 @@ def test_cart_belongs_to_owner(owner, conversation, catalog):
 
 
 def test_price_formula_with_options_and_currency(owner, conversation, catalog):
-    """T7, сторона api: те же числа, что даёт формула в Django."""
+    """Те же числа, что даёт формула в Django."""
     today = datetime.date.today()
     admin_sql("INSERT INTO catalog_currencyrate(currency, date, rate, fetched_at) VALUES ('USD', $1, 95.5, now())"
               " ON CONFLICT (currency, date) DO UPDATE SET rate = 95.5", today)
@@ -148,7 +148,7 @@ def test_agent_changes_cart_and_storefront_is_told(client, redis_sync, conversat
     assert [(r["product_id"], r["quantity"]) for r in cart_rows(conversation)] == [(catalog["loupe"], 1)]
 
 
-# --- форма заказа (ТЗ §8, §10.2, D6)
+# --- форма заказа
 
 
 def test_order_form_only_with_items(owner, catalog):
@@ -162,7 +162,7 @@ def test_order_form_only_with_items(owner, catalog):
 
 
 def test_status_events_show_card_without_turn(client, redis_sync, conversation, fake_model):
-    """order_confirmed / order_paid / order_cancelled — только карточка, хода агента нет (ТЗ §6.3)."""
+    """order_confirmed / order_paid / order_cancelled — только карточка, хода агента нет."""
     with connect(client, make_ticket(redis_sync, conversation)) as ws:
         ws.receive_json()
         add_event(redis_sync, conversation["id"], "order_confirmed",

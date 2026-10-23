@@ -1,7 +1,7 @@
-"""Корзина и КП глазами api: та же формула цены, что в Django (ТЗ §10.1, D5, D17).
+"""Корзина и КП глазами api: та же формула цены, что в Django.
 
 Формула: price_rub товара (её считает Django) + доплаты опций по курсу ЦБ, до копеек.
-На этапе 3 опции никто не выбирает, поэтому на деле цена = price_rub.
+Опции сейчас не выбираются, поэтому на деле цена = price_rub.
 """
 
 import datetime
@@ -19,7 +19,7 @@ from ..db.models import CartItem, CurrencyRate, Product, ProductOption, Quote
 
 MOSCOW = ZoneInfo("Europe/Moscow")
 KOPECK = Decimal("0.01")
-QUOTE_VALID_DAYS = 14  # Q7: срок действия КП по умолчанию
+QUOTE_VALID_DAYS = 14
 
 
 def today() -> datetime.date:
@@ -96,7 +96,7 @@ async def cart_summary(session: AsyncSession, owner: Owner) -> dict:
 
 
 async def allowed_product(session: AsyncSession, product_id: int) -> tuple[Product | None, str | None]:
-    """То же правило допуска, что в Django (D16): активен и есть цена в рублях; остаток не важен."""
+    """То же правило допуска, что в Django: активен и есть цена в рублях; остаток не важен."""
     product = await session.get(Product, product_id)
     if product is None or not product.is_active:
         return None, "товара нет в каталоге"
@@ -163,7 +163,7 @@ async def create_quote(session: AsyncSession, owner: Owner, positions: list[tupl
 
 
 def quote_card(quote: Quote) -> dict:
-    """Виджет КП: номер, сумма, срок, ссылка на PDF — его рендерит Django при скачивании (D8)."""
+    """Виджет КП: номер, сумма, срок, ссылка на PDF — его рендерит Django при скачивании."""
     return {
         "widget": "quote", "number": quote.number, "total": money(quote.total),
         "valid_until": quote.valid_until.isoformat(), "items_count": len(quote.items),

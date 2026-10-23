@@ -18,7 +18,7 @@ def product():
 
 @pytest.mark.parametrize("quantity", [0, 1000])
 def test_cart_quantity_limited_in_db(product, quantity):
-    """Правило количества 1–999 закреплено в БД — одно для витрины и агента (ТЗ D16)."""
+    """Правило количества 1–999 закреплено в БД — одно для витрины и агента."""
     with pytest.raises(IntegrityError), transaction.atomic():
         CartItem.objects.create(session=AnonSession.objects.create(), product=product, quantity=quantity)
 
@@ -43,7 +43,7 @@ def test_order_lines(product):
         OrderItem.objects.create(order=order, product_name="?", unit_price=1, line_total=1)
 
 
-# --- единая формула цены, правило допуска, версия корзины (ТЗ §10.1, T7, T15)
+# --- единая формула цены, правило допуска, версия корзины
 
 import datetime
 import json
@@ -84,7 +84,7 @@ def test_no_rate_means_no_price_and_cannot_buy(client):
 
 
 def test_out_of_stock_can_be_added(client, usd_product):
-    """«Под заказ» можно везде (D16): остаток не проверяется."""
+    """«Под заказ» можно везде: остаток не проверяется."""
     response = client.post("/cart/add/", data=json.dumps({"product_id": usd_product.pk}), content_type="application/json")
     assert response.status_code == 200
     item = cart_json(client)["items"][0]
@@ -92,7 +92,7 @@ def test_out_of_stock_can_be_added(client, usd_product):
 
 
 def test_formula_with_options_in_cart_and_order(client, product, usd_product):
-    """T7: опции, заданные напрямую, и валюта дают одну цену и в корзине, и в заказе."""
+    """Опции, заданные напрямую, и валюта дают одну цену и в корзине, и в заказе."""
     client.post("/cart/add/", data=json.dumps({"product_id": product.pk, "quantity": 2}), content_type="application/json")
     client.post("/cart/add/", data=json.dumps({"product_id": usd_product.pk}), content_type="application/json")
     option = ProductOption.objects.create(product=usd_product, name="Вариоскоп", value="да", price_delta=Decimal("10"))
@@ -116,7 +116,7 @@ def test_formula_with_options_in_cart_and_order(client, product, usd_product):
 
 
 def test_checkout_rejects_changed_cart(client, product):
-    """T15: состав или цена изменились между показом и отправкой — 409, заказ не создан."""
+    """Состав или цена изменились между показом и отправкой — 409, заказ не создан."""
     client.post("/cart/add/", data=json.dumps({"product_id": product.pk}), content_type="application/json")
     version = cart_json(client)["version"]
     product.price = Decimal("600")

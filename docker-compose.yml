@@ -50,20 +50,20 @@ services:
   api:
     build: ./api
     restart: unless-stopped
-    # Только свои переменные: секреты Django и почты в контейнер api не попадают (ТЗ §15)
+    # Только свои переменные: секреты Django и почты в контейнер api не попадают
     environment:
       # Отдельная роль без доступа к ПДн; права выдаёт catalog при старте (manage.py grant_api_role)
       DATABASE_URL: postgresql+asyncpg://${API_DB_USER}:${API_DB_PASSWORD}@postgres:5432/${POSTGRES_DB}
       REDIS_URL: ${REDIS_URL}
       SITE_ORIGIN: ${SITE_ORIGIN}
       DEBUG: ${DEBUG:-False}
-      # Лимиты и бюджет (ТЗ §7.8): пусто — значения по умолчанию из api/app/config.py
+      # Лимиты и бюджет: пусто — значения по умолчанию из api/app/config.py
       CHAT_MAX_MESSAGE_LENGTH: ${CHAT_MAX_MESSAGE_LENGTH:-}
       CHAT_MESSAGES_PER_MINUTE: ${CHAT_MESSAGES_PER_MINUTE:-}
       CHAT_MESSAGES_PER_DAY: ${CHAT_MESSAGES_PER_DAY:-}
       CHAT_MESSAGES_PER_CONVERSATION: ${CHAT_MESSAGES_PER_CONVERSATION:-}
       CHAT_DAILY_BUDGET_USD: ${CHAT_DAILY_BUDGET_USD:-}
-      # Claude API (ТЗ §7): пустые переменные прокси — прямое подключение
+      # Claude API: пустые переменные прокси — прямое подключение
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-}
       ANTHROPIC_PROXY_URL: ${ANTHROPIC_PROXY_URL:-}

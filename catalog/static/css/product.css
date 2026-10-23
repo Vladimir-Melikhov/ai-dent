@@ -1,6 +1,5 @@
 /* ============================================================
-   AI-DENT — PRODUCT
-   Уже контент + крупное фото
+   СТРАНИЦА ТОВАРА
    ============================================================ */
 
 /* Фон (если main.css не подключён) */
@@ -134,7 +133,7 @@ body:has(.product-page) {
 }
 
 /* ============================================================
-   HERO — уже общий контент + крупное фото
+   HERO
    ============================================================ */
 
 .product-hero {
@@ -143,7 +142,7 @@ body:has(.product-page) {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(480px, 560px);
     align-items: center;
-    max-width: 1240px;          /* уже весь контент */
+    max-width: 1240px;
     margin: 0 auto;
     padding: 48px 40px 40px;
     gap: 32px;
@@ -306,7 +305,7 @@ body:has(.product-page) {
 }
 
 /* ============================================================
-   VISUAL — крупное фото по краю
+   VISUAL
    ============================================================ */
 
 .product-hero__visual-wrap {
@@ -348,9 +347,9 @@ body:has(.product-page) {
     width: 100%;
     height: 100%;
     object-fit: contain;
-    object-position: top center;   /* ← касание верхней границы */
+    object-position: top center;
     display: block;
-    transform: scale(1.06);        /* чуть крупнее */
+    transform: scale(1.06);
     transform-origin: top center;
 }
 
@@ -462,7 +461,7 @@ body:has(.product-page) {
 .gb-wrap {
     position: relative;
     z-index: 2;
-    max-width: 1240px;          /* как hero */
+    max-width: 1240px;
     margin: 0 auto;
     padding: 16px 40px 64px;
     display: flex;
@@ -704,7 +703,7 @@ body:has(.product-page) {
     );
 }
 
-/* ===== Характеристики — ВАРИАНТ 6 / КАРТОЧКИ ===== */
+/* ===== Характеристики ===== */
 
 .gb--chars .gb-char-groups {
     display: grid;
@@ -789,12 +788,10 @@ body:has(.product-page) {
     display: none;
 }
 
-/* Если значение длинное — карточка остаётся аккуратной */
 .gb--chars .gb-list li {
     overflow-wrap: anywhere;
 }
 
-/* Большой заголовок блока оставляем в общей стилистике страницы */
 .gb--chars .gb-head {
     margin-bottom: 0;
 }
@@ -926,7 +923,7 @@ body:has(.product-page) {
     }
 }
 
-/* ===== ФИКС ФОТО — ПРИЖАТЬ К ВЕРХУ ===== */
+/* ===== Фото товара ===== */
 .product-hero__visual {
     max-width: 560px !important;
     width: 100% !important;
@@ -934,7 +931,7 @@ body:has(.product-page) {
     padding: 0 !important;
     overflow: hidden !important;
     display: flex !important;
-    align-items: flex-start !important;   /* сверху */
+    align-items: flex-start !important;
     justify-content: center !important;
 }
 
@@ -949,7 +946,7 @@ body:has(.product-page) {
     display: block !important;
 }
 
-/* ===== ФОТО В ДОП. БЛОКАХ — ЕЩЁ КРУПНЕЕ ===== */
+/* ===== Фото в доп. блоках ===== */
 .gb-two {
     grid-template-columns: 0.9fr 1.3fr !important;
     gap: 28px !important;
@@ -965,7 +962,7 @@ body:has(.product-page) {
     border: none !important;
     min-height: 0 !important;
     display: flex !important;
-    justify-content: flex-end !important; /* Прижали контейнер вправо */
+    justify-content: flex-end !important;
 }
 
 .gb-two__img img {
@@ -974,11 +971,11 @@ body:has(.product-page) {
     max-height: 225px !important;
     min-height: 0 !important;
     object-fit: contain !important;
-    object-position: right center !important; /* Прижали саму картинку вправо */
+    object-position: right center !important;
     display: block !important;
     border-radius: 20px !important;
     border: none !important;
-    margin-left: auto !important; /* Сдвинули вправо */
+    margin-left: auto !important;
     margin-right: 0 !important;
 }
 
@@ -992,8 +989,7 @@ body:has(.product-page) {
 }
 
 /* ============================================================
-   МОБИЛЬНАЯ АДАПТАЦИЯ — ТОЛЬКО ТЕЛЕФОНЫ (≤640px)
-   Дополняет блоки 1100px/768px выше, не изменяя их.
+   ТЕЛЕФОНЫ (≤640px)
    ============================================================ */
 
 @media (max-width: 640px) {
@@ -1001,7 +997,7 @@ body:has(.product-page) {
         padding: 18px 14px 24px;
     }
 
-    /* фото сверху, контент (название/цена/кнопка/описание) ниже */
+    /* фото сверху */
     .product-hero__visual-wrap {
         order: -1;
     }
@@ -1012,7 +1008,6 @@ body:has(.product-page) {
         max-width: 100%;
     }
 
-    /* умеренная высота фото, а не во весь экран */
     .product-hero__visual {
         max-width: 260px !important;
         aspect-ratio: 1 / 1 !important;
@@ -1056,7 +1051,6 @@ body:has(.product-page) {
         grid-template-columns: 1fr;
     }
 
-    /* фон-зуб приглушён и не мешает чтению */
     .product-page__tooth {
         width: min(260px, 80vw) !important;
         height: min(260px, 80vw) !important;
@@ -1064,5 +1058,5 @@ body:has(.product-page) {
     }
 }
 
-/* Исходная цена валютного товара (ТЗ §10.7) */
+/* Исходная цена валютного товара */
 .product-price-source { margin-top: 4px; color: #8a94a6; font-size: 13px; }

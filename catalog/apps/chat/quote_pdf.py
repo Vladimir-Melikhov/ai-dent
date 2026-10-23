@@ -1,4 +1,4 @@
-"""PDF коммерческого предложения (ТЗ §10.4, D8): позиции и цены из снапшота, без реквизитов и данных клиента."""
+"""PDF коммерческого предложения: позиции и цены из снапшота, без реквизитов и данных клиента."""
 
 import io
 import os
@@ -45,7 +45,7 @@ def quote_document(quote) -> dict:
 
 
 def generate_quote_pdf(quote) -> str:
-    """Рисует PDF и сохраняет в media/quotes/; Caddy этот каталог напрямую не отдаёт (ТЗ §15)."""
+    """Рисует PDF и сохраняет в media/quotes/; Caddy этот каталог напрямую не отдаёт."""
     doc = quote_document(quote)
     reg, bold = _fonts()
     buf = io.BytesIO()

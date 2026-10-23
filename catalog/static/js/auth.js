@@ -114,6 +114,5 @@ function getCookie(name) {
     const { ok, data } = await post("/accounts/verify-code/", { phone: currentPhone, code });
     if (!ok) { err.textContent = data.error || "Неверный код"; return; }
   
-    // вошёл — перезагружаем страницу (обновит шапку под залогиненного)
     window.location.reload();
   });

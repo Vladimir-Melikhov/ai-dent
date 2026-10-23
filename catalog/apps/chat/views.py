@@ -12,7 +12,7 @@ from .quote_pdf import generate_quote_pdf
 
 @require_POST
 def ticket(request):
-    """Тикет для WebSocket чата. {"new": true} — начать новый диалог (ТЗ §6.1)."""
+    """Тикет для WebSocket чата. {"new": true} — начать новый диалог."""
     data = parse_json_body(request) if request.body else {}
     if data is None:
         return JsonResponse({"error": "Некорректный запрос"}, status=400)
@@ -34,7 +34,7 @@ def _is_quote_owner(request, quote) -> bool:
 
 @require_GET
 def quote_pdf(request, quote_id):
-    """PDF коммерческого предложения: только владельцу; создаётся при первом обращении (ТЗ §10.4)."""
+    """PDF коммерческого предложения: только владельцу; создаётся при первом обращении."""
     quote = Quote.objects.filter(pk=quote_id).first()
     if quote is None or not _is_quote_owner(request, quote):
         raise Http404("КП не найдено")

@@ -4,7 +4,7 @@ from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.db import connection, transaction
 
-# Права роли сервиса api — строго по таблице ТЗ §4. Всё, чего здесь нет, недоступно:
+# Права роли сервиса api. Всё, чего здесь нет, недоступно:
 # пользователи, заказы, счета, лиды, сессии Django.
 TABLE_PRIVILEGES = {
     "orders_cartitem": "SELECT, INSERT, UPDATE, DELETE",
@@ -24,7 +24,7 @@ ROLE_NAME_RE = re.compile(r"^[a-z_][a-z0-9_]{0,62}$")
 
 
 class Command(BaseCommand):
-    help = "Создаёт роль БД для сервиса api и выдаёт ей права по ТЗ §4. Запускается после migrate."
+    help = "Создаёт роль БД для сервиса api и выдаёт ей права. Запускается после migrate."
 
     def handle(self, *args, **options):
         role, password = settings.API_DB_USER, settings.API_DB_PASSWORD

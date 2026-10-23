@@ -205,10 +205,8 @@ async function initFilters() {
       });
     }
 
-    // сайдбар из того же списка
     buildSidebarCategories(categories);
 
-    // URL-параметры
     const url = new URLSearchParams(window.location.search);
 
     if (url.get("q") && getElement("f-q")) {
@@ -222,7 +220,6 @@ async function initFilters() {
     updateCatalogTitle();
     syncSidebarFromSelect();
 
-    // события
     if (cSel) {
       cSel.addEventListener("change", () => {
         updateCatalogTitle();

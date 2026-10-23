@@ -23,8 +23,7 @@ function catalogSearch(q) {
   window.location.href = q ? `/catalog/?q=${encodeURIComponent(q)}` : "/catalog/";
 }
 
-/* Строка под заголовком — чат с консультантом (его ведёт chat.js). Если агент недоступен —
-   поиск по каталогу: строка #hero-search при загрузке или кнопка «Поиск по каталогу» после сбоя (ТЗ §11) */
+/* Если агент недоступен, строка под заголовком ищет по каталогу */
 function initSearch() {
   const form = document.getElementById("hero-search");
   const down = document.getElementById("agent-down");
@@ -62,7 +61,6 @@ function initSearch() {
     if (!down) return;
     down.hidden = false;
     if (downLink) downLink.href = searchHref((event.detail && event.detail.question) || "");
-    // Блок под окном чата может оказаться ниже края экрана — подводим к нему
     requestAnimationFrame(() => down.scrollIntoView({ block: "nearest", behavior: "smooth" }));
   });
 }

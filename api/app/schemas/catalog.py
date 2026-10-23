@@ -33,7 +33,7 @@ class ProductOptionOut(BaseModel):
     price_delta: Decimal
 
 
-class ContentBlockOut(BaseModel):          # ← ДОЛЖЕН быть ВЫШЕ ProductDetailOut
+class ContentBlockOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     block_type: str
     title: str
@@ -52,7 +52,7 @@ class ProductListItemOut(BaseModel):
     slug: str
     price: Decimal  # исходная цена в валюте каталога
     currency: str
-    # Цена в рублях по курсу ЦБ — её показывают карточки, она попадает в корзину и счёт (ТЗ §10.7)
+    # Цена в рублях по курсу ЦБ — её показывают карточки, она попадает в корзину и счёт
     price_rub: Decimal | None
     stock_qty: int
     priority: int
@@ -66,7 +66,7 @@ class ProductDetailOut(ProductListItemOut):
     characteristics: dict
     images: list[ProductImageOut]
     options: list[ProductOptionOut]
-    content_blocks: list[ContentBlockOut] = []     # ← использует, ContentBlockOut уже определён выше
+    content_blocks: list[ContentBlockOut] = []
 
 
 class ProductPageOut(BaseModel):

@@ -1,9 +1,5 @@
 /* ============================================================
    CHECKOUT — страница оформления заказа (/checkout/)
-   Работает со стандартной разметкой checkout.html:
-     #co-items, #co-total, #co-name, #co-phone, #co-email,
-     input[name="pay"], #co-req, #co-error, #co-submit,
-     #checkout-form, #checkout-success, #co-number
    ============================================================ */
 
    function getCookie(name) {
@@ -74,8 +70,7 @@
     return digits.length === 10 ? "+7" + digits : "";
   }
 
-  /* ---- минимальные стили для строк состава заказа
-         (чтобы не трогать checkout.css) ---- */
+  /* ---- стили строк состава заказа ---- */
   (function injectStyles() {
     if (document.getElementById("co-inline-styles")) return;
     const s = document.createElement("style");
@@ -197,7 +192,6 @@
       payment_method: selectedPayment(),
       requisites: el("co-req")?.value.trim() || null,
       consent: true, // без галочки отправка остановится ниже
-      // Версия состава: если корзина изменилась после показа, заказ не создаётся (ТЗ §10.1)
       cart_version: cartVersion,
     };
   
@@ -230,7 +224,6 @@
         return;
       }
   
-      /* успех */
       const numberBox = el("co-number");
       if (numberBox) numberBox.textContent = data.number;
 
@@ -258,7 +251,7 @@
   
   if (submitBtn) submitBtn.addEventListener("click", submitOrder);
 
-  // Консультант в чате изменил корзину — показать актуальный состав
+  // Корзину изменил консультант в чате
   document.addEventListener("cart:changed", loadSummary);
   
   loadSummary();

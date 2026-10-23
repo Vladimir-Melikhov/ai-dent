@@ -1,4 +1,4 @@
-"""Уведомления о смене статуса заказа (ТЗ §10.6).
+"""Уведомления о смене статуса заказа.
 
 Telegram — тип, номер, статус и ссылка, без ПДн. Письмо внутри компании — администратору и рассылке
 одним письмом; клиенту — отдельное письмо. При подтверждении к обоим прикладывается PDF счёта.
@@ -32,7 +32,6 @@ def order_admin_link(order) -> str:
 
 def telegram_order(order, text: str) -> None:
     lines = [text]
-    # Q6: ссылка в админку отключается настройкой
     if settings.TELEGRAM_ADMIN_LINKS:
         lines += ["", order_admin_link(order)]
     send_telegram("\n".join(lines))

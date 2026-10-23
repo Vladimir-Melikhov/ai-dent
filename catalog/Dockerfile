@@ -36,7 +36,6 @@ USER app
 
 EXPOSE 8000
 
-# После migrate — права роли БД для api (ТЗ §5.4).
-# База знаний загружается из файла только при первом запуске — дальше её ведут в админке (ТЗ §9).
-# Курсы ЦБ — при каждом старте; сбой загрузки запуск не останавливает (ТЗ §10.7)
+# После migrate — права роли БД для api. База знаний из файла — только при первом запуске,
+# дальше её ведут в админке. Сбой загрузки курсов ЦБ запуск не останавливает
 CMD sh -c "python manage.py migrate --noinput && python manage.py grant_api_role && python manage.py import_kb knowledge_base/baza_znaniy.md --if-empty && (python manage.py update_currency_rates || true) && gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3"

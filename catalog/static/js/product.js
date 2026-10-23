@@ -14,15 +14,12 @@ function getImage(path) {
   return imageUrl(path);
 }
 
-/** Собираем все картинки товара */
 function collectImages(product) {
   const list = [];
 
-  // primary
   const primary = product.primary_image_path || product.image || product.primary_image;
   if (primary) list.push(primary);
 
-  // images / gallery / media
   const sources = [
     product.images,
     product.gallery,

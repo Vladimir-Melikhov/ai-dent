@@ -1,4 +1,4 @@
-"""Курсы ЦБ и цена в рублях (ТЗ §10.7)."""
+"""Курсы ЦБ и цена в рублях."""
 
 import datetime
 from decimal import Decimal

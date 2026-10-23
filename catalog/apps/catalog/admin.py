@@ -49,7 +49,7 @@ class ProductAdmin(admin.ModelAdmin):
 
 @admin.register(CurrencyRate)
 class CurrencyRateAdmin(admin.ModelAdmin):
-    """Курсы ЦБ (ТЗ §12): только чтение и кнопка «Обновить курсы» над списком."""
+    """Курсы ЦБ: только чтение и кнопка «Обновить курсы» над списком."""
 
     list_display = ["date", "currency", "rate", "fetched_at"]
     list_filter = ["currency"]

@@ -1,4 +1,4 @@
-"""Ход агента на подменной модели: инструменты, история, фолбэк, отказы, расход (ТЗ §7, T3, T9, T10, T12)."""
+"""Ход агента на подменной модели: инструменты, история, фолбэк, отказы, расход."""
 
 import json
 import time
@@ -32,7 +32,7 @@ def usage(conversation_id):
 
 
 def assert_append_only(requests):
-    """T3: соседние запросы совпадают на общем участке — история только дописывается."""
+    """Соседние запросы совпадают на общем участке — история только дописывается."""
     for previous, current in zip(requests, requests[1:]):
         assert json.dumps(current["system"]) == json.dumps(previous["system"])
         assert json.dumps(current["tools"]) == json.dumps(previous["tools"])
@@ -194,7 +194,7 @@ def test_mid_stream_fallback_keeps_text_and_drops_blocks_before_boundary(
     saved = json.loads(rows[1]["api"])["content"]
     assert [b["type"] for b in saved] == ["text", "thinking", "text"]
 
-    # T10: расход по каждой попытке по цене своей модели
+    # Расход по каждой попытке по цене своей модели
     attempts = usage(conversation["id"])
     assert [(a["model"], a["attempt_type"]) for a in attempts] == [
         ("claude-opus-5-5", "message"), ("claude-opus-5", "fallback_message")]
@@ -257,7 +257,7 @@ def test_max_tokens_retried_with_bigger_limit(client, redis_sync, conversation, 
 
 
 def test_dangling_tool_use_is_closed_by_appending(client, redis_sync, conversation, fake_model):
-    """T12: висящий вызов (сбой, ручное вмешательство) закрывается результатом с is_error."""
+    """Висящий вызов (сбой, ручное вмешательство) закрывается результатом с is_error."""
     admin_sql(
         "INSERT INTO chat_message(conversation_id, role, content, api_content, event_type, epoch, stop_reason,"
         " request_id, created_at) VALUES ($1, 'user', 'старый вопрос', $2::jsonb, '', '', '', '', now()),"

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Тесты этапа 3 (ТЗ §17.2) без обращений к платной модели.
+# Тесты без обращений к платной модели.
 #
 # Нужны тестовые Postgres и Redis:
 #   docker compose -f docker-compose.test.yml up -d
@@ -50,9 +50,9 @@ echo "== api"
   "$PY" -m pytest -q -p no:cacheprovider "$@")
 
 echo "== Фронтенд (node)"
-# T11: текст агента выводится как текст. Нужен Node.js 20+; без него — предупреждение, не ошибка
+# Нужен Node.js 20+; без него — предупреждение, не ошибка
 if command -v node >/dev/null 2>&1; then
   node --test "$ROOT"/catalog/tests_js/*.test.mjs
 else
-  echo "Node.js не найден — пропущены тесты catalog/tests_js (T11)"
+  echo "Node.js не найден — пропущены тесты catalog/tests_js"
 fi

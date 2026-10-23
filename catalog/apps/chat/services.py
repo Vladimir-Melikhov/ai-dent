@@ -14,7 +14,7 @@ redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
 
 TICKET_KEY = "chat:ticket:{token}"
 CHANNEL = "chat:conv:{id}"
-# Ставит api, когда модель недоступна или исчерпан суточный бюджет (ТЗ §7.8)
+# Ставит api, когда модель недоступна или исчерпан суточный бюджет
 AGENT_UNAVAILABLE_KEY = "chat:agent_unavailable"
 
 
@@ -43,7 +43,7 @@ def current_conversation(owner):
 
 
 def close_conversations(queryset):
-    """Закрывает диалоги; после коммита их соединения получают conversation_closed (ТЗ §6.4)."""
+    """Закрывает диалоги; после коммита их соединения получают conversation_closed."""
     ids = list(queryset.filter(status=Conversation.Status.ACTIVE).values_list("id", flat=True))
     if not ids:
         return
@@ -73,7 +73,7 @@ def get_or_create_current(owner, new=False):
 
 
 def issue_ticket(conversation):
-    """Одноразовый тикет для подключения WebSocket (ТЗ §6.1)."""
+    """Одноразовый тикет для подключения WebSocket."""
     token = secrets.token_urlsafe(32)
     payload = {
         "conversation_id": conversation.pk,
@@ -85,7 +85,7 @@ def issue_ticket(conversation):
 
 
 def add_event(conversation, event_type, payload, content=""):
-    """Строка-событие в диалоге (без ПДн) и звонок api после коммита (ТЗ §6.3)."""
+    """Строка-событие в диалоге (без ПДн) и звонок api после коммита."""
     message = Message.objects.create(
         conversation=conversation,
         role=Message.Role.EVENT,
@@ -103,7 +103,7 @@ def add_event(conversation, event_type, payload, content=""):
 
 
 def merge_guest_conversations(session, user):
-    """Диалоги гостя переходят на аккаунт при входе (ТЗ §5.5).
+    """Диалоги гостя переходят на аккаунт при входе.
 
     Активный гостевой диалог становится текущим, активный диалог аккаунта закрывается.
     Гостевого нет — текущим остаётся диалог аккаунта.

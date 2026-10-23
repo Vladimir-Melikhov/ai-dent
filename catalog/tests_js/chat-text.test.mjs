@@ -1,4 +1,4 @@
-// T11 (ТЗ §17.2): ответ модели с тегами HTML отображается как текст. Запуск: node --test catalog/tests_js/
+// Ответ модели с тегами HTML отображается как текст. Запуск: node --test catalog/tests_js/*.test.mjs
 import assert from "node:assert/strict";
 import { test } from "node:test";
 

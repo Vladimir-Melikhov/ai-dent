@@ -7,7 +7,7 @@ from apps.chat.models import KnowledgeBaseVersion
 
 
 class Command(BaseCommand):
-    help = "Загружает базу знаний из файла (.md / .txt) новой активной версией (ТЗ §9)."
+    help = "Загружает базу знаний из файла (.md / .txt) новой активной версией."
 
     def add_arguments(self, parser):
         parser.add_argument("path", help="Путь к файлу базы знаний")

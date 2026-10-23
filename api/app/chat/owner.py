@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class Owner:
-    """Владелец соединения — только из тикета, никогда из сообщений клиента (ТЗ §6.2)."""
+    """Владелец соединения — только из тикета, никогда из сообщений клиента."""
 
     conversation_id: int
     user_id: int | None

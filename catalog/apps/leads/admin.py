@@ -7,7 +7,7 @@ from .models import Lead
 
 @admin.register(Lead)
 class LeadAdmin(admin.ModelAdmin):
-    """Заявки (ТЗ §12): статус и заметку ведёт менеджер, остальное — только чтение."""
+    """Заявки: статус и заметку ведёт менеджер, остальное — только чтение."""
 
     list_display = ["number", "created_at", "status", "source", "phone", "name", "city", "short_topic", "dialog"]
     list_filter = ["status", "source", "created_at"]

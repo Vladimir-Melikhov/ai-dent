@@ -1,5 +1,5 @@
 /* ============================================================
-   AI-DENT - CHECKOUT (Единый стиль фона с каталогом)
+   CHECKOUT
    ============================================================ */
 
    .checkout-page,
@@ -490,7 +490,7 @@
    }
    
    /* ============================================================
-      SUCCESS SCREEN (С узором оптики на фоне и поднятым контентом)
+      SUCCESS SCREEN
       ============================================================ */
    
    .checkout-success {
@@ -501,13 +501,12 @@
      display: flex;
      flex-direction: column;
      align-items: center;
-     justify-content: flex-start; /* Поднято наверх */
+     justify-content: flex-start;
      text-align: center;
      isolation: isolate;
      overflow: hidden;
    }
    
-   /* КОНТЕЙНЕР УЗОРА ОПТИКИ НА ФОНЕ */
    .checkout-success__pattern {
      position: absolute;
      top: 18%;
@@ -519,7 +518,6 @@
      pointer-events: none;
    }
    
-   /* УЗОР ОПТИКИ (из каталога) */
    .checkout-success__pattern .optics-light {
      position: absolute;
      z-index: 0;
@@ -576,10 +574,9 @@
      flex-direction: column;
      align-items: center;
      max-width: 750px;
-     margin-top: 20px; /* Сдвинуто аккуратно к верху */
+     margin-top: 20px;
    }
    
-   /* Плашка надпись над заголовком */
    .checkout-success__eyebrow {
      display: inline-block;
      margin-bottom: 14px;
@@ -590,7 +587,6 @@
      text-transform: uppercase;
    }
    
-   /* Заголовок с контрастной жирностью и градиентом */
    .checkout-success h2 {
      margin: 0 0 16px;
      color: #17222c;
@@ -803,6 +799,6 @@
    [hidden] {
      display: none !important;
    }
-/* Предупреждение о валютных позициях (ТЗ §10.7) */
+/* Предупреждение о валютных позициях */
 .checkout-summary__note { margin: 12px 0 0; color: #8a5a00; font-size: 12px; line-height: 1.45; }
 .checkout-summary__note[hidden] { display: none; }

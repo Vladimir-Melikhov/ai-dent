@@ -19,7 +19,7 @@ class Conversation(models.Model):
         verbose_name="Гостевая сессия",
     )
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.ACTIVE, verbose_name="Статус")
-    # Отпечаток «модель + промпт + версия базы знаний + инструменты»; пишет api (ТЗ §7.4)
+    # Отпечаток «модель + промпт + версия базы знаний + инструменты»; пишет api
     prompt_epoch = models.CharField(max_length=64, blank=True, default="", verbose_name="Эпоха промпта")
     pending_lead_topic = models.TextField(blank=True, default="", verbose_name="Пометка агента для заявки")
     created_at = models.DateTimeField(default=timezone.now, verbose_name="Создан")
@@ -34,7 +34,7 @@ class Conversation(models.Model):
                 condition=models.Q(user__isnull=False) | models.Q(session__isnull=False),
                 name="conversation_user_or_session",
             ),
-            # У владельца ровно один текущий диалог (ТЗ §1.5)
+            # У владельца ровно один текущий диалог
             models.UniqueConstraint(
                 fields=["user"],
                 condition=models.Q(status="active", user__isnull=False),
@@ -73,7 +73,7 @@ class Message(models.Model):
     role = models.CharField(max_length=20, choices=Role.choices, verbose_name="Роль")
     # Текст для человека: исходный текст клиента, итоговый текст агента, описание события
     content = models.TextField(blank=True, default="", verbose_name="Текст")
-    # Точные блоки, отправленные в модель или полученные от неё (ТЗ §5.1)
+    # Точные блоки, отправленные в модель или полученные от неё
     api_content = models.JSONField(null=True, blank=True, verbose_name="Блоки для модели")
     ui = models.JSONField(null=True, blank=True, verbose_name="Виджеты")
     event_type = models.CharField(max_length=30, choices=EventType.choices, blank=True, default="", verbose_name="Событие")
@@ -114,7 +114,7 @@ class KnowledgeBaseVersion(models.Model):
     )
     created_at = models.DateTimeField(default=timezone.now, verbose_name="Создана")
     char_count = models.PositiveIntegerField(default=0, verbose_name="Символов")
-    # Считает api через эндпоинт подсчёта токенов (ТЗ §9)
+    # Считает api через эндпоинт подсчёта токенов
     token_count = models.PositiveIntegerField(null=True, blank=True, verbose_name="Токенов")
 
     class Meta:
@@ -164,7 +164,7 @@ class Quote(models.Model):
 
 
 class LLMUsage(models.Model):
-    """Одна строка на попытку из usage.iterations (ТЗ §7.9)."""
+    """Одна строка на попытку из usage.iterations."""
 
     class AttemptType(models.TextChoices):
         MESSAGE = "message", "Основная модель"

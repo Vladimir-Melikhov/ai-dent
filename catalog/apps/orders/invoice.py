@@ -1,4 +1,4 @@
-"""PDF счёта (ТЗ §10.5): выставляется при подтверждении заказа, по составу на этот момент."""
+"""PDF счёта: выставляется при подтверждении заказа, по составу на этот момент."""
 
 import io
 import os
@@ -27,7 +27,7 @@ def invoice_items(order) -> list[OrderItem]:
 
 
 def buyer_lines(order) -> list[str]:
-    """Блок «Покупатель» по типу (ТЗ §10.5); заказ с /checkout/ — как раньше: имя и реквизиты отдельно."""
+    """Блок «Покупатель» по типу; заказ с /checkout/ — как раньше: имя и реквизиты отдельно."""
     lines = []
     if order.buyer_type == Order.BuyerType.LEGAL:
         lines += [order.company_name, f"ИНН: {order.inn}", f"Контактное лицо: {order.contact_name}"]
@@ -284,8 +284,7 @@ def generate_invoice_pdf(order, issued_at) -> str:
 
         y -= 5 * mm
 
-        # Если таблица закончилась слишком низко —
-        # продолжаем на новой странице.
+        # Таблица закончилась слишком низко — продолжаем на новой странице
 
         if y < 70 * mm:
             c.showPage()

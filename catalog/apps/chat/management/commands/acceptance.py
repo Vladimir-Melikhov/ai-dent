@@ -1,4 +1,4 @@
-"""Приёмочные диалоги ТЗ §17.1 одной командой (M5).
+"""Приёмочные диалоги одной командой.
 
     docker compose exec -T catalog python manage.py acceptance > acceptance-report.md
     docker compose exec -T catalog python manage.py acceptance --only 3,7,12

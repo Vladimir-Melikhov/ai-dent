@@ -1,4 +1,4 @@
-"""Ход агента: запрос к модели, поток клиенту, инструменты, запись истории (ТЗ §7)."""
+"""Ход агента: запрос к модели, поток клиенту, инструменты, запись истории."""
 
 import asyncio
 import datetime
@@ -38,7 +38,7 @@ ROUNDS_EXHAUSTED = "Не получилось довести ответ до к�
 
 
 class TurnAborted(Exception):
-    """Ход прерван: клиенту уходит error с кодом (ТЗ §6.2)."""
+    """Ход прерван: клиенту уходит error с кодом."""
 
     def __init__(self, code: str):
         super().__init__(code)
@@ -46,7 +46,7 @@ class TurnAborted(Exception):
 
 
 class StreamBroken(Exception):
-    """Поток оборвался после первого байта — SDK такое не повторяет (ТЗ §7.10)."""
+    """Поток оборвался после первого байта — SDK такое не повторяет."""
 
 
 def clean_blocks(content) -> list[dict]:
@@ -54,7 +54,7 @@ def clean_blocks(content) -> list[dict]:
 
     После фолбэка посреди ответа блоки мышления, вызовы инструментов и незнакомые
     служебные блоки до последнего блока fallback не сохраняются; текст сохраняется.
-    Сам блок fallback — только отметка, в историю не идёт (ТЗ §7.10).
+    Сам блок fallback — только отметка, в историю не идёт.
     """
     blocks = [b.model_dump(mode="json", by_alias=True, exclude_none=True) for b in content]
     boundary = max((i for i, b in enumerate(blocks) if b["type"] == "fallback"), default=-1)
@@ -70,7 +70,7 @@ def text_of(blocks: list[dict]) -> str:
 
 def usage_rows(message, conversation_id: int, configured_model: str, request_id: str | None,
                latency_ms: int) -> list[LLMUsage]:
-    """Строка на каждую попытку: при фолбэке верхний usage — только последняя (ТЗ §7.9)."""
+    """Строка на каждую попытку: при фолбэке верхний usage — только последняя."""
     usage = message.usage
     attempts = usage.iterations or [None]
     rows = []
@@ -130,7 +130,7 @@ class Agent:
     # --- запрос
 
     def epoch(self, kb: KnowledgeBase) -> str:
-        """Отпечаток всего, что задаёт смысл блоков мышления (ТЗ §7.4)."""
+        """Отпечаток всего, что задаёт смысл блоков мышления."""
         source = json.dumps(
             [self.settings.anthropic_model, BASE_PROMPT, kb.version_id, self.tool_definitions],
             ensure_ascii=False, sort_keys=True,
@@ -138,7 +138,7 @@ class Agent:
         return hashlib.sha256(source.encode()).hexdigest()[:16]
 
     def system(self, kb: KnowledgeBase) -> list[dict]:
-        """Одинаков для всех клиентов: ничего меняющегося сюда не попадает (ТЗ §7.2)."""
+        """Одинаков для всех клиентов: ничего меняющегося сюда не попадает."""
         cached = {"type": "ephemeral", "ttl": "1h"}
         if not kb.content:
             return [{"type": "text", "text": BASE_PROMPT, "cache_control": cached}]
@@ -183,7 +183,7 @@ class Agent:
                 message = await stream.get_final_message()
                 return message, started_text, stream.request_id
         except asyncio.CancelledError:
-            # «Стоп» во время генерации: ответ не сохраняется (ТЗ §7.11)
+            # «Стоп» во время генерации: ответ не сохраняется
             await self.hub.broadcast(cid, {"type": "assistant_discard"})
             raise
         except (anthropic.APIStatusError, anthropic.APIConnectionError) as error:
@@ -218,7 +218,7 @@ class Agent:
         return TurnAborted("model_unavailable")
 
     async def request(self, cid: int, kb: KnowledgeBase, messages: list[dict]):
-        """Один ответ модели с обработкой отказа, обрыва и лимита токенов (ТЗ §7.5, §7.10)."""
+        """Один ответ модели с обработкой отказа, обрыва и лимита токенов."""
         await self._check_budget()
         max_tokens = self.settings.agent_max_tokens
         broken = 0
@@ -237,7 +237,7 @@ class Agent:
 
             await self._record(cid, message, request_id, started)
             for change in message.input_transformations or []:
-                # В норме бывает только model_binding_mismatch после фолбэка (ТЗ §7.4)
+                # В норме бывает только model_binding_mismatch после фолбэка
                 logger.warning("Диалог %s: %s %s (%s)", cid, change.type, getattr(change, "path", ""),
                                getattr(change, "reason", ""))
 
@@ -285,7 +285,7 @@ class Agent:
             return await self._run_tool(ToolContext(owner, session), call)
 
     async def _finish_round(self, owner: Owner, assistant: Message, calls: list[dict], streamed: bool) -> None:
-        """Круг с инструментами пишется атомарно: ответ, изменения корзины, результаты (ТЗ §7.11)."""
+        """Круг с инструментами пишется атомарно: ответ, изменения корзины, результаты."""
         cid = owner.conversation_id
         outcomes: list = [None] * len(calls)
         reading = [i for i, c in enumerate(calls) if not getattr(self.tools.get(c["name"]), "mutating", False)]
@@ -315,7 +315,7 @@ class Agent:
             await self.hub.broadcast(cid, {"type": "cart_updated"})
 
     async def close_dangling(self, cid: int) -> list[Message]:
-        """Висящий вызов закрывается результатом с is_error — дописыванием, не правкой (ТЗ §7.11)."""
+        """Висящий вызов закрывается результатом с is_error — дописыванием, не правкой."""
         rows = await store.model_rows(cid)
         ids = history.dangling_tool_uses(rows)
         if not ids:
@@ -373,7 +373,7 @@ class Agent:
             await self.hub.broadcast(cid, error(abort.code))
 
     async def run_after_event(self, owner: Owner) -> None:
-        """Ход по событию: перед ним служебная реплика «клиент отправил форму» (ТЗ §7.3)."""
+        """Ход по событию: перед ним служебная реплика «клиент отправил форму»."""
         await store.save_message(
             owner.conversation_id, Message.USER, "",
             api_content={"role": "user", "content": [{"type": "text", "text": FORM_SUBMITTED}]},

@@ -1,4 +1,4 @@
-"""Курсы ЦБ РФ и цена в рублях (ТЗ §10.7, D17)."""
+"""Курсы ЦБ РФ и цена в рублях."""
 
 import datetime
 import logging
@@ -20,7 +20,7 @@ STALE_AFTER = datetime.timedelta(days=7)
 
 
 def to_rub(amount: Decimal, rate: Decimal) -> Decimal:
-    """Округление до копеек, половина вверх — за единицу товара (ТЗ §10.7)."""
+    """Округление до копеек, половина вверх — за единицу товара."""
     return (amount * rate).quantize(KOPECK, rounding=ROUND_HALF_UP)
 
 

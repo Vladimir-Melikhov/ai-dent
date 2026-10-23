@@ -183,7 +183,7 @@
   {% endif %}
 
   {% if chat_widget_enabled and not chat_inline %}
-  <!-- ИИ-консультант (ТЗ §11); на главной чат встроен в страницу -->
+  <!-- Чат; на главной встроен в страницу -->
   <div class="chat" id="chat-widget">
     {% csrf_token %}
     <button type="button" class="chat__fab" id="chat-open" aria-controls="chat-panel" aria-expanded="false" aria-label="Консультант">

@@ -28,7 +28,7 @@
       <div class="search-wrap">
 
         {% if chat_widget_enabled and not agent_unavailable %}
-        <!-- ИИ-консультант на первом экране: строка ввода, после первого сообщения — лента прямо на странице (ТЗ §11, D1) -->
+        <!-- Чат на первом экране -->
         <div class="chat chat--inline" id="chat-widget" data-mode="inline"
              data-has-dialog="{% if chat_has_dialog %}1{% else %}0{% endif %}">
           {% csrf_token %}
@@ -106,7 +106,7 @@
         {% endif %}
 
         {% if chat_widget_enabled %}
-        <!-- Агент недоступен — запасной поиск по каталогу (ТЗ §11) -->
+        <!-- Агент недоступен — поиск по каталогу -->
         <div class="agent-down" id="agent-down" {% if not agent_unavailable %}hidden{% endif %}>
           <span class="agent-down__text">Агент временно не работает</span>
           <a class="agent-down__search" id="agent-down-search" href="{% url 'storefront:catalog' %}">Поиск по каталогу</a>
@@ -156,7 +156,7 @@
 </section>
 
 <!-- ============================================================
-     01 — ОПТИКА (НЕ ТРОГАЕМ)
+     ОПТИКА
      ============================================================ -->
 
      <section
@@ -223,7 +223,7 @@
    
      <div class="cat-panel cat-panel--feature">
    
-       <!-- Уникальные световые линии для Наконечников -->
+       <!-- Световые линии -->
        <div class="optics-light optics-light--one" aria-hidden="true"></div>
        <div class="optics-light optics-light--two" aria-hidden="true"></div>
        <div class="optics-light optics-light--three" aria-hidden="true"></div>
@@ -278,7 +278,7 @@
    
      <div class="cat-panel cat-panel--feature">
    
-       <!-- Уникальные световые линии для Установок -->
+       <!-- Световые линии -->
        <div class="optics-light optics-light--one" aria-hidden="true"></div>
        <div class="optics-light optics-light--two" aria-hidden="true"></div>
        <div class="optics-light optics-light--three" aria-hidden="true"></div>
@@ -333,7 +333,7 @@
    
      <div class="cat-panel cat-panel--feature">
    
-       <!-- Уникальные световые линии для Цифрового отдела -->
+       <!-- Световые линии -->
        <div class="optics-light optics-light--one" aria-hidden="true"></div>
        <div class="optics-light optics-light--two" aria-hidden="true"></div>
        <div class="optics-light optics-light--three" aria-hidden="true"></div>

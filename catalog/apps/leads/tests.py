@@ -1,4 +1,4 @@
-"""Заявка менеджеру (ТЗ §10.3, §10.6)."""
+"""Заявка менеджеру."""
 
 import json
 from unittest import mock

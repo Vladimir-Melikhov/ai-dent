@@ -1,4 +1,4 @@
-"""Сборка истории для модели из сохранённых сообщений (ТЗ §7.3, §7.4).
+"""Сборка истории для модели из сохранённых сообщений.
 
 Результат должен быть одинаковым при каждой сборке: история только дописывается,
 иначе ломаются кэш и проверка блоков мышления.
@@ -12,7 +12,7 @@ THINKING_TYPES = {"thinking", "redacted_thinking"}
 
 
 def event_line(event_type: str, payload: dict | None) -> str:
-    """События без ПДн — номер и сумма (ТЗ §6.3)."""
+    """События без ПДн — номер и сумма."""
     p = payload or {}
     number = p.get("number", "")
     total = p.get("total")
@@ -80,7 +80,7 @@ def build(rows: list[Message], epoch: str) -> list[dict]:
 
 
 def dangling_tool_uses(rows: list[Message]) -> list[str]:
-    """id вызовов последнего ответа агента, на которые нет результатов (ТЗ §7.11)."""
+    """id вызовов последнего ответа агента, на которые нет результатов."""
     visible = [r for r in rows if r.role != Message.EVENT and r.api_content is not None]
     if not visible or visible[-1].role != Message.ASSISTANT:
         return []

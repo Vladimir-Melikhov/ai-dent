@@ -5,7 +5,7 @@ from apps.orders.telegram import send_telegram
 
 
 class Command(BaseCommand):
-    help = "Загружает курсы ЦБ РФ и пересчитывает цены валютных товаров в рубли (ТЗ §10.7). Раз в день по cron."
+    help = "Загружает курсы ЦБ РФ и пересчитывает цены валютных товаров в рубли. Раз в день по cron."
 
     def handle(self, *args, **options):
         result = update_rates()

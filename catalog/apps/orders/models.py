@@ -26,7 +26,7 @@ class CartItem(models.Model):
                 condition=models.Q(user__isnull=False) | models.Q(session__isnull=False),
                 name="cart_item_user_or_session",
             ),
-            # Одно правило количества для витрины и агента (ТЗ §5.3, D16)
+            # Одно правило количества для витрины и агента
             models.CheckConstraint(
                 condition=models.Q(quantity__gte=1, quantity__lte=MAX_ITEM_QUANTITY),
                 name="cart_item_quantity_range",
@@ -148,7 +148,7 @@ class OrderItem(models.Model):
     exchange_rate = models.DecimalField(
         max_digits=14, decimal_places=6, null=True, blank=True, verbose_name="Курс ЦБ"
     )
-    # Цену задал менеджер (скидка) — при подтверждении по курсу не пересчитывается (ТЗ §10.5)
+    # Цену задал менеджер (скидка) — при подтверждении по курсу не пересчитывается
     price_overridden = models.BooleanField(default=False, verbose_name="Цена менеджера")
 
     class Meta:
@@ -201,10 +201,10 @@ class Invoice(models.Model):
     order = models.OneToOneField(Order, on_delete=models.CASCADE, related_name="invoice", verbose_name="Заказ")
     number = models.CharField(max_length=50, unique=True, verbose_name="Номер счёта")
     pdf_path = models.CharField(max_length=255, null=True, blank=True, verbose_name="Путь к PDF")
-    # Момент подтверждения заказа (ТЗ §10.5); задаётся явно при выпуске и перевыпуске
+    # Момент подтверждения заказа; задаётся явно при выпуске и перевыпуске
     issued_at = models.DateTimeField(default=timezone.now, verbose_name="Выставлен")
     due_date = models.DateField(null=True, blank=True, verbose_name="Оплатить до")
-    # Выставлен при оформлении, до этапа 3 — продолжает скачиваться (ТЗ §10.5)
+    # Выставлен при оформлении по старой схеме — продолжает скачиваться
     legacy = models.BooleanField(default=False, verbose_name="Выставлен до этапа 3")
     emailed_at = models.DateTimeField(null=True, blank=True, verbose_name="Отправлен письмом")
 
@@ -217,7 +217,7 @@ class Invoice(models.Model):
 
 
 class OrderChange(models.Model):
-    """История правок состава заказа менеджером до подтверждения (ТЗ §10.5)."""
+    """История правок состава заказа менеджером до подтверждения."""
 
     class Action(models.TextChoices):
         QUANTITY_CHANGED = "quantity_changed", "Изменено количество"

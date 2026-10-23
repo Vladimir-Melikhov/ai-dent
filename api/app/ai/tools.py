@@ -1,4 +1,4 @@
-"""Инструменты агента (ТЗ §8).
+"""Инструменты агента.
 
 Схемы строгие (strict); ограничения, которых строгие схемы не поддерживают (min/max,
 длины, размеры массивов), проверяет pydantic до выполнения. Владелец берётся из
@@ -136,7 +136,7 @@ def comparison_table(products: list[Product]) -> dict:
 
 
 async def hydrate_widget(session: AsyncSession, widget: dict) -> dict | None:
-    """Виджет с актуальными данными каталога: в истории хранятся только id (ТЗ §5.1)."""
+    """Виджет с актуальными данными каталога: в истории хранятся только id."""
     kind = widget.get("widget")
     ids = widget.get("product_ids") or []
     if kind == "product_cards":
@@ -404,7 +404,7 @@ async def run_create_quote(ctx: ToolContext, args: QuoteArgs) -> ToolOutput:
 
 
 async def run_open_order_form(ctx: ToolContext, args: EmptyArgs) -> ToolOutput:
-    """Форма оформления в ленте чата: состав — текущая корзина, данные покупателя клиент вводит сам (D6)."""
+    """Форма оформления в ленте чата: состав — текущая корзина, данные покупателя клиент вводит сам."""
     summary = await cart.cart_summary(ctx.session, ctx.owner)
     if not summary["items"]:
         raise ToolError("корзина пуста — сначала положи товары через cart_set_item")
@@ -414,7 +414,7 @@ async def run_open_order_form(ctx: ToolContext, args: EmptyArgs) -> ToolOutput:
 
 
 async def run_open_lead_form(ctx: ToolContext, args: LeadArgs) -> ToolOutput:
-    # Пометка без ПДн: та же маска, что для реплик клиента (ТЗ §7.6)
+    # Пометка без ПДн: та же маска, что для реплик клиента
     await ctx.session.execute(
         update(Conversation).where(Conversation.id == ctx.owner.conversation_id)
         .values(pending_lead_topic=mask_pii(args.topic))
@@ -423,7 +423,7 @@ async def run_open_lead_form(ctx: ToolContext, args: LeadArgs) -> ToolOutput:
                       widget={"widget": "lead_form"})
 
 
-# --- реестр: набор и порядок неизменны — от них зависит кэш (ТЗ §7.2)
+# --- реестр: набор и порядок неизменны — от них зависит кэш
 
 INT_LIST = {"type": "array", "items": {"type": "integer"}}
 

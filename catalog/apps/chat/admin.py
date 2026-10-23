@@ -25,7 +25,7 @@ def _per_conversation(queryset, aggregate):
 
 
 class ReadOnlyMixin:
-    """Переписка в админке только для чтения (ТЗ §12)."""
+    """Переписка в админке только для чтения."""
 
     def has_add_permission(self, request, obj=None):
         return False
@@ -92,7 +92,7 @@ class ConversationAdmin(ReadOnlyMixin, admin.ModelAdmin):
         return obj.lead_exists
 
 
-# --- база знаний (ТЗ §9, §12)
+# --- база знаний
 
 
 class KnowledgeBaseForm(forms.ModelForm):
@@ -182,7 +182,7 @@ class KnowledgeBaseVersionAdmin(admin.ModelAdmin):
         self.message_user(request, f"Версия #{version.pk} активна", messages.SUCCESS)
 
 
-# --- КП (ТЗ §12)
+# --- КП
 
 
 @admin.register(Quote)
@@ -208,7 +208,7 @@ class QuoteAdmin(ReadOnlyMixin, admin.ModelAdmin):
                            reverse("admin:chat_conversation_change", args=[obj.conversation_id]), obj.conversation_id)
 
 
-# --- расход модели (ТЗ §12, §7.9)
+# --- расход модели
 
 MOSCOW = ZoneInfo("Europe/Moscow")
 SUMMARY_DAYS = 60

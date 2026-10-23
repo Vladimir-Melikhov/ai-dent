@@ -16,7 +16,7 @@ def has_dialog(request) -> bool:
 
 
 def landing(request):
-    """Главная: чат встроен в первый экран, плавающей кнопки нет (ТЗ §11, D1)."""
+    """Главная: чат встроен в первый экран, плавающей кнопки нет."""
     unavailable = agent_unavailable()
     return render(request, "storefront/landing.html", {
         "agent_unavailable": unavailable,

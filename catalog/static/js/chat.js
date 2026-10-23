@@ -1,8 +1,6 @@
 /* ============================================================
-   ИИ-консультант: чат (ТЗ §6, §11)
-   Тикет — POST /chat/ticket/ (Django), затем WebSocket /ws/chat (api).
-   Два вида одного текущего диалога: на главной чат встроен в первый экран
-   (data-mode="inline", как у Gemini), на остальных страницах — панель с плавающей кнопкой.
+   Чат консультанта. Тикет — POST /chat/ticket/ (Django), затем WebSocket /ws/chat (api).
+   На главной чат встроен в первый экран (data-mode="inline"), на остальных страницах — панель.
    ============================================================ */
 
 import { bindCartButtons, escapeHTML, formatPrice, productCard } from "./api.js";
@@ -21,7 +19,7 @@ const STATUS_TEXT = {
   cart: "Обновляю корзину…",
   quote: "Готовлю КП…",
 };
-// После этих ошибок на главной включается запасной поиск по каталогу (ТЗ §11)
+// После этих ошибок строка на главной ищет по каталогу
 const UNAVAILABLE_CODES = new Set(["model_unavailable", "limit_reached"]);
 
 const CATALOG_SEARCH_PLACEHOLDER = "Найти оборудование, инструмент, материалы…";
@@ -85,7 +83,7 @@ if (root) {
     notice.hidden = !text;
   }
 
-  /* ---------- форма заявки (ТЗ §10.3): данные уходят в Django, в модель — нет ---------- */
+  /* ---------- форма заявки ---------- */
 
   function formatPhoneDigits(digits) {
     if (!digits.length) return "+7 ";
@@ -162,7 +160,7 @@ if (root) {
     return form;
   }
 
-  /* ---------- форма заказа (ТЗ §10.2, D6): состав — текущая корзина, данные — в Django ---------- */
+  /* ---------- форма заказа ---------- */
 
   const CURRENCY_NOTE = "Сумма по позициям в валюте предварительная — окончательная фиксируется в счёте по курсу ЦБ на дату подтверждения.";
   const BUYER_FIELDS = {
@@ -247,14 +245,13 @@ if (root) {
     }
 
     form.querySelectorAll("[name=buyer_type]").forEach(r => r.addEventListener("change", showBuyerFields));
-    // Клиент исправляет поле — прежняя ошибка уже не про него
     form.addEventListener("input", () => { error.textContent = ""; });
     f.contact_phone.value = "+7 ";
     f.contact_phone.addEventListener("input", () => {
       f.contact_phone.value = formatPhoneDigits(extractPhoneDigits(f.contact_phone.value));
     });
     f.inn.addEventListener("input", () => { f.inn.value = f.inn.value.replace(/\D/g, "").slice(0, 12); });
-    // Состав мог измениться, пока форма была открыта: при сохранении сервер сверит версию (409)
+    // Сервер сверяет версию состава при отправке (409)
     document.addEventListener("cart:changed", () => { if (form.isConnected) loadCart(); });
 
     form.addEventListener("submit", async event => {
@@ -282,7 +279,6 @@ if (root) {
         const data = await res.json();
         if (res.status === 409) { await loadCart(data.message); return; }
         if (!res.ok) throw new Error(data.error || "Не удалось оформить заказ");
-        // Корзина очищена — бейдж и витрина узнают об этом сразу
         if (window.updateCartBadge) window.updateCartBadge(0);
         if (window.refreshCartState) window.refreshCartState();
         if (feed.querySelector(`[data-order="${CSS.escape(data.number)}"]`)) form.remove();
@@ -316,7 +312,6 @@ if (root) {
     sendBtn.hidden = on;
   }
 
-  // Лента листается внутри панели или окна на главной — страница не растягивается
   function scrollDown() { feed.scrollTop = feed.scrollHeight; }
 
   // Картинки карточек догружаются позже — докручиваем, если клиент был внизу ленты
@@ -330,12 +325,9 @@ if (root) {
     });
   }
 
-  // На главной первый экран — заголовок и строка ввода; с первым сообщением строка становится окном чата
   function setActive(on) {
     if (!inlineMode || root.classList.contains("is-active") === on) return;
     root.classList.toggle("is-active", on);
-    // Окно целиком на экране; если уже видно — страница не двигается.
-    // «Новый диалог» сворачивает окно в строку — страница становится короче, строку возвращаем в центр экрана
     requestAnimationFrame(() => root.scrollIntoView({ block: on ? "nearest" : "center", behavior: "smooth" }));
     document.dispatchEvent(new CustomEvent("aidentchat:active", { detail: { active: on } }));
   }
@@ -362,7 +354,6 @@ if (root) {
 
   function showEmpty() {
     if (inlineMode) {
-      // Приветствие на главной — заголовок над строкой ввода
       feed.innerHTML = "";
       setActive(false);
       return;
@@ -370,7 +361,7 @@ if (root) {
     feed.innerHTML = '<p class="chat__empty">Здравствуйте! Я консультант Ai-Dent. Расскажите, какое оборудование вы подбираете.</p>';
   }
 
-  /* ---------- виджеты: данные каталога приходят с сервера, не от модели ---------- */
+  /* ---------- виджеты ---------- */
 
   function renderCards(products) {
     const el = document.createElement("div");
@@ -425,7 +416,6 @@ if (root) {
   }
 
   function afterWidgets() {
-    // Кнопки «В корзину» и «Избранное» в карточках — общие с витриной
     bindCartButtons();
     initShortlist();
   }
@@ -476,8 +466,7 @@ if (root) {
     streaming = null;
     setStreaming(false);
     if (!messages.length) showEmpty();
-    // Формы, после которых были заявка или заказ, показываются отправленными — как сразу после отправки:
-    // на месте последней формы перед событием — подтверждение с номером, само событие второй раз не выводится (append)
+    // Форма, после которой была заявка или заказ, показывается отправленной; событие второй раз не выводится
     const sent = new Map(); // индекс формы → номер или true
     const open = { lead_form: [], order_form: [] };
     const formOf = { lead_created: "lead_form", order_created: "order_form" };
@@ -556,7 +545,7 @@ if (root) {
         setStatus("");
         break;
       case "assistant_discard":
-        // Ответ отменён (остановка, отказ, обрыв) — его текст убирается (ТЗ §6.2)
+        // Ответ отменён (остановка, отказ, обрыв) — его текст убирается
         if (streaming) streaming.el.remove();
         streaming = null;
         setStreaming(false);
@@ -566,7 +555,6 @@ if (root) {
         append(msg.message);
         break;
       case "cart_updated":
-        // Консультант изменил корзину — бейдж, кнопки карточек, открытая корзина и /checkout/ (ТЗ §11)
         fetch("/cart/count/").then(r => r.json()).then(d => window.updateCartBadge && window.updateCartBadge(d.count));
         if (window.refreshCartState) window.refreshCartState();
         document.dispatchEvent(new CustomEvent("cart:changed"));
@@ -580,7 +568,6 @@ if (root) {
         showNotice(msg.message || "Не удалось отправить сообщение", msg.show_lead_button);
         if (UNAVAILABLE_CODES.has(msg.code)) {
           if (inlineMode) {
-            // Запасной поиск: строка на главной ищет по каталогу (ТЗ §11)
             unavailable = true;
             input.placeholder = CATALOG_SEARCH_PLACEHOLDER;
           }
@@ -767,7 +754,7 @@ if (root) {
   const closeBtn = document.getElementById("chat-close");
   if (closeBtn) closeBtn.addEventListener("click", closePanel);
 
-  /* ---------- вопрос извне: подсказки под строкой на главной (ТЗ §11) ---------- */
+  /* ---------- вопрос извне: подсказки под строкой на главной ---------- */
 
   window.aidentChat = {
     open: openPanel,

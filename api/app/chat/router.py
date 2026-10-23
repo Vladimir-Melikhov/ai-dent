@@ -18,7 +18,7 @@ async def chat_socket(websocket: WebSocket, ticket: str = ""):
     service: ChatService = websocket.app.state.chat
     settings = get_settings()
 
-    # Чужой сайт не может открыть соединение от имени клиента (ТЗ §6.2)
+    # Чужой сайт не может открыть соединение от имени клиента
     if websocket.headers.get("origin", "").rstrip("/") != settings.site_origin.rstrip("/"):
         await websocket.close(code=CLOSE_FORBIDDEN)
         return

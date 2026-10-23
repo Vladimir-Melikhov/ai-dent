@@ -49,7 +49,7 @@ class Product(Base):
     description: Mapped[str]
     price: Mapped[decimal.Decimal] = mapped_column(Numeric(12, 2))
     currency: Mapped[str]
-    # Цена в рублях по курсу ЦБ; считает Django (ТЗ §10.7)
+    # Цена в рублях по курсу ЦБ; считает Django
     price_rub: Mapped[decimal.Decimal | None] = mapped_column(Numeric(12, 2))
     stock_qty: Mapped[int]
     characteristics: Mapped[dict] = mapped_column(JSON)
@@ -127,7 +127,7 @@ class CurrencyRate(Base):
     fetched_at: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True))
 
 
-# --- Таблицы, в которые пишет api (ТЗ §4). Миграции — только в Django.
+# --- Таблицы, в которые пишет api. Миграции — только в Django.
 # Значения по умолчанию Django задаёт в Python, а не в БД, поэтому здесь они продублированы.
 
 

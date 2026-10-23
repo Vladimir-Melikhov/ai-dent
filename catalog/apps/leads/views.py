@@ -24,7 +24,7 @@ def _too_many(key: str, limit: int) -> bool:
 
 @require_POST
 def create_lead(request):
-    """Заявка менеджеру из чата (ТЗ §10.3): данные идут в Django и в модель не попадают."""
+    """Заявка менеджеру из чата: данные идут в Django и в модель не попадают."""
     data = parse_json_body(request)
     if data is None:
         return JsonResponse({"error": "Некорректный запрос"}, status=400)

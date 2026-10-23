@@ -313,7 +313,6 @@
   }
   
   
-  /* информация */
   
   .drawer-item--fav .drawer-item__info {
     flex: 1;
@@ -322,7 +321,6 @@
   }
   
   
-  /* правая часть */
   
   .drawer-item--fav .drawer-item__actions {
     display: flex;
@@ -341,7 +339,6 @@
   
   /* ============================================================
      ИЗБРАННОЕ — В КОРЗИНУ
-     ТАКАЯ ЖЕ КНОПКА, КАК В ОСТАЛЬНОМ DRAWER
      ============================================================ */
   
   .drawer-item--fav .drawer-item__tocart {
@@ -408,7 +405,7 @@
     position: relative;
   }
   
-  /* display ниже перебивал атрибут hidden — при пустой корзине бейдж показывал «0» */
+  /* иначе display перебивает hidden */
   .header__cart-badge[hidden] {
     display: none;
   }

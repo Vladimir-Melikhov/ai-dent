@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 
 def send_telegram(text: str) -> bool:
-    """Сообщение в чат менеджеров. Новые уведомления этапа 3 — без ПДн (ТЗ §10.6)."""
+    """Сообщение в чат менеджеров."""
     token = settings.TELEGRAM_BOT_TOKEN
     chat_id = settings.TELEGRAM_CHAT_ID
     if not token or not chat_id:

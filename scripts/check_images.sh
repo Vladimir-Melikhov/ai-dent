@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# T19 (ТЗ §17.2): в собранных образах нет файлов .env. Нужен запущенный Docker.
+# В собранных образах нет файлов .env. Нужен запущенный Docker.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 docker compose build catalog api

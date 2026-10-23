@@ -1,7 +1,7 @@
 /* ============================================================
-   ИИ-консультант: плавающая кнопка и панель чата (ТЗ §11)
-   Слои: кнопка 90 — под модалкой входа (100) и cookie-баннером (150);
-   панель 160 — над cookie-баннером, чтобы он не закрывал поле ввода, но под корзиной (200)
+   ЧАТ: плавающая кнопка и панель
+   z-index: кнопка 90 — под модалкой входа (100) и cookie (150);
+   панель 160 — над cookie, но под корзиной (200)
    ============================================================ */
 
 .chat__fab {
@@ -174,7 +174,7 @@
 
 .chat__hint { margin: 0; padding: 4px 16px 12px; font-size: 11px; line-height: 1.4; color: var(--muted-light); }
 
-/* Телефон: панель на весь экран; кнопка — круглая, без подписи, чтобы не закрывать «В корзину» у карточек */
+/* Телефон: круглая кнопка без подписи, чтобы не закрывать «В корзину» */
 @media (max-width: 640px) {
   .chat__fab { right: 16px; bottom: 16px; width: 56px; height: 56px; padding: 0; justify-content: center; }
   .chat__fab svg { width: 24px; height: 24px; }
@@ -192,7 +192,7 @@
   .chat-msg { max-width: 90%; }
 }
 
-/* Главная: агент недоступен — запасной поиск (ТЗ §11) */
+/* Главная: агент недоступен */
 .agent-down {
   display: flex;
   align-items: center;
@@ -213,15 +213,14 @@
 }
 .agent-down__search:hover { background: var(--accent-hover); }
 
-/* Виджеты в ленте: карточки товаров (общая разметка с витриной) и сравнение */
+/* Виджеты в ленте */
 .chat-widget { align-self: stretch; }
 .chat-cards {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
-/* Стили карточки витрины лежат в catalog.css, который есть только на странице каталога, —
-   здесь их компактная копия для чата, чтобы карточки выглядели одинаково на любой странице */
+/* Копия стилей карточки из catalog.css — он подключён только в каталоге */
 .chat-cards .product-card {
   position: relative; display: flex; flex-direction: column; min-width: 0;
   background: #fff; box-shadow: 0 8px 30px rgba(31, 43, 54, .05); overflow: hidden;
@@ -291,7 +290,7 @@
 }
 .chat-cards .product-card__price-source { flex-basis: 100%; color: #9aa5af; font-size: 10px; }
 
-/* Карточка КП и форма заявки в ленте */
+/* КП и форма заявки */
 .chat-quote {
   padding: 12px 14px;
   border: 1px solid var(--border-soft);
@@ -343,7 +342,7 @@
 .chat-form__error { margin: 0; min-height: 0; color: #b42318; font-size: 12px; }
 .chat-form__error:empty { display: none; }
 
-/* Форма заказа: состав корзины, тип покупателя, поля по типу (ТЗ §10.2) */
+/* Форма заказа */
 .chat-form__input[hidden] { display: none; }
 textarea.chat-form__input { resize: vertical; min-height: 40px; }
 .chat-order__items { display: flex; flex-direction: column; gap: 4px; font-size: 13px; line-height: 1.4; color: var(--text-soft); }
@@ -359,15 +358,12 @@ textarea.chat-form__input { resize: vertical; min-height: 40px; }
   border: 1px solid var(--border-strong); border-radius: var(--radius-pill); font-size: 13px; cursor: pointer;
 }
 .chat-order__types label:has(input:checked) { border-color: var(--accent); background: var(--accent); color: #fff; }
-/* Радиокнопка внутри своей подписи: иначе при фокусе браузер прокручивает саму панель */
+/* Радиокнопка внутри подписи: иначе фокус прокручивает панель */
 .chat-order__types input { position: absolute; inset: 0; margin: 0; opacity: 0; pointer-events: none; }
 .chat-order__types label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* ============================================================
-   Главная: чат на первом экране (ТЗ §11, D1).
-   До первого сообщения — заголовок и строка ввода. После него строка превращается
-   в стеклянное окно фиксированной высоты: лента листается внутри окна, строка ввода — внизу,
-   высота страницы не меняется. Цвета окна — переменными.
+   ГЛАВНАЯ: чат на первом экране
    ============================================================ */
 .chat--inline {
   --glass-bg: rgba(255, 255, 255, .58);
@@ -388,13 +384,13 @@ textarea.chat-form__input { resize: vertical; min-height: 40px; }
   text-align: left;
   color: var(--chat-text);
 }
-/* --- окно: появляется с первым сообщением */
+/* --- окно */
 .chat--inline.is-active {
   display: flex;
   flex-direction: column;
   max-width: 1040px;
   margin: 0 auto;
-  /* Вместе с уменьшенным заголовком укладывается в высоту первого экрана (.hero — 78vh) */
+  /* .hero — 78vh */
   height: clamp(360px, calc(78vh - 108px), 860px);
   background: var(--glass-bg);
   -webkit-backdrop-filter: blur(24px) saturate(150%);
@@ -403,7 +399,7 @@ textarea.chat-form__input { resize: vertical; min-height: 40px; }
   border-radius: 28px;
   box-shadow: var(--glass-shadow), var(--glass-highlight);
   overflow: hidden;
-  overflow: clip; /* фокус внутри окна не прокручивает само окно */
+  overflow: clip;
   animation: chat-window-in .35s cubic-bezier(.16, 1, .3, 1);
 }
 @keyframes chat-window-in {
@@ -437,7 +433,7 @@ textarea.chat-form__input { resize: vertical; min-height: 40px; }
 .chat--inline .chat-form.chat-order { max-width: 480px; }
 .chat--inline .chat-quote { max-width: 420px; }
 
-/* --- строка ввода: «пилюля» поиска; в окне — внизу, на всю ширину */
+/* --- строка ввода */
 .chat--inline .chat__composer { position: relative; z-index: 2; }
 .chat--inline.is-active .chat__composer {
   flex: 0 0 auto;
@@ -486,13 +482,12 @@ textarea.chat-form__input { resize: vertical; min-height: 40px; }
 .chat--inline .chat__new { flex: 0 0 auto; margin-left: auto; color: var(--chat-muted); }
 .chat--inline .chat__new:hover { background: var(--event-bg); color: var(--chat-text); }
 
-/* Переписка началась: заголовок меньше, подсказки и картинка фона уходят — высота страницы та же */
+/* Переписка началась */
 .hero:has(.chat--inline.is-active) .hero__title {
   font-size: clamp(26px, 3.2vw, 36px);
   margin-bottom: 10px;
 }
 .hero:has(.chat--inline.is-active) .hero__title br { display: none; }
-/* Подложка строки поиска не добавляет отступов вокруг окна — место отдано окну */
 .hero:has(.chat--inline.is-active) .search-block-glow { max-width: 1040px; margin-bottom: 12px; padding: 0; }
 .hero:has(.chat--inline.is-active) .search-wrap { margin-bottom: 0; }
 .hero:has(.chat--inline.is-active) .chips { display: none; }
@@ -501,7 +496,7 @@ textarea.chat-form__input { resize: vertical; min-height: 40px; }
 @media (max-width: 1024px) {
   .chat--inline .chat__form { height: auto; min-height: 50px; padding: 4px 6px 4px 16px; }
 }
-/* Телефон: окно на 65% экрана — сверху видны логотип и меню, снизу — начало следующего блока */
+/* Телефон */
 @media (max-width: 640px) {
   .chat--inline.is-active { height: 65vh; height: 65dvh; min-height: 320px; border-radius: 22px; }
   .chat--inline.is-active .chat__feed { padding: 16px 14px 10px; }

@@ -28,7 +28,7 @@ def guest_request(session):
     return SimpleNamespace(anon_session=session)
 
 
-# --- T6: слияние при входе (ТЗ §5.5)
+# --- слияние при входе
 
 
 def test_active_guest_dialog_becomes_current(redis_client, channel, django_capture_on_commit_callbacks):
@@ -98,7 +98,7 @@ def test_sms_login_moves_guest_dialog(client, redis_client):
     assert dialog.user.phone == "+79990000004" and dialog.status == Conversation.Status.ACTIVE
 
 
-# --- очистка гостевых сессий (ТЗ §5.5)
+# --- очистка гостевых сессий
 
 
 def test_cleanup_keeps_sessions_linked_to_order_or_lead():

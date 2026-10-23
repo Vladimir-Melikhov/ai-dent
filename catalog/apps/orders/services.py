@@ -1,4 +1,4 @@
-"""Сервисный слой заказов (ТЗ §10.1, §10.5): единая формула цены, правило допуска, версия корзины,
+"""Сервисный слой заказов: единая формула цены, правило допуска, версия корзины,
 создание заказа, смена статуса, счёт при подтверждении, правка состава менеджером."""
 
 import hashlib
@@ -29,7 +29,7 @@ class CartInvalid(Exception):
 
 
 def cart_item_allowed(product: Product) -> str | None:
-    """Правило допуска — одно для витрины и агента (D16): товар активен и у него есть цена в рублях.
+    """Правило допуска — одно для витрины и агента: товар активен и у него есть цена в рублях.
 
     Остаток не проверяется: товар «под заказ» купить можно. Количество 1–999 закреплено в БД.
     """
@@ -46,7 +46,7 @@ def option_ids(selected_options) -> list[int]:
 
 
 def unit_price_rub(item: CartItem, options: list[ProductOption] | None = None) -> Decimal | None:
-    """Единая формула (D5, D17): price_rub товара + доплаты опций по тому же курсу, до копеек.
+    """Единая формула: price_rub товара + доплаты опций по тому же курсу, до копеек.
 
     Без опций равна price_rub — поэтому корзина в Django и ответы агента дают одни и те же числа.
     """
@@ -94,7 +94,7 @@ def cart_total(lines: list[CartLine]) -> Decimal:
 
 
 def cart_version(lines: list[CartLine]) -> str:
-    """Отпечаток состава и цен: форма отправляет его обратно, расхождение — 409 (D6)."""
+    """Отпечаток состава и цен: форма отправляет его обратно, расхождение — 409."""
     parts = sorted(f"{l.item.id}:{l.item.product_id}:{l.item.quantity}:{l.unit_price}" for l in lines)
     return hashlib.sha256("|".join(parts).encode()).hexdigest()[:16]
 
@@ -106,7 +106,7 @@ def has_foreign_currency(lines: list[CartLine]) -> bool:
 @transaction.atomic
 def create_order_from_cart(owner, data: dict, created_by: str, version: str, *, conversation=None,
                            actor=OrderStatusHistory.Actor.CUSTOMER, actor_user=None) -> Order:
-    """Общая для /checkout/ и чата (ТЗ §10.1). Счёт здесь не создаётся."""
+    """Общая для /checkout/ и чата. Счёт здесь не создаётся."""
     lines = cart_lines(owner)
     if not lines:
         raise CartInvalid("Корзина пуста")
@@ -153,7 +153,7 @@ def create_order_from_cart(owner, data: dict, created_by: str, version: str, *, 
     return order
 
 
-# --- ИНН покупателя (ТЗ §10.2)
+# --- ИНН покупателя
 
 INN10 = [2, 4, 10, 3, 5, 9, 4, 6, 8]
 INN12_1 = [7, 2, 4, 10, 3, 5, 9, 4, 6, 8]
@@ -174,7 +174,7 @@ def valid_inn(inn: str, length: int) -> bool:
     return check(INN12_1) == digits[10] and check(INN12_2) == digits[11]
 
 
-# --- статусы (ТЗ §10.5)
+# --- статусы
 
 S = Order.Status
 TRANSITIONS = {
@@ -201,7 +201,7 @@ def invoice_path(invoice) -> str:
 
 def invoice_available(order) -> bool:
     """Одно правило для скачивания, «Моих заказов» и чата: подтверждён или оплачен — счёт есть;
-    старый счёт (до этапа 3) продолжает выдаваться, пока заказ ждёт подтверждения; у отменённого — нет."""
+    старый счёт, выставленный при оформлении, продолжает выдаваться, пока заказ ждёт подтверждения; у отменённого — нет."""
     invoice = getattr(order, "invoice", None)
     if invoice is None or not os.path.exists(invoice_path(invoice) or "/nonexistent"):
         return False
@@ -215,7 +215,7 @@ def order_total(order) -> Decimal:
 
 
 def recalc_foreign_items(order, date) -> None:
-    """Пересчёт валютных товаров по курсу ЦБ на дату подтверждения (§10.7).
+    """Пересчёт валютных товаров по курсу ЦБ на дату подтверждения.
 
     Доставка и позиции с ценой менеджера не пересчитываются; total_at_creation не меняется.
     """
@@ -262,7 +262,7 @@ EVENT_TEXT = {
 
 
 def _status_event(order, to_status) -> None:
-    """Системная карточка в диалоге (ТЗ §6.3): номер, сумма, ссылка на счёт — без ПДн; хода агента нет."""
+    """Системная карточка в диалоге: номер, сумма, ссылка на счёт — без ПДн; хода агента нет."""
     from apps.chat.models import Message
     from apps.chat.services import add_event
 
@@ -312,7 +312,7 @@ def _change_status(order_id, to_status, actor, actor_user) -> Order:
 
 
 def change_status(order, to_status, actor=OrderStatusHistory.Actor.MANAGER, actor_user=None) -> Order:
-    """Единственный путь смены статуса (ТЗ §10.5). Сбой PDF откатывает подтверждение целиком."""
+    """Единственный путь смены статуса. Сбой PDF откатывает подтверждение целиком."""
     try:
         return _change_status(order.pk, to_status, actor, actor_user)
     except InvoiceError as error:
@@ -322,7 +322,7 @@ def change_status(order, to_status, actor=OrderStatusHistory.Actor.MANAGER, acto
         raise InvoiceError(f"Счёт не сформирован, заказ не подтверждён: {error}") from error
 
 
-# --- правка состава до подтверждения (ТЗ §10.5, D25)
+# --- правка состава до подтверждения
 
 class OrderEditError(Exception):
     """Правка не разрешена — текст для менеджера."""

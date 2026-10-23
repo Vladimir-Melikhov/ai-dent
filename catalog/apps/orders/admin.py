@@ -1,4 +1,4 @@
-"""Админка заказов (ТЗ §10.5, §12): статус только действиями, правка состава до подтверждения."""
+"""Админка заказов: статус только действиями, правка состава до подтверждения."""
 
 from decimal import Decimal
 
@@ -83,7 +83,7 @@ class OrderItemInline(admin.TabularInline):
         return self.fields
 
     def has_add_permission(self, request, obj=None):
-        return False  # новые товары в заказ не добавляются (ТЗ §10.5)
+        return False  # новые товары в заказ не добавляются
 
     def has_delete_permission(self, request, obj=None):
         return editable(obj)

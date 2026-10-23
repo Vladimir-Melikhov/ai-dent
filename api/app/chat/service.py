@@ -47,7 +47,7 @@ CLOSE_FORBIDDEN = 4403
 CLOSE_CONVERSATION_CLOSED = 4409
 
 def triggers_turn(event_type: str, payload: dict | None) -> bool:
-    """Ход агента запускают оформленный заказ и заявка из чата; заявка из запасной формы — нет (ТЗ §6.3)."""
+    """Ход агента запускают оформленный заказ и заявка из чата; заявка из запасной формы — нет."""
     if event_type == "order_created":
         return True
     return event_type == "lead_created" and (payload or {}).get("source") == "ai"
@@ -70,7 +70,7 @@ class ChatService:
     # --- подключение
 
     async def redeem_ticket(self, token: str) -> Owner | None:
-        """Тикет одноразовый: забирается из Redis с удалением (ТЗ §6.2)."""
+        """Тикет одноразовый: забирается из Redis с удалением."""
         if not token:
             return None
         raw = await self.redis.getdel(TICKET_KEY.format(token=token))
@@ -113,7 +113,7 @@ class ChatService:
         return count
 
     async def check_limits(self, owner: Owner) -> str | None:
-        """Счётчики по образцу otp.py (ТЗ §7.8). Возвращает код ошибки или None."""
+        """Счётчики по образцу otp.py. Возвращает код ошибки или None."""
         if await store.count_user_messages(owner.conversation_id) >= self.settings.chat_messages_per_conversation:
             return "conversation_full"
         minute = await self._count(MINUTE_KEY.format(id=owner.conversation_id), 60)
@@ -157,9 +157,9 @@ class ChatService:
                 await self.release_lock(cid, lock)
                 await ws.send_json(error(code))
                 return
-            # Висящий вызов инструмента закрывается до новой реплики — иначе история не соберётся (ТЗ §7.11)
+            # Висящий вызов инструмента закрывается до новой реплики — иначе история не соберётся
             await self.agent.close_dangling(cid)
-            # В БД — исходный текст для человека; модели — замаскированная копия, раз и навсегда (ТЗ §7.4, §7.6)
+            # В БД — исходный текст для человека; модели — замаскированная копия, раз и навсегда
             message = await store.save_message(
                 cid, Message.USER, text, client_message_id=client_id,
                 api_content={"role": "user", "content": [{"type": "text", "text": mask_pii(text)}]},
@@ -185,7 +185,7 @@ class ChatService:
             await self.release_lock(cid, lock)
             self._spawn(self._drain_pending(cid))
 
-    # --- события из Django (ТЗ §6.3)
+    # --- события из Django
 
     async def _drain_pending(self, cid: int) -> None:
         """События, пришедшие во время хода, обрабатываются сразу после него."""

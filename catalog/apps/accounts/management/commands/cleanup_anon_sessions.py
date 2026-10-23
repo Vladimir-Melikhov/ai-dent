@@ -20,7 +20,7 @@ class Command(BaseCommand):
         cutoff = timezone.now() - timedelta(days=days)
         stale = (
             AnonSession.objects.filter(last_seen_at__lt=cutoff)
-            # Иначе пропадёт ссылка «диалог» у заказа или заявки (ТЗ §5.5)
+            # Иначе пропадёт ссылка «диалог» у заказа или заявки
             .exclude(conversations__orders__isnull=False)
             .exclude(conversations__leads__isnull=False)
         )

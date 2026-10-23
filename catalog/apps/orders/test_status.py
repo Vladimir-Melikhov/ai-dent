@@ -1,5 +1,4 @@
-"""M4: заказ из чата, статусы, счёт при подтверждении, правка состава (ТЗ §10.2, §10.5, §10.6; T15, T16, T20;
-приёмочные диалоги 8, 9, 11, 13, 14)."""
+"""Заказ из чата, статусы, счёт при подтверждении, правка состава."""
 
 import datetime
 import json
@@ -89,7 +88,7 @@ def make_order(client, products, capture, **fields):
     return Order.objects.get(number=response.json()["number"])
 
 
-# --- ИНН и поля покупателя (§10.2)
+# --- ИНН и поля покупателя
 
 
 def test_inn_checksum():
@@ -99,7 +98,7 @@ def test_inn_checksum():
 
 
 def test_chat_order_full_path(client, products, dialog, channel, django_capture_on_commit_callbacks):
-    """Диалог 8: заказ в pending_confirmation, created_by = ai, цены из каталога, связь с диалогом, уведомления."""
+    """Заказ в pending_confirmation, created_by = ai, цены из каталога, связь с диалогом, уведомления."""
     listener = channel(dialog.pk)
     order = make_order(client, products, django_capture_on_commit_callbacks)
 
@@ -108,12 +107,12 @@ def test_chat_order_full_path(client, products, dialog, channel, django_capture_
     assert (order.buyer_type, order.company_name, order.inn, order.contact_name) == (
         "legal", "ООО «Улыбка»", "1234567894", "Пётр Сидоров")
     assert order.contact_phone == "+79991112233" and order.delivery_city == "Казань" and order.pd_consent_at
-    # Диалог 11: сумма — по каталогу, другой у агента взяться неоткуда
+    # Сумма — по каталогу, другой у агента взяться неоткуда
     assert order.total_amount == order.total_at_creation == Decimal("48500") * 2 + Decimal("95500")
     assert order.status_history.get().actor == OrderStatusHistory.Actor.AI
     assert not hasattr(order, "invoice") and not invoice_available(order)
 
-    # В диалог — только номер и сумма; данные покупателя в событие не попадают (диалог 10)
+    # В диалог — только номер и сумма; данные покупателя в событие не попадают
     event = next_published(listener)
     assert event["event_type"] == "order_created"
     assert event["payload"] == {"number": order.number, "total": 192500.0}
@@ -155,7 +154,7 @@ def test_ip_and_individual_contact_is_buyer(client, products, django_capture_on_
 
 
 def test_chat_order_rejects_changed_cart(client, products):
-    """T15 для заказа из чата: состав изменился после показа формы — 409, заказ не создан."""
+    """Заказ из чата: состав изменился после показа формы — 409, заказ не создан."""
     add(client, products["loupe"])
     stale = version(client)
     add(client, products["loupe"])
@@ -165,14 +164,14 @@ def test_chat_order_rejects_changed_cart(client, products):
 
 
 def test_under_order_product_can_be_ordered(client, products, django_capture_on_commit_callbacks):
-    """Диалог 13: товар «под заказ» оформляется."""
+    """Товар «под заказ» оформляется."""
     add(client, products["usd"])
     with django_capture_on_commit_callbacks(execute=True):
         assert chat_order(client).status_code == 200
     assert Order.objects.get().items.get().product == products["usd"]
 
 
-# --- статусы (T16)
+# --- статусы
 
 
 @pytest.fixture
@@ -200,7 +199,7 @@ def test_only_allowed_transitions(order, start, target, django_capture_on_commit
 
 def test_confirm_issues_invoice_and_sends_it(client, dialog, order, channel, no_telegram, admin_user,
                                               django_capture_on_commit_callbacks):
-    """Диалог 9 для заказа из чата: до подтверждения счёта нет, после — есть, письма с PDF ушли, событие в диалоге."""
+    """Заказ из чата: до подтверждения счёта нет, после — есть, письма с PDF ушли, событие в диалоге."""
     url = f"/cart/invoice/{order.number}/"
     assert client.get(url).status_code == 404
     listener = channel(dialog.pk)
@@ -234,7 +233,7 @@ def test_confirm_issues_invoice_and_sends_it(client, dialog, order, channel, no_
 
 
 def test_checkout_order_gets_invoice_after_confirmation(client, products, django_capture_on_commit_callbacks):
-    """Диалог 9 для /checkout/: при оформлении счёта нет, в ответе нет invoice_url; после подтверждения — есть."""
+    """Заказ с /checkout/: при оформлении счёта нет, в ответе нет invoice_url; после подтверждения — есть."""
     add(client, products["loupe"])
     body = {"contact_phone": "+7 999 000 00 01", "contact_email": "buyer@example.com", "payment_method": "invoice",
             "cart_version": version(client), "contact_name": "Анна", "requisites": "ООО Ромашка, ИНН 1234567894",
@@ -333,7 +332,7 @@ def test_legacy_invoice_of_cancelled_order_is_hidden(client, order, settings):
     assert client.get(f"/cart/invoice/{order.number}/").status_code == 404
 
 
-# --- валюта при подтверждении (диалог 14) и правка состава (T20)
+# --- валюта при подтверждении и правка состава
 
 
 def tomorrow():
@@ -358,7 +357,7 @@ def test_currency_recalculated_at_confirmation(order, django_capture_on_commit_c
 
 
 def test_manager_edits_before_confirmation(order, admin_user, django_capture_on_commit_callbacks):
-    """T20: количество, цена (скидка), удаление, доставка — в истории; итог пересчитан."""
+    """Количество, цена (скидка), удаление, доставка — в истории; итог пересчитан."""
     loupe = order.items.get(source_currency="RUB")
     microscope = order.items.get(source_currency="USD")
     edit_order_items(order, [
@@ -414,7 +413,7 @@ def test_edit_limits(order, admin_user):
     assert order.total_amount == Decimal("97000") and not order.items.filter(kind="delivery").exists()
 
 
-# --- админка (§12)
+# --- админка
 
 
 class FormFields(HTMLParser):

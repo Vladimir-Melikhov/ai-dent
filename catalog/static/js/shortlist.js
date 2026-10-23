@@ -79,8 +79,6 @@
       .querySelectorAll(".product-card__fav")
       .forEach(btn => {
   
-        /* Защита от повторной привязки */
-  
         if (btn.dataset.favBound) {
           return;
         }
@@ -92,14 +90,10 @@
           Number(btn.dataset.productId);
   
   
-        /* Уже есть в избранном */
-  
         if (favIds.has(productId)) {
           btn.classList.add("is-active");
         }
   
-  
-        /* Нажатие */
   
         btn.addEventListener(
           "click",

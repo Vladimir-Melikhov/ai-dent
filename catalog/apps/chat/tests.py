@@ -19,7 +19,7 @@ def post_ticket(client, body=None):
     return client.post("/chat/ticket/", data=json.dumps(body or {}), content_type="application/json")
 
 
-# --- тикет (ТЗ §6.1)
+# --- тикет
 
 
 def test_ticket_creates_guest_session_and_dialog(client, redis_client):
@@ -66,7 +66,7 @@ def test_ticket_only_post(client):
     assert client.get("/chat/ticket/").status_code == 405
 
 
-# --- события (ТЗ §6.3)
+# --- события
 
 
 def test_event_is_stored_and_published_after_commit(client, redis_client, channel, django_capture_on_commit_callbacks):
@@ -92,7 +92,7 @@ def test_widget_hidden_until_enabled(client, settings):
     assert 'id="chat-widget"' in client.get("/catalog/").content.decode()
 
 
-# --- админка диалогов (ТЗ §12)
+# --- админка диалогов
 
 
 def test_admin_shows_dialog_read_only(admin_client):
@@ -110,7 +110,7 @@ def test_admin_shows_dialog_read_only(admin_client):
     assert 'name="_save"' not in page
 
 
-# --- T1: роль БД для api (ТЗ §5.4)
+# --- роль БД для api
 
 
 @pytest.mark.django_db(transaction=True)
@@ -140,7 +140,7 @@ def test_api_role_has_no_access_to_personal_data():
         conn.close()
 
 
-# --- база знаний (ТЗ §9)
+# --- база знаний
 
 
 def test_import_kb_creates_active_version_once(tmp_path, capsys):
@@ -212,7 +212,7 @@ def test_admin_rejects_empty_and_wrong_file(admin_client):
     assert not KnowledgeBaseVersion.objects.exists()
 
 
-# --- главная: чат на первом экране (ТЗ §11, D1)
+# --- главная: чат на первом экране
 
 
 def test_landing_has_inline_chat_without_floating_button(client, settings, redis_client):
@@ -252,7 +252,7 @@ def test_landing_without_widget_is_plain_search(client, settings, redis_client):
     assert 'id="hero-search"' in page and 'id="chat-widget"' not in page and 'id="agent-down"' not in page
 
 
-# --- КП (ТЗ §10.4)
+# --- КП
 
 
 @pytest.fixture
@@ -304,7 +304,7 @@ def test_quote_admin(admin_client, quote):
     assert admin_client.get("/admin/chat/quote/").status_code == 200
 
 
-# --- расход модели по дням (ТЗ §12)
+# --- расход модели по дням
 
 
 def test_usage_summary_by_day(admin_client):

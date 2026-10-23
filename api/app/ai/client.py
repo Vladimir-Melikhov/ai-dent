@@ -1,4 +1,4 @@
-"""Клиент Claude API: напрямую или через прокси (ТЗ §7, D18)."""
+"""Клиент Claude API: напрямую или через прокси."""
 
 from urllib.parse import urlsplit
 
@@ -7,7 +7,7 @@ import anthropic
 from ..config import Settings, get_settings
 
 DEFAULT_BASE_URL = "https://api.anthropic.com"
-# Фолбэк при отказе классификатора и контроль привязки блоков мышления (ТЗ §7.1)
+# Фолбэк при отказе классификатора и контроль привязки блоков мышления
 BETAS = ["server-side-fallback-2026-07-01", "thinking-binding-controls-2026-08-01"]
 
 
