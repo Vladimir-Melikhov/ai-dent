@@ -1,8 +1,7 @@
-{
-    auto_https off
-}
-
-:80 {
+# Адрес сайта — SITE_ADDRESS из .env (на сервере: aident24.ru, www.aident24.ru).
+# С доменом Caddy сам получает сертификат Let's Encrypt и переводит http на https.
+# Не задан — :80 без HTTPS (локальный стенд)
+{$SITE_ADDRESS::80} {
     encode gzip
 
     header {
@@ -11,6 +10,10 @@
         Referrer-Policy "strict-origin-when-cross-origin"
         Content-Security-Policy "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; font-src 'self'; script-src 'self' https://cdn.tailwindcss.com 'unsafe-inline' 'unsafe-eval'; connect-src 'self' blob: data: ws: wss:;"
     }
+
+    # www → основной домен: Origin WebSocket чата должен совпадать с SITE_ORIGIN
+    @www header_regexp www Host ^www\.(.+)$
+    redir @www https://{re.www.1}{uri} permanent
 
     # Явные MIME-типы для 3D-моделей
     @gltf path *.gltf *.glb
