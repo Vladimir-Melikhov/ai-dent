@@ -1,7 +1,12 @@
+# Пакеты Debian — с зеркала Яндекса: deb.debian.org с сервера в России отдаёт их еле-еле
+ARG DEBIAN_MIRROR=http://mirror.yandex.ru
+
 # --- сборка колёс: компиляторы нужны только здесь ---
 FROM python:3.12-slim AS builder
+ARG DEBIAN_MIRROR
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN sed -i "s|http://deb.debian.org|$DEBIAN_MIRROR|" /etc/apt/sources.list.d/debian.sources \
+    && apt-get update && apt-get install -y --no-install-recommends \
     build-essential libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
@@ -11,13 +16,15 @@ RUN pip wheel --no-cache-dir --wheel-dir /wheels -r requirements.txt
 
 
 FROM python:3.12-slim
+ARG DEBIAN_MIRROR
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN sed -i "s|http://deb.debian.org|$DEBIAN_MIRROR|" /etc/apt/sources.list.d/debian.sources \
+    && apt-get update && apt-get install -y --no-install-recommends \
     fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 
