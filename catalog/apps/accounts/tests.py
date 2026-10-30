@@ -98,6 +98,120 @@ def test_sms_login_moves_guest_dialog(client, redis_client):
     assert dialog.user.phone == "+79990000004" and dialog.status == Conversation.Status.ACTIVE
 
 
+# --- вход по SMS через Notificore
+
+
+@pytest.fixture
+def notificore(settings, monkeypatch):
+    """Notificore без сети: ответы по пути запроса, запросы копятся в calls."""
+    from . import sms
+
+    settings.SMS_PROVIDER = "notificore"
+    settings.SMS_API_KEY = "live_test"
+    settings.SMS_SENDER = "Ai-Dent"
+    settings.SMS_TEMPLATE_ID = "443"
+    monkeypatch.setattr(sms, "_token", {"value": "", "expires_at": 0.0})
+    fake = SimpleNamespace(calls=[], responses={
+        "/auth/login": [(200, {"bearer": "jwt"})],
+        "/2fa/authentications/otp": [(200, {"data": {"id": "auth-1", "status": "pending"}})],
+        "/2fa/authentications/otp/auth-1/verify": [(200, {"data": {"id": "auth-1", "status": "verified"}})],
+    })
+
+    def post(path, payload, token=""):
+        fake.calls.append((path, payload, token))
+        answers = fake.responses[path]
+        return answers.pop(0) if len(answers) > 1 else answers[0]
+
+    monkeypatch.setattr(sms, "_post", post)
+    return fake
+
+
+def request_code(client, phone="+79060608801"):
+    return client.post("/accounts/request-code/", data={"phone": phone}, content_type="application/json")
+
+
+def verify_code(client, code, phone="+79060608801"):
+    return client.post(
+        "/accounts/verify-code/", data={"phone": phone, "code": code}, content_type="application/json",
+    )
+
+
+def test_notificore_login(client, redis_client, notificore):
+    assert request_code(client, "8 906 060-88-01").status_code == 200
+    assert redis_client.get("otp:+79060608801") == "auth-1"
+    path, payload, token = notificore.calls[1]
+    assert path == "/2fa/authentications/otp" and token == "jwt"
+    assert payload == {
+        "channel": "sms", "recipient": "79060608801", "sender": "Ai-Dent", "template_id": 443,
+        "code_digits": 4, "code_max_tries": 2, "code_lifetime": 60,
+    }
+
+    response = verify_code(client, "0786")
+
+    assert response.status_code == 200
+    assert notificore.calls[-1][1] == {"access_code": "0786"}  # строкой — ведущий ноль на месте
+    assert User.objects.filter(phone="+79060608801").exists()
+    assert redis_client.get("otp:+79060608801") is None
+
+
+def test_notificore_wrong_code_then_locked(client, redis_client, notificore):
+    notificore.responses["/2fa/authentications/otp/auth-1/verify"] = [
+        (404, {"message": "2FA Service error.", "errors": ["The code does not match the expected value"]}),
+    ]
+    request_code(client)
+
+    first, second = verify_code(client, "1111"), verify_code(client, "2222")
+
+    assert first.json()["error"] == "Неверный или просроченный код"
+    assert second.json()["error"] == "Слишком много попыток. Запросите новый код"
+    assert redis_client.get("otp:+79060608801") is None
+    assert not User.objects.filter(phone="+79060608801").exists()
+
+
+def test_notificore_expired_token_is_renewed(client, redis_client, notificore):
+    notificore.responses["/auth/login"] = [(200, {"bearer": "old"}), (200, {"bearer": "new"})]
+    notificore.responses["/2fa/authentications/otp"] = [
+        (401, {"code": 401, "message": "Expired JWT Token"}),
+        (200, {"data": {"id": "auth-1"}}),
+    ]
+
+    assert request_code(client).status_code == 200
+    assert [token for path, _, token in notificore.calls if path != "/auth/login"] == ["old", "new"]
+
+
+def test_notificore_send_failure_allows_retry(client, redis_client, notificore):
+    notificore.responses["/2fa/authentications/otp"] = [
+        (402, {"errors": [{"message": "Insufficient funds"}]}),
+        (200, {"data": {"id": "auth-1"}}),
+    ]
+
+    failed = request_code(client)
+
+    assert failed.status_code == 503
+    assert failed.json()["error"] == "Не удалось отправить SMS. Попробуйте позже"
+    assert redis_client.get("otp:+79060608801") is None
+    assert request_code(client).status_code == 200  # без паузы на повторную отправку
+
+
+def test_notificore_unavailable_on_verify(client, redis_client, notificore):
+    request_code(client)
+    notificore.responses["/2fa/authentications/otp/auth-1/verify"] = [(500, {})]
+
+    response = verify_code(client, "0786")
+
+    assert response.status_code == 503
+    assert response.json()["error"] == "Не удалось проверить код. Попробуйте ещё раз"
+
+
+def test_no_sms_provider(client, redis_client, settings):
+    settings.SMS_PROVIDER = ""
+
+    response = request_code(client)
+
+    assert response.status_code == 503
+    assert redis_client.get("otp:+79060608801") is None
+
+
 # --- очистка гостевых сессий
 
 

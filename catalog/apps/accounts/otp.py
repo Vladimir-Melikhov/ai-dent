@@ -1,5 +1,3 @@
-import secrets
-
 import redis
 from django.conf import settings
 
@@ -13,6 +11,7 @@ from .constans import (
     OTP_RESEND_KEY,
     OTP_TTL,
 )
+from .sms import check_otp, send_otp
 
 redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
 
@@ -37,17 +36,18 @@ def ip_limit_exceeded(ip: str) -> bool:
     return count > OTP_IP_HOURLY_LIMIT
 
 
-def generate_and_store_otp(phone: str) -> str:
-    code = f"{secrets.randbelow(10000):04d}"
+def send_and_store_otp(phone: str) -> None:
+    """Отправляет код; SmsError — не отправлен, повторить можно сразу."""
+    reference = send_otp(phone)
     pipe = redis_client.pipeline()
-    pipe.set(OTP_KEY.format(phone=phone), code, ex=OTP_TTL)
+    pipe.set(OTP_KEY.format(phone=phone), reference, ex=OTP_TTL)
     pipe.delete(OTP_ATTEMPTS_KEY.format(phone=phone))
     pipe.set(OTP_RESEND_KEY.format(phone=phone), 1, ex=OTP_RESEND_COOLDOWN)
     pipe.execute()
-    return code
 
 
 def verify_otp(phone: str, code: str) -> str:
+    """OTP_OK / OTP_INVALID / OTP_LOCKED; SmsError — провайдер не ответил."""
     code_key = OTP_KEY.format(phone=phone)
     attempts_key = OTP_ATTEMPTS_KEY.format(phone=phone)
 
@@ -63,7 +63,7 @@ def verify_otp(phone: str, code: str) -> str:
         redis_client.delete(code_key, attempts_key)
         return OTP_LOCKED
 
-    if secrets.compare_digest(stored, code):
+    if check_otp(stored, code):
         redis_client.delete(code_key, attempts_key)
         return OTP_OK
     if attempts == OTP_MAX_ATTEMPTS:

@@ -7,12 +7,12 @@ from .models import User
 from .otp import (
     OTP_LOCKED,
     OTP_OK,
-    generate_and_store_otp,
     ip_limit_exceeded,
     resend_wait_seconds,
+    send_and_store_otp,
     verify_otp,
 )
-from .sms import send_otp_sms
+from .sms import SmsError
 from django.contrib.auth import logout as auth_logout
 from django.shortcuts import redirect
 from .models import ShortlistItem
@@ -55,8 +55,10 @@ def request_code(request):
     if ip_limit_exceeded(get_client_ip(request)):
         return JsonResponse({"error": "Слишком много запросов. Попробуйте позже"}, status=429)
 
-    code = generate_and_store_otp(phone)
-    send_otp_sms(phone, code)
+    try:
+        send_and_store_otp(phone)
+    except SmsError:
+        return JsonResponse({"error": "Не удалось отправить SMS. Попробуйте позже"}, status=503)
     return JsonResponse({"ok": True})
 
 
@@ -70,7 +72,10 @@ def verify_code(request):
     if not phone or not isinstance(code, str) or not code.strip():
         return _bad_request("Неверный или просроченный код")
 
-    result = verify_otp(phone, code.strip())
+    try:
+        result = verify_otp(phone, code.strip())
+    except SmsError:
+        return JsonResponse({"error": "Не удалось проверить код. Попробуйте ещё раз"}, status=503)
     if result == OTP_LOCKED:
         return _bad_request("Слишком много попыток. Запросите новый код")
     if result != OTP_OK:

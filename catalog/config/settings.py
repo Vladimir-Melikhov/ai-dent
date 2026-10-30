@@ -171,6 +171,13 @@ TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
 # Ссылки в админку в уведомлениях Telegram: путь админки становится известен Telegram
 TELEGRAM_ADMIN_LINKS = env("TELEGRAM_ADMIN_LINKS", default="True") == "True"
+# SMS с кодом входа: notificore — 2FA API Notificore; console — код в лог (только локальный стенд).
+# На проде без провайдера вход по SMS отвечает «Не удалось отправить SMS»
+SMS_PROVIDER = env("SMS_PROVIDER", default="console" if DEBUG else "")
+SMS_API_KEY = env("SMS_API_KEY", default="")
+SMS_SENDER = env("SMS_SENDER", default="")
+SMS_TEMPLATE_ID = env("SMS_TEMPLATE_ID", default="")
+
 # Ссылка на оплату в событии order_confirmed — после подключения провайдера
 PAYMENT_LINK_ENABLED = env("PAYMENT_LINK_ENABLED", default="False") == "True"
 

@@ -12,6 +12,7 @@ def pytest_configure(config):
 def _no_external_notifications(settings):
     settings.TELEGRAM_BOT_TOKEN = ""
     settings.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+    settings.SMS_PROVIDER = "console"
 
 
 @pytest.fixture
