@@ -120,11 +120,17 @@ def test_request_shape_and_cache(client, redis_sync, conversation, fake_model, k
 def test_client_text_reaches_model_masked(client, redis_sync, conversation, fake_model):
     with chat(client, redis_sync, conversation) as ws:
         ws.receive_json()
-        ws.send_json(user_message("Перезвоните на +7 999 123-45-67, ИНН 7701234567"))
+        ws.send_json(user_message(
+            "Перезвоните на +7 999 123-45-67, ИНН 7701234567. Меня зовут Петрова Анна Сергеевна, "
+            "почта anna.petrova собака mail точка ru, адрес: ул. Ленина, д. 5, кв. 12. Нужны лупы Zumax 3,5× до 200 000 ₽"
+        ))
         receive_until(ws, "assistant_end")
     sent = json.dumps(fake_model.requests, ensure_ascii=False)
-    assert "123-45-67" not in sent and "7701234567" not in sent
-    assert "[телефон]" in sent and "[реквизит]" in sent
+    for secret in ("123-45-67", "7701234567", "Петрова", "Анна", "Сергеевна", "anna.petrova", "Ленина", "кв. 12"):
+        assert secret not in sent, secret
+    for label in ("[телефон]", "[реквизит]", "[имя]", "[email]", "[адрес]"):
+        assert label in sent, label
+    assert "Нужны лупы Zumax 3,5× до 200 000 ₽" in sent
     # В нашей БД — исходный текст
     assert messages_in_db(conversation["id"])[0]["content"].startswith("Перезвоните на +7 999 123-45-67")
 

@@ -11,7 +11,7 @@ from redis.exceptions import ConnectionError as RedisConnectionError
 from starlette.websockets import WebSocket
 
 from ..ai.agent import Agent
-from ..ai.masking import mask_pii
+from ..ai.masking import mask_pii, refresh_vocabulary
 from ..config import Settings
 from ..db.models import Conversation, Message
 from . import store
@@ -159,6 +159,8 @@ class ChatService:
                 return
             # Висящий вызов инструмента закрывается до новой реплики — иначе история не соберётся
             await self.agent.close_dangling(cid)
+            # Бренды и товары каталога — чтобы маскирование их не задело (из БД не чаще раза в 10 минут)
+            await refresh_vocabulary()
             # В БД — исходный текст для человека; модели — замаскированная копия, раз и навсегда
             message = await store.save_message(
                 cid, Message.USER, text, client_message_id=client_id,
