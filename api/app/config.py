@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     chat_max_message_length: int = 2000
     chat_messages_per_minute: int = 6
     chat_messages_per_day: int = 50
+    # Сутки на один IP: новая cookie или «новый диалог» лимиты не обходят
+    chat_messages_per_ip_per_day: int = 150
     # Длинная история дорожает с каждой репликой — дальше предлагаем новый диалог
     chat_messages_per_conversation: int = 60
     # Суточный бюджет на модель по сайту, $ (~25–35 диалогов); 0 — без ограничения

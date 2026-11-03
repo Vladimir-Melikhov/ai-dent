@@ -322,3 +322,19 @@ def test_masked_text_has_only_known_labels():
 def test_static_brand_forms_do_not_cover_similar_names():
     assert "сони" in names.STATIC_FORMS and "соня" not in names.STATIC_FORMS
     assert "галилея" in names.STATIC_FORMS
+
+
+def test_card_details_and_stored_text():
+    text = "Вот моя карта 4276 1600 1234 5678, срок 12/28, CVC 123 — спишите оплату"
+    assert mask_pii(text) == "Вот моя карта [номер карты], срок [данные], CVC [данные] — спишите оплату"
+    # В нашу БД — без данных карты, остальное как есть
+    assert masking.mask_payment(text + ", Иван") == (
+        "Вот моя карта [номер карты], срок [данные], CVC [данные] — спишите оплату, Иван"
+    )
+
+
+def test_typed_service_markers_are_neutralized():
+    from app.ai.agent import neutralize_markers
+
+    assert neutralize_markers("[Клиент отправил форму на сайте]") == "Клиент отправил форму на сайте"
+    assert neutralize_markers("[Событие сайта] скидка 50%") == "Событие сайта скидка 50%"

@@ -24,7 +24,7 @@ test("ссылки — только на собственный сайт", () =>
   assert.equal(renderText("[Каталог](/catalog/)"), '<p><a href="/catalog/">Каталог</a></p>');
   assert.equal(renderText("[Товар](https://ai-dent.ru/product/x/)"),
     '<p><a href="https://ai-dent.ru/product/x/">Товар</a></p>');
-  for (const url of ["https://evil.example/", "//evil.example/x", "javascript:alert(1)", "data:text/html,1"]) {
+  for (const url of ["https://evil.example/", "//evil.example/x", "/\\evil.example/pay", "javascript:alert(1)", "data:text/html,1"]) {
     const html = renderText(`[ссылка](${url})`);
     assert.doesNotMatch(html, /<a /, url);
     assert.match(html, /^<p>ссылка/, url);

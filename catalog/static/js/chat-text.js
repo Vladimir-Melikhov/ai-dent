@@ -6,6 +6,8 @@
 import { escapeHTML } from "./api.js";
 
 export function safeHref(url) {
+  // «/\\evil.example» браузер открывает как внешний сайт
+  if (url.includes("\\")) return null;
   if (url.startsWith("/") && !url.startsWith("//")) return url;
   if (url.startsWith(location.origin + "/")) return url;
   return null;

@@ -34,6 +34,14 @@ BUDGET_KEY = "chat:budget:{date}"
 UNAVAILABLE_KEY = "chat:agent_unavailable"
 UNAVAILABLE_TTL = 300
 FORM_SUBMITTED = "[Клиент отправил форму на сайте]"
+EVENT_PREFIX = "[Событие сайта]"
+
+
+def neutralize_markers(text: str) -> str:
+    """Служебные пометки сайта, набранные клиентом, — без квадратных скобок: модель им не доверяет."""
+    for marker in (FORM_SUBMITTED, EVENT_PREFIX):
+        text = text.replace(marker, marker.strip("[]"))
+    return text
 ROUNDS_EXHAUSTED = "Не получилось довести ответ до конца — переформулируйте, пожалуйста, вопрос."
 
 
@@ -213,6 +221,10 @@ class Agent:
         await self.redis.expire(key, 2 * 24 * 3600)
 
     async def _unavailable(self, error: Exception) -> TurnAborted:
+        if isinstance(error, anthropic.APIStatusError) and error.status_code in (429, 529):
+            # Перегрузка после повторов — отказ этому клиенту, но чат на сайте не прячем
+            logger.warning("Модель перегружена: %s", error)
+            return TurnAborted("model_unavailable")
         logger.error("Модель недоступна: %s", error)
         await self.redis.set(UNAVAILABLE_KEY, "model", ex=UNAVAILABLE_TTL)
         return TurnAborted("model_unavailable")
@@ -288,7 +300,10 @@ class Agent:
         """Круг с инструментами пишется атомарно: ответ, изменения корзины, результаты."""
         cid = owner.conversation_id
         outcomes: list = [None] * len(calls)
-        reading = [i for i, c in enumerate(calls) if not getattr(self.tools.get(c["name"]), "mutating", False)]
+        mutating = [i for i, c in enumerate(calls) if getattr(self.tools.get(c["name"]), "mutating", False)]
+        # Читающие вызовы после изменяющего идут по порядку в той же транзакции: «положи и покажи корзину»
+        first_change = mutating[0] if mutating else len(calls)
+        reading = [i for i in range(first_change) if i not in mutating]
         done = await asyncio.gather(*(self._reading(owner, calls[i]) for i in reading))
         for i, outcome in zip(reading, done):
             outcomes[i] = outcome
@@ -352,6 +367,9 @@ class Agent:
                         await store.add_messages(session, cid, assistant)
                     if streamed or assistant.content:
                         await self.hub.broadcast(cid, {"type": "assistant_end", "message": store.display(assistant)})
+                    else:
+                        # Пустой ответ (например, после формы): без сигнала «думает…» висел бы вечно
+                        await self.hub.broadcast(cid, {"type": "assistant_discard"})
                     await self.redis.delete(UNAVAILABLE_KEY)
                     return
 

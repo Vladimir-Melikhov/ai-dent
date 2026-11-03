@@ -239,8 +239,17 @@ def test_stream_break_is_retried_once_then_model_unavailable(client, redis_sync,
     assert redis_sync.get("chat:agent_unavailable") == "model"
 
 
-def test_http_error_marks_agent_unavailable_and_success_clears_it(client, redis_sync, conversation, fake_model):
+def test_overload_does_not_hide_chat_for_everyone(client, redis_sync, conversation, fake_model):
     fake_model.add(Reply(http_status=529))
+    with chat(client, redis_sync, conversation) as ws:
+        ws.receive_json()
+        ws.send_json(user_message("Вопрос"))
+        assert receive_until(ws, "error")[-1]["code"] == "model_unavailable"
+    assert redis_sync.get("chat:agent_unavailable") is None
+
+
+def test_http_error_marks_agent_unavailable_and_success_clears_it(client, redis_sync, conversation, fake_model):
+    fake_model.add(Reply(http_status=401))
     with chat(client, redis_sync, conversation) as ws:
         ws.receive_json()
         ws.send_json(user_message("Вопрос"))

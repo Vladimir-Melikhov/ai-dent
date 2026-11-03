@@ -240,7 +240,8 @@ _DATE_VALUE = re.compile(
     re.I,
 )
 _HANDLE_VALUE = re.compile(r"@?[A-Za-z][A-Za-z0-9_.]{3,31}")
-_VALUES = {"date": _DATE_VALUE, "number": _NUMBER_VALUE, "handle": _HANDLE_VALUE, "index": re.compile(r"\d{6}")}
+_VALUES = {"date": _DATE_VALUE, "number": _NUMBER_VALUE, "handle": _HANDLE_VALUE, "index": re.compile(r"\d{6}"),
+           "card": re.compile(r"\d{2}\s*/\s*\d{2,4}(?!\d)|\d{3,4}(?!\d)")}
 # Между триггером имени или фразы и значением — только пробелы, двоеточие, тире: «ФИО, телефон» — перечисление
 _TIGHT_GAP = r"[ \t:=—–\-]*"
 
@@ -266,13 +267,15 @@ _VALUE_TRIGGERS = [
               r"skype|скайп\w*)(?:\s+(?:в|во)\s+[а-яёa-z]+)?"),
      "ник", "handle"),
     (_trigger(r"индекс\w*"), "адрес", "index"),
+    (_trigger(r"срок(?:\s+действия)?|действует\s+до|годна\s+до|exp(?:iry|\.)?|valid\s+thru|cvv2?|cvc2?|"
+              r"код\s+безопасности"), "данные", "card"),
 ]
 # После этих слов маскируем всё до конца фразы
 _CLAUSE_TRIGGERS = [
     (_trigger(r"адрес(?:\s+доставки|\s+проживания|\s+регистрации)?|по\s+адресу|проживаю|живу|прописан[аы]?|"
               r"зарегистрирован[аы]?\s+по|доставьте\s+(?:на|по)|address", gap=_TIGHT_GAP), "адрес"),
     (_trigger(r"выдан[аоы]?", gap=_TIGHT_GAP), "документ"),
-    (_trigger(r"пароль|логин|password|passwd|login|пин(?:-?код)?|pin|cvv|cvc|код\s+(?:из|в)\s+смс|"
+    (_trigger(r"пароль|логин|password|passwd|login|пин(?:-?код)?|pin|код\s+(?:из|в)\s+смс|"
               r"код\s+подтверждения|кодовое\s+слово|секретн\w*\s+слово", gap=_TIGHT_GAP), "данные"),
 ]
 # Имя после этих слов; lower=True — и строчными («меня зовут вася»)
@@ -519,6 +522,16 @@ def _mask_once(text: str, vocabulary: Vocabulary) -> str:
     hits += _initials(blanked, vocabulary.protects)
     hits += _context(text, vocabulary.protects)
     hits += [Hit(s, e, "имя", 2) for s, e in names.find_names(blanked, vocabulary.protects)]
+    return _apply(text, hits)
+
+
+def mask_payment(text: str) -> str:
+    """Для хранения в нашей БД: только номер карты, срок и CVC — остальной текст как есть."""
+    card = next(pattern for label, pattern in STRONG if label == "номер карты")
+    hits = [Hit(*m.span(), "номер карты") for m in card.finditer(text)]
+    for pattern, label, kind in _VALUE_TRIGGERS:
+        if kind == "card":
+            hits += [Hit(*v.span(), label) for m in pattern.finditer(text) if (v := _VALUES[kind].match(text, m.end()))]
     return _apply(text, hits)
 
 

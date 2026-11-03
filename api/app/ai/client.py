@@ -16,6 +16,8 @@ def _client_kwargs(settings: Settings) -> dict:
     return {
         "api_key": settings.anthropic_api_key,
         "base_url": settings.anthropic_base_url or DEFAULT_BASE_URL,
+        # 429 и перегрузку SDK повторяет с паузой (учитывает retry-after)
+        "max_retries": 4,
     }
 
 

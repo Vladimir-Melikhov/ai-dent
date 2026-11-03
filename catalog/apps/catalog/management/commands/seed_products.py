@@ -2,6 +2,7 @@
 с плейсхолдер-картинками. Идемпотентно — повторный запуск не плодит дубли."""
 import random
 import textwrap
+from decimal import Decimal
 
 from django.core.files.base import ContentFile
 from django.core.management.base import BaseCommand
@@ -88,7 +89,7 @@ class Command(BaseCommand):
                 if Product.objects.filter(name=name).exists():
                     continue
 
-                price = round(random.uniform(*spec["price"]), -2)
+                price = Decimal(round(random.uniform(*spec["price"]), -2)).quantize(Decimal("1"))
                 product = Product.objects.create(
                     name=name,
                     brand=brand,

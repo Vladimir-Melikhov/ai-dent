@@ -11,7 +11,8 @@ from redis.exceptions import ConnectionError as RedisConnectionError
 from starlette.websockets import WebSocket
 
 from ..ai.agent import Agent
-from ..ai.masking import mask_pii, refresh_vocabulary
+from ..ai.agent import neutralize_markers
+from ..ai.masking import mask_payment, mask_pii, refresh_vocabulary
 from ..config import Settings
 from ..db.models import Conversation, Message
 from . import store
@@ -29,6 +30,7 @@ EVENT_KEY = "chat:event:{id}"
 PENDING_KEY = "chat:conv:{id}:pending"
 MINUTE_KEY = "chat:limit:minute:{id}"
 DAY_KEY = "chat:limit:day:{owner}:{date}"
+IP_DAY_KEY = "chat:limit:ip:{ip}:{date}"
 CHANNEL_PATTERN = "chat:conv:*"
 
 EVENT_TTL = 24 * 60 * 60
@@ -45,6 +47,14 @@ return 0
 CLOSE_BAD_TICKET = 4401
 CLOSE_FORBIDDEN = 4403
 CLOSE_CONVERSATION_CLOSED = 4409
+
+def client_ip(ws: WebSocket) -> str:
+    # За Caddy реальный IP — последний в X-Forwarded-For (его дописывает сам прокси), как в Django
+    forwarded = ws.headers.get("x-forwarded-for", "")
+    if forwarded:
+        return forwarded.split(",")[-1].strip()
+    return ws.client.host if ws.client else ""
+
 
 def triggers_turn(event_type: str, payload: dict | None) -> bool:
     """Ход агента запускают оформленный заказ и заявка из чата; заявка из запасной формы — нет."""
@@ -112,7 +122,7 @@ class ChatService:
             await self.redis.expire(key, ttl)
         return count
 
-    async def check_limits(self, owner: Owner) -> str | None:
+    async def check_limits(self, owner: Owner, ip: str = "") -> str | None:
         """Счётчики по образцу otp.py. Возвращает код ошибки или None."""
         if await store.count_user_messages(owner.conversation_id) >= self.settings.chat_messages_per_conversation:
             return "conversation_full"
@@ -122,6 +132,8 @@ class ChatService:
         today = datetime.datetime.now(MOSCOW).strftime("%Y%m%d")
         day = await self._count(DAY_KEY.format(owner=owner.key, date=today), EVENT_TTL)
         if day > self.settings.chat_messages_per_day:
+            return "limit_reached"
+        if ip and await self._count(IP_DAY_KEY.format(ip=ip, date=today), EVENT_TTL) > self.settings.chat_messages_per_ip_per_day:
             return "limit_reached"
         return None
 
@@ -152,7 +164,7 @@ class ChatService:
             if await store.client_message_exists(cid, client_id):
                 await self.release_lock(cid, lock)
                 return
-            code = await self.check_limits(owner)
+            code = await self.check_limits(owner, client_ip(ws))
             if code:
                 await self.release_lock(cid, lock)
                 await ws.send_json(error(code))
@@ -161,10 +173,10 @@ class ChatService:
             await self.agent.close_dangling(cid)
             # Бренды и товары каталога — чтобы маскирование их не задело (из БД не чаще раза в 10 минут)
             await refresh_vocabulary()
-            # В БД — исходный текст для человека; модели — замаскированная копия, раз и навсегда
+            # В БД — текст для человека без данных карты; модели — замаскированная копия, раз и навсегда
             message = await store.save_message(
-                cid, Message.USER, text, client_message_id=client_id,
-                api_content={"role": "user", "content": [{"type": "text", "text": mask_pii(text)}]},
+                cid, Message.USER, mask_payment(text), client_message_id=client_id,
+                api_content={"role": "user", "content": [{"type": "text", "text": neutralize_markers(mask_pii(text))}]},
             )
         except BaseException:
             await self.release_lock(cid, lock)

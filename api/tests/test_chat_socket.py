@@ -102,6 +102,15 @@ def test_rate_limit_per_minute(client, redis_sync, conversation, chat_settings):
         assert ws.receive_json()["code"] == "rate_limited"
 
 
+def test_daily_limit_per_ip_survives_new_cookie(client, redis_sync, conversation, chat_settings):
+    # Новая гостевая cookie даёт новые 50 сообщений, но не новый лимит IP
+    chat_settings.chat_messages_per_ip_per_day = 0
+    with connect(client, make_ticket(redis_sync, conversation)) as ws:
+        ws.receive_json()
+        ws.send_json(user_message())
+        assert ws.receive_json()["code"] == "limit_reached"
+
+
 def test_daily_limit_shows_lead_button(client, redis_sync, conversation, chat_settings):
     chat_settings.chat_messages_per_day = 0
     with connect(client, make_ticket(redis_sync, conversation)) as ws:

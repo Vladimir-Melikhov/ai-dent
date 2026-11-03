@@ -148,6 +148,19 @@ def test_agent_changes_cart_and_storefront_is_told(client, redis_sync, conversat
     assert [(r["product_id"], r["quantity"]) for r in cart_rows(conversation)] == [(catalog["loupe"], 1)]
 
 
+
+def test_put_and_show_cart_in_one_round(client, redis_sync, conversation, catalog, fake_model):
+    """«Положи и покажи корзину» в одном шаге: корзина показывается уже с товаром."""
+    fake_model.add(Reply(blocks=[thinking(), tool_use("cart_set_item", {"product_id": catalog["loupe"], "quantity": 1}),
+                                 tool_use("get_cart", {})], stop_reason="tool_use"))
+    with connect(client, make_ticket(redis_sync, conversation)) as ws:
+        ws.receive_json()
+        ws.send_json(user_message("Положите лупу и покажите корзину"))
+        receive_until(ws, "assistant_end")
+    results = fake_model.requests[1]["messages"][-1]["content"]
+    assert str(catalog["loupe"]) in json.dumps(results[1], ensure_ascii=False)
+
+
 # --- форма заказа
 
 
