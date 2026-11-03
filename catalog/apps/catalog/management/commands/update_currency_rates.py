@@ -18,4 +18,4 @@ class Command(BaseCommand):
         if result["stale"]:
             message = f"Курс ЦБ для {', '.join(result['stale'])} не обновлялся больше 7 дней или его нет"
             self.stderr.write(self.style.WARNING(message))
-            send_telegram(f"Ai-Dent: {message}")
+            send_telegram(f"Ай-Дент: {message}")

@@ -32,20 +32,15 @@ def send_order_telegram(order):
     if not token or not chat_id:
         return
 
-    items = order.items.select_related("product").all()
+    # Без персональных данных: имя, телефон и почта покупателя — только в письме
+    count = order.items.count()
     lines = [
-        f"Новый заказ №{order.number}",
-        f"Имя: {order.contact_name or '-'}",
-        f"Телефон: {order.contact_phone or '-'}",
-        f"Email: {order.contact_email or '-'}",
+        f"🛒 Новый заказ №{order.number}",
+        f"Позиций: {count} · сумма {order.total_amount} {order.currency}",
+        f"Оплата: {order.get_payment_method_display() if order.payment_method else '—'}",
         "",
-        "Состав:",
+        "Состав и данные покупателя — в письме на почте.",
     ]
-    for it in items:
-        lines.append(f"• {it.product_name} x{it.quantity} — {it.line_total} ₽")
-    lines.append("")
-    lines.append(f"Сумма: {order.total_amount} {order.currency}")
-    lines.append(f"Оплата: {order.get_payment_method_display() if order.payment_method else '-'}")
     text = "\n".join(lines)
 
     url = f"https://api.telegram.org/bot{token}/sendMessage"

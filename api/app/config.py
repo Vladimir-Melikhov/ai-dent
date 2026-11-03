@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     # Пустая переменная окружения — то же, что отсутствующая: берётся значение по умолчанию
     model_config = SettingsConfigDict(env_ignore_empty=True)
 
-    app_title: str = "Ai-Dent"
+    app_title: str = "Ай-Дент"
     debug: bool = False
     database_url: str = "postgresql+asyncpg://dentai:dentai@localhost:5432/dentai"
     # В тестах соединения не переиспользуются между циклами событий

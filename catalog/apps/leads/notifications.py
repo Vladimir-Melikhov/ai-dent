@@ -45,6 +45,6 @@ def notify_lead(lead) -> None:
         f"Заявка в админке: {link}",
     ])
     try:
-        EmailMessage(f"Заявка № {lead.number} — Ai-Dent", body, settings.DEFAULT_FROM_EMAIL, recipients).send()
+        EmailMessage(f"Заявка № {lead.number} — Ай-Дент", body, settings.DEFAULT_FROM_EMAIL, recipients).send()
     except Exception:
         logger.exception("Заявка %s: ошибка отправки письма", lead.number)

@@ -20,7 +20,7 @@ def send_order_email(order):
     html_body = render_to_string("orders/email_order.html", context)
     text_body = render_to_string("orders/email_order.txt", context)
 
-    subject = f"Заказ №{order.number} — Ai-Dent"
+    subject = f"Заказ №{order.number} — Ай-Дент"
 
     recipients = []
     if order.contact_email:

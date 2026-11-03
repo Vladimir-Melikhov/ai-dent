@@ -86,9 +86,9 @@ def send_invoice_emails(order) -> bool:
             "",
             f"Скачать счёт на сайте: {settings.SITE_ORIGIN}{invoice_url(order)}",
             "",
-            "Ai-Dent · Оборудование для стоматологии",
+            "Ай-Дент · Оборудование для стоматологии",
         ])
-        message = EmailMessage(f"Счёт по заказу № {order.number} — Ai-Dent", body,
+        message = EmailMessage(f"Счёт по заказу № {order.number} — Ай-Дент", body,
                                settings.DEFAULT_FROM_EMAIL, [order.contact_email])
         message.attach(filename, pdf, "application/pdf")
         try:
@@ -128,7 +128,7 @@ def notify_status(order_id, status) -> None:
         f"Заказ в админке: {order_admin_link(order)}",
     ])
     try:
-        EmailMessage(f"Заказ № {order.number} {STATUS_WORD[status]} — Ai-Dent", body,
+        EmailMessage(f"Заказ № {order.number} {STATUS_WORD[status]} — Ай-Дент", body,
                      settings.DEFAULT_FROM_EMAIL, recipients).send()
     except Exception:
         logger.exception("Заказ %s: письмо о смене статуса не отправлено", order.number)

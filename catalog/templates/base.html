@@ -5,7 +5,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="only light">
-  <title>{% block title %}Ai-Dent — оборудование для стоматологии{% endblock %}</title>
+  <title>{% block title %}Ай-Дент — оборудование для стоматологии{% endblock %}</title>
   <link rel="stylesheet" href="{% static 'css/fonts.css' %}">
   <link rel="stylesheet" href="{% static 'css/main.css' %}">
   <link rel="stylesheet" href="{% static 'css/auth.css' %}">
@@ -20,7 +20,7 @@
 
   <header class="header">
     <a href="{% url 'storefront:landing' %}" class="header__logo">
-      <img src="{% static 'img/logo.png' %}" alt="Ai-Dent">
+      <img src="{% static 'img/logo.png' %}" alt="Ай-Дент">
     </a>
 
     <nav class="header__nav">
@@ -62,7 +62,7 @@
     <aside class="mobnav__panel">
       <div class="mobnav__head">
         <a href="{% url 'storefront:landing' %}" class="mobnav__logo">
-          <img src="{% static 'img/logo.png' %}" alt="Ai-Dent">
+          <img src="{% static 'img/logo.png' %}" alt="Ай-Дент">
         </a>
         <button type="button" class="mobnav__x" id="mobnav-x" aria-label="Закрыть">✕</button>
       </div>
@@ -71,7 +71,7 @@
         <a href="{% url 'storefront:delivery' %}">Доставка</a>
         <a href="{% url 'storefront:about' %}">О нас</a>
       </nav>
-      <div class="mobnav__foot">Ai-Dent — оборудование для стоматологии</div>
+      <div class="mobnav__foot">Ай-Дент — оборудование для стоматологии</div>
     </aside>
   </div>
 
@@ -82,7 +82,7 @@
   <footer class="site-footer">
     <div class="site-footer__inner">
       <a href="{% url 'storefront:landing' %}" class="site-footer__logo">
-        <img src="{% static 'img/logo.png' %}" alt="Ai-Dent">
+        <img src="{% static 'img/logo.png' %}" alt="Ай-Дент">
       </a>
 
       <nav class="site-footer__links">
@@ -93,7 +93,7 @@
         <a href="{% url 'storefront:terms' %}">Пользовательское соглашение</a>
       </nav>
 
-      <div class="site-footer__meta">© {% now "Y" %} Ai-Dent · ИП Мелихов В.С. · ИНН 616808573750</div>
+      <div class="site-footer__meta">© {% now "Y" %} Ай-Дент · ИП Мелихов В.С. · ИНН 616808573750 · ОГРНИП 326508100167700</div>
     </div>
   </footer>
 
@@ -195,7 +195,7 @@
     <section class="chat__panel" id="chat-panel" role="dialog" aria-label="ИИ-консультант" hidden>
       <header class="chat__head">
         <div class="chat__title">
-          Консультант Ai-Dent
+          Консультант Ай-Дент
           <span class="chat__status" id="chat-status" aria-live="polite"></span>
         </div>
         <button type="button" class="chat__new" id="chat-new">Новый диалог</button>
