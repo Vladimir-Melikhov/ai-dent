@@ -352,7 +352,7 @@ def generate_invoice_pdf(order, issued_at) -> str:
 
     y -= 11 * mm
 
-    payment_height = 30 * mm
+    payment_height = 44 * mm
     payment_y = y - payment_height + 5 * mm
 
     # Если до футера не хватает места — переносим блок.
@@ -407,6 +407,10 @@ def generate_invoice_pdf(order, issued_at) -> str:
         text_y,
         f"Расчётный счёт: {SELLER['account']}",
     )
+
+    for line in (f"Банк: {SELLER['bank']}", f"БИК: {SELLER['bik']}", f"Корр. счёт: {SELLER['corr_account']}"):
+        text_y -= 4.5 * mm
+        c.drawString(text_x, text_y, line)
 
     # ─── Спасибо за заказ ───
 
