@@ -17,6 +17,7 @@ from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_GET, require_POST
 
+from apps.accounts.models import User
 from apps.orders.models import Order
 
 from . import services
@@ -38,6 +39,19 @@ def normalize_phone(raw: str) -> str:
     return f"+{digits}" if digits else ""
 
 
+def phone_variants(raw: str) -> list[str]:
+    """Как один и тот же номер мог быть записан в базе: +7…, 7…, 8…, как набран."""
+    digits = "".join(ch for ch in raw if ch.isdigit())
+    variants = [normalize_phone(raw), digits, f"+{digits}"]
+    if len(digits) == 11 and digits[0] in "78":
+        variants += [f"8{digits[1:]}", f"7{digits[1:]}", f"+7{digits[1:]}"]
+    return list(dict.fromkeys(v for v in variants if v))
+
+
+def find_user(raw: str):
+    return User.objects.filter(phone__in=phone_variants(raw)).first()
+
+
 def login_view(request):
     if has_panel_access(request.user):
         return redirect("panel:dashboard")
@@ -49,8 +63,15 @@ def login_view(request):
         if login_blocked(request, phone):
             error = "Слишком много попыток. Подождите 15 минут."
         else:
-            user = authenticate(request, username=phone, password=request.POST.get("password", ""))
-            if user is not None and has_panel_access(user):
+            account = find_user(phone_value)
+            user = authenticate(
+                request, username=account.phone if account else phone, password=request.POST.get("password", "")
+            )
+            if user is not None and not has_panel_access(user):
+                # Пароль верный, но роль не та: говорим прямо, чтобы не гадать (ответ получает только знающий пароль)
+                login_failed(request, phone)
+                error = "Пароль верный, но у аккаунта нет доступа к панели: нужен суперпользователь или роль «Директор»"
+            elif user is not None:
                 login_succeeded(request, phone)
                 login(request, user)
                 request.session.set_expiry(SESSION_AGE)
@@ -58,8 +79,9 @@ def login_view(request):
                 if not url_has_allowed_host_and_scheme(target, allowed_hosts={request.get_host()}):
                     target = ""
                 return redirect(target or "panel:dashboard")
-            login_failed(request, phone)
-            error = "Неверный телефон или пароль"
+            else:
+                login_failed(request, phone)
+                error = "Неверный телефон или пароль"
     return render(request, "panel/login.html", {
         "error": error, "phone": phone_value, "next": request.GET.get("next", request.POST.get("next", "")),
     }, status=400 if error else 200)

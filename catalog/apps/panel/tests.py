@@ -282,3 +282,35 @@ def test_server_check_reports_answer(client, monkeypatch):
 def test_referrer_policy_keeps_origin_for_csrf(client):
     # no-referrer заставил бы браузер слать «Origin: null» — CSRF отклонил бы каждую форму
     assert client.get("/")["Referrer-Policy"] == "same-origin"
+
+
+def test_login_page_prefills_phone_prefix():
+    body = Client(HTTP_HOST=PANEL).get("/login/").content.decode()
+    assert 'data-phone-mask' in body and 'value="+7 "' in body and "Панель" in body
+
+
+def test_masked_phone_logs_in(owner):
+    # то, что отправляет маска: «+7 999 000 00 01»
+    response = Client(HTTP_HOST=PANEL).post("/login/", {"phone": "+7 999 000 00 01", "password": "pass-12345"})
+    assert response.status_code == 302
+
+
+@pytest.mark.parametrize("stored", ["81703097097", "+71703097097", "71703097097"])
+@pytest.mark.parametrize("typed", ["+7 170 309 70 97", "8 (170) 309-70-97", "81703097097"])
+def test_login_finds_phone_however_it_is_stored(stored, typed):
+    # в базе номер мог быть записан с 8, с 7 или с +7 — вход должен находить его при любом наборе
+    User.objects.create_superuser(stored, "pass-12345")
+    response = Client(HTTP_HOST=PANEL).post("/login/", {"phone": typed, "password": "pass-12345"})
+    assert response.status_code == 302
+
+
+def test_staff_without_rights_is_told_why():
+    User.objects.create_user("+79990000004", "pass-12345", is_staff=True, role=User.Role.STAFF)
+    response = Client(HTTP_HOST=PANEL).post("/login/", {"phone": "+79990000004", "password": "pass-12345"})
+    assert response.status_code == 400 and "нет доступа к панели" in response.content.decode()
+
+
+def test_wrong_password_stays_generic():
+    User.objects.create_superuser("+79990000005", "pass-12345")
+    response = Client(HTTP_HOST=PANEL).post("/login/", {"phone": "+79990000005", "password": "nope"})
+    assert "Неверный телефон или пароль" in response.content.decode()

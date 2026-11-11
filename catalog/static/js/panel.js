@@ -1,5 +1,33 @@
-// Штаб: окна создания и правки, удаление, перетаскивание сделок, проверка серверов.
+// Ai Панель: окна создания и правки, удаление, перетаскивание сделок, проверка серверов.
 (() => {
+  // --- маска телефона на входе: +7 стоит сам, вводить нужно только с девятки (как на сайте)
+  function phoneDigits(raw) {
+    let d = String(raw || '').replace(/\D/g, '');
+    // подставленная «7», затем случайно набранные 7 или 8
+    if (d.startsWith('7')) d = d.slice(1);
+    if (d.startsWith('7') || d.startsWith('8')) d = d.slice(1);
+    return d.slice(0, 10);
+  }
+  function phoneText(d) {
+    let out = '+7 ' + d.slice(0, 3);
+    if (d.length > 3) out += ' ' + d.slice(3, 6);
+    if (d.length > 6) out += ' ' + d.slice(6, 8);
+    if (d.length > 8) out += ' ' + d.slice(8, 10);
+    return out;
+  }
+  document.querySelectorAll('[data-phone-mask]').forEach((input) => {
+    input.value = phoneText(phoneDigits(input.value));
+    input.addEventListener('input', () => {
+      input.value = phoneText(phoneDigits(input.value));
+      input.setSelectionRange(input.value.length, input.value.length);
+    });
+    // курсор всегда после введённых цифр, префикс не стереть
+    input.addEventListener('keydown', (event) => {
+      if (event.key === 'Backspace' && input.value.length <= 3) event.preventDefault();
+    });
+    input.setSelectionRange(input.value.length, input.value.length);
+  });
+
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
   const json = (id) => {

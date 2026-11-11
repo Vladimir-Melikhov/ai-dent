@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex, nofollow">
   <meta name="color-scheme" content="dark">
-  <title>{% block title %}Штаб{% endblock %} · Ай-Дент</title>
+  <title>{% block title %}Ai Панель{% endblock %} · Ай-Дент</title>
   <link rel="icon" href="{% static 'img/favicon.png' %}">
   <link rel="stylesheet" href="{% static 'css/fonts.css' %}">
   <link rel="stylesheet" href="{% static 'css/panel.css' %}">
@@ -15,7 +15,7 @@
 {% block shell %}
 {% include "panel/_icons.html" %}
 <header class="top">
-  <a class="brand" href="{% url 'panel:dashboard' %}" aria-label="Обзор"><span class="brand-mark">А</span><span class="brand-name">Штаб</span></a>
+  <a class="brand" href="{% url 'panel:dashboard' %}" aria-label="Обзор"><span class="brand-mark">Ai</span><span class="brand-name">Панель</span></a>
   <nav class="tabs" aria-label="Разделы">
     <a href="{% url 'panel:dashboard' %}" class="{% if section == 'dashboard' %}on{% endif %}"><svg><use href="#i-home"/></svg><span>Обзор</span></a>
     <a href="{% url 'panel:deals' %}" class="{% if section == 'deals' %}on{% endif %}"><svg><use href="#i-deal"/></svg><span>Сделки</span></a>
