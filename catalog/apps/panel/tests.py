@@ -173,7 +173,7 @@ def make_deal(**kwargs):
 
 def test_winning_deal_creates_income_and_reopening_removes_it(client):
     deal = make_deal()
-    assert client.post(f"/deals/{deal.pk}/stage/", {"stage": "won"}).status_code == 200
+    assert client.post(f"/deals/{deal.pk}/stage/", {"stage": "won", "cost": "0"}).status_code == 200
     entry = Entry.objects.get(deal=deal)
     assert entry.kind == "income" and entry.amount == 50000 and entry.category.name == "Сделки"
     deal.refresh_from_db()
@@ -186,8 +186,8 @@ def test_winning_deal_creates_income_and_reopening_removes_it(client):
 
 def test_won_deal_amount_edit_updates_income(client):
     deal = make_deal()
-    client.post(f"/deals/{deal.pk}/stage/", {"stage": "won"})
-    client.post("/deals/save/", {"id": deal.pk, "title": "Клиника", "amount": "70 000", "stage": "won"})
+    client.post(f"/deals/{deal.pk}/stage/", {"stage": "won", "cost": "0"})
+    client.post("/deals/save/", {"id": deal.pk, "title": "Клиника", "amount": "70 000", "stage": "won", "cost": "0"})
     assert Entry.objects.get(deal=deal).amount == 70000
 
 
@@ -204,7 +204,7 @@ def test_unknown_stage_rejected(client):
 
 def test_deal_income_not_editable_from_finance(client):
     deal = make_deal()
-    client.post(f"/deals/{deal.pk}/stage/", {"stage": "won"})
+    client.post(f"/deals/{deal.pk}/stage/", {"stage": "won", "cost": "0"})
     entry = Entry.objects.get(deal=deal)
     client.post(f"/finance/{entry.pk}/delete/")
     assert Entry.objects.filter(pk=entry.pk).exists()
@@ -212,7 +212,7 @@ def test_deal_income_not_editable_from_finance(client):
 
 def test_stage_requires_login():
     deal = make_deal()
-    response = Client(HTTP_HOST=PANEL).post(f"/deals/{deal.pk}/stage/", {"stage": "won"})
+    response = Client(HTTP_HOST=PANEL).post(f"/deals/{deal.pk}/stage/", {"stage": "won", "cost": "0"})
     assert response.status_code == 302
 
 
@@ -581,7 +581,7 @@ def test_sales_tiles_count_orders_by_status(client):
 def test_payment_by_invoice_marked_from_panel(client, owner):
     order = make_order(status=Order.Status.CONFIRMED)
     client.get("/deals/")
-    response = client.post(f"/orders/{order.pk}/to/paid/", {"back": "/deals/"})
+    response = client.post(f"/orders/{order.pk}/to/paid/", {"back": "/deals/", "cost": "0"})
     assert response["Location"] == "/deals/"
     order.refresh_from_db()
     assert order.status == "paid" and order.paid_at and order.payment_status == "paid"
@@ -652,3 +652,110 @@ def test_card_age_is_order_age_not_sync_time(client):
     make_order(number="NEW")
     client.get("/deals/")
     assert Deal.objects.get(order=order).archived_at is not None
+
+
+# --- закупка: спрашиваем при оплате; калькулятор маржи
+
+def period_totals():
+    period = services.resolve_period("30")
+    return services.totals(period.start, period.end)
+
+
+def test_paying_order_requires_purchase_price(client):
+    order = make_order(status=Order.Status.CONFIRMED, total_amount=Decimal("1900000"))
+    client.post(f"/orders/{order.pk}/to/paid/", {"back": "/sales/"})
+    order.refresh_from_db()
+    assert order.status == "confirmed"  # без закупки заказ не уходит в «оплачен»
+    client.post(f"/orders/{order.pk}/to/paid/", {"cost": "-1"})
+    order.refresh_from_db()
+    assert order.status == "confirmed"
+    client.post(f"/orders/{order.pk}/to/paid/", {"cost": "abc"})
+    order.refresh_from_db()
+    assert order.status == "confirmed"
+
+
+def test_profit_after_paying_with_purchase_price(client):
+    order = make_order(status=Order.Status.CONFIRMED, total_amount=Decimal("1900000"))
+    client.post(f"/orders/{order.pk}/to/paid/", {"cost": "1 700 000"})
+    order.refresh_from_db()
+    assert order.status == "paid"
+    assert Deal.objects.get(order=order).cost == 1_700_000
+    totals = period_totals()
+    assert totals["revenue"] == 1_900_000 and totals["cogs"] == 1_700_000
+    assert totals["costs"] == 1_700_000 and totals["profit"] == 200_000
+
+
+def test_zero_purchase_price_is_allowed(client):
+    order = make_order(status=Order.Status.CONFIRMED)
+    client.post(f"/orders/{order.pk}/to/paid/", {"cost": "0"})
+    order.refresh_from_db()
+    assert order.status == "paid" and Deal.objects.get(order=order).cost == 0
+
+
+def test_old_order_gets_card_when_paid(client):
+    order = make_order(status=Order.Status.CONFIRMED)
+    Order.objects.filter(pk=order.pk).update(created_at=timezone.now() - datetime.timedelta(days=90))
+    client.post(f"/orders/{order.pk}/to/paid/", {"cost": "500"})
+    assert Deal.objects.get(order=order).cost == 500
+
+
+def test_other_statuses_do_not_ask_for_cost(client):
+    order = make_order(status=Order.Status.CONFIRMED)
+    client.post(f"/orders/{order.pk}/to/cancelled/")
+    order.refresh_from_db()
+    assert order.status == "cancelled"
+
+
+def test_manual_deal_won_needs_cost_via_drag_and_via_form(client):
+    deal = make_deal()
+    assert client.post(f"/deals/{deal.pk}/stage/", {"stage": "won"}).status_code == 400
+    client.post("/deals/save/", {"id": deal.pk, "title": "Клиника", "amount": "50000", "stage": "won"})
+    deal.refresh_from_db()
+    assert deal.stage == "new" and not Entry.objects.exists()
+    assert client.post(f"/deals/{deal.pk}/stage/", {"stage": "won", "cost": "42 000"}).status_code == 200
+    totals = period_totals()
+    assert totals["revenue"] == 50_000 and totals["cogs"] == 42_000 and totals["profit"] == 8_000
+
+
+def test_cost_can_be_corrected_on_system_card(client):
+    order = make_order(status=Order.Status.CONFIRMED, total_amount=Decimal("1000"))
+    client.post(f"/orders/{order.pk}/to/paid/", {"cost": "800"})
+    deal = Deal.objects.get(order=order)
+    client.post("/deals/save/", {"id": deal.pk, "cost": "700", "note": ""})
+    deal.refresh_from_db()
+    assert deal.cost == 700 and deal.amount == 1000  # сумма по-прежнему задаётся заказом
+
+
+def test_paid_order_without_cost_is_flagged(client):
+    make_order(status=Order.Status.PAID, paid_at=timezone.now())
+    assert "нет закупки" in client.get("/deals/").content.decode()
+    assert "нет закупки" in client.get("/sales/").content.decode()
+
+
+def test_cost_shows_in_breakdown_dashboard_and_sales(client):
+    order = make_order(status=Order.Status.CONFIRMED, total_amount=Decimal("1900000"))
+    client.post(f"/orders/{order.pk}/to/paid/", {"cost": "1700000"})
+    period = services.resolve_period("30")
+    assert "Закупка проданного" in [e["name"] for e in services.expenses_by_category(period.start, period.end)]
+    assert sum(r["expenses"] for r in services.series(period)) == 1_700_000
+    cards = {c["key"]: c for c in client.get("/").context["cards"]}
+    assert cards["expenses"]["value"] == 1_700_000 and cards["profit"]["value"] == 200_000
+    assert "прибыль" in client.get("/sales/").content.decode()
+
+
+def test_pay_action_asks_for_cost_in_dialog(client):
+    make_order(status=Order.Status.CONFIRMED)
+    actions = list(client.get("/deals/").context["objects"].values())[0]["actions"]
+    pay = next(a for a in actions if a["label"] == "Оплата пришла")
+    assert pay["ask_cost"] is True
+
+
+def test_margin_calculator_page(client):
+    from apps.catalog.models import Brand, Category as ProductCategory, Product
+
+    Product.objects.create(
+        name="Микроскоп", brand=Brand.objects.create(name="B"), category=ProductCategory.objects.create(name="C"), price=1900000,
+    )
+    response = client.get("/margin/")
+    assert response.status_code == 200 and "Микроскоп" in response.content.decode()
+    assert Client(HTTP_HOST=PANEL).get("/margin/").status_code == 302

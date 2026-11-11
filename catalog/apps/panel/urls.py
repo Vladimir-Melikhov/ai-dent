@@ -29,6 +29,7 @@ urlpatterns = [
     path("sales/", views.sales, name="sales"),
     path("orders/<int:pk>/to/<str:to>/", views.order_status, name="order_status"),
     path("ai/", views.ai, name="ai"),
+    path("margin/", views.margin, name="margin"),
 
     path("servers/", views.servers, name="servers"),
     path("servers/save/", views.server_save, name="server_save"),

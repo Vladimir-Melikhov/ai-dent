@@ -1,0 +1,45 @@
+{% extends "panel/base.html" %}
+{% load static %}
+{% block title %}Маржа{% endblock %}
+{% block h1 %}Калькулятор маржи{% endblock %}
+{% block sub %}Посчитайте, что останется с товара, до сделки. Ничего не сохраняется{% endblock %}
+{% block tools %}{% endblock %}
+
+{% block content %}
+<section class="row two calc">
+  <article class="glass panel">
+    <div class="panel-head"><div><h2>Что считаем</h2><p class="muted">Товар можно выбрать из каталога — цена подставится сама</p></div></div>
+    <div class="grid2" id="calc-form">
+      <label class="fld wide"><span>Товар из каталога (необязательно)</span>
+        <input id="c-product" list="c-products" placeholder="Начните вводить название или артикул" autocomplete="off"></label>
+      <label class="fld"><span>Закупка за штуку, ₽</span><input id="c-cost" inputmode="decimal" placeholder="1 700 000"></label>
+      <label class="fld"><span>Цена продажи за штуку, ₽</span><input id="c-price" inputmode="decimal" placeholder="1 900 000"></label>
+      <label class="fld"><span>Количество</span><input id="c-qty" inputmode="numeric" value="1"></label>
+      <label class="fld"><span>Налог с выручки, %</span><input id="c-tax" inputmode="decimal" value="0"></label>
+      <label class="fld wide"><span>Доставка и прочие расходы на всю партию, ₽</span><input id="c-extra" inputmode="decimal" placeholder="0"></label>
+    </div>
+    <datalist id="c-products">{% for p in products %}<option value="{{ p.name }}{% if p.sku %} · {{ p.sku }}{% endif %}"></option>{% endfor %}</datalist>
+    <div class="calc-reverse">
+      <label class="fld"><span>Хочу маржу, %</span><input id="c-target" inputmode="decimal" value="20"></label>
+      <div class="calc-need"><span class="muted">Для этого цена продажи за штуку</span><b id="o-need">—</b></div>
+    </div>
+  </article>
+
+  <article class="glass panel">
+    <div class="panel-head"><div><h2>Результат</h2><p class="muted" id="o-note">Заполните закупку и цену</p></div></div>
+    <div class="calc-hero"><span class="muted">Прибыль</span><b id="o-profit">—</b><span class="chip flat" id="o-margin">маржа —</span></div>
+    <dl class="calc-list">
+      <div><dt>Выручка</dt><dd id="o-revenue">—</dd></div>
+      <div><dt>Закупка всего</dt><dd id="o-cogs">—</dd></div>
+      <div><dt>Налог</dt><dd id="o-tax">—</dd></div>
+      <div><dt>Доставка и прочее</dt><dd id="o-extra">—</dd></div>
+      <div><dt>Прибыль с одной штуки</dt><dd id="o-unit">—</dd></div>
+      <div><dt>Наценка к закупке</dt><dd id="o-markup">—</dd></div>
+      <div><dt>Безубыточная цена за штуку</dt><dd id="o-breakeven">—</dd></div>
+    </dl>
+    <p class="hint">Маржа — доля прибыли в цене продажи, наценка — на сколько процентов цена выше закупки: прибыль 200 000 ₽ при продаже за 1 900 000 ₽ даёт маржу 10,5%, а наценку 11,8%.</p>
+  </article>
+</section>
+{{ products|json_script:"c-data" }}
+{% endblock %}
+{% block scripts %}<script src="{% static 'js/panel-margin.js' %}" defer></script>{% endblock %}

@@ -21,10 +21,11 @@ def money(**kwargs):
 
 class DealForm(forms.ModelForm):
     amount = money(min_value=Decimal("0"), label="Сумма, ₽", required=False)
+    cost = money(min_value=Decimal("0"), label="Закупка, ₽", required=False)
 
     class Meta:
         model = Deal
-        fields = ["title", "client", "contact", "amount", "stage", "source", "expected_date", "note"]
+        fields = ["title", "client", "contact", "amount", "cost", "stage", "source", "expected_date", "note"]
         widgets = {
             "expected_date": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
             "note": forms.Textarea(attrs={"rows": 3}),
@@ -41,6 +42,16 @@ class DealForm(forms.ModelForm):
 
     def clean_amount(self):
         return self.cleaned_data.get("amount") or Decimal("0")
+
+    def clean_cost(self):
+        return self.cleaned_data.get("cost")  # пусто остаётся пустым: закупка не указана
+
+    def clean(self):
+        cleaned = super().clean()
+        # Выигранная ручная сделка без закупки дала бы прибыль, равную выручке
+        if cleaned.get("stage") == Deal.Stage.WON and cleaned.get("cost") is None and not self.instance.is_system:
+            self.add_error("cost", "Укажите закупку (0, если её не было)")
+        return cleaned
 
 
 class EntryForm(forms.ModelForm):
@@ -60,6 +71,12 @@ class EntryForm(forms.ModelForm):
         if category and kind and category.kind != kind:
             self.add_error("category", "Категория другого вида — выберите из списка")
         return cleaned
+
+
+class CostForm(forms.Form):
+    """Закупка по заказу целиком: спрашивается, когда заказ или сделка становятся оплаченными."""
+
+    cost = money(min_value=Decimal("0"), label="Закупка, ₽")
 
 
 class CategoryForm(forms.ModelForm):

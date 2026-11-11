@@ -67,6 +67,26 @@ def entries_by_day(start, end, kind):
     return {row["date"]: row["total"] for row in rows}
 
 
+def order_cost(order) -> Decimal:
+    """Закупка по заказу — то, что владелец указал при оплате. Не указал — 0, прибыль равна выручке."""
+    deal = getattr(order, "panel_deal", None)
+    return deal.cost if deal is not None and deal.cost is not None else ZERO
+
+
+def cogs_by_day(start, end) -> dict:
+    """Закупка проданного по дням: оплаченные заказы и выигранные ручные сделки."""
+    days = defaultdict(lambda: ZERO)
+    for order in paid_orders(start, end).select_related("panel_deal"):
+        days[order.day] += order_cost(order)
+    won = Deal.objects.filter(
+        origin=Deal.Origin.MANUAL, stage=Deal.Stage.WON, cost__isnull=False,
+        closed_at__date__gte=start, closed_at__date__lte=end,
+    )
+    for deal in won:
+        days[timezone.localtime(deal.closed_at).date()] += deal.cost
+    return days
+
+
 def totals(start, end) -> dict:
     shop = shop_by_day(start, end)
     shop_revenue = sum((v[0] for v in shop.values()), ZERO)
@@ -74,8 +94,12 @@ def totals(start, end) -> dict:
     other_income = sum(entries_by_day(start, end, Category.Kind.INCOME).values(), ZERO)
     expenses = sum(entries_by_day(start, end, Category.Kind.EXPENSE).values(), ZERO)
     revenue = shop_revenue + other_income
-    profit = revenue - expenses
+    cogs = sum(cogs_by_day(start, end).values(), ZERO)
+    costs = expenses + cogs
+    profit = revenue - costs
     return {
+        "cogs": cogs,
+        "costs": costs,
         "shop_revenue": shop_revenue,
         "other_income": other_income,
         "revenue": revenue,
@@ -114,12 +138,13 @@ def series(period: Period) -> list[dict]:
     shop = shop_by_day(period.start, period.end)
     other = entries_by_day(period.start, period.end, Category.Kind.INCOME)
     spent = entries_by_day(period.start, period.end, Category.Kind.EXPENSE)
+    cogs = cogs_by_day(period.start, period.end)
     buckets = defaultdict(lambda: {"income": ZERO, "expenses": ZERO})
     day = period.start
     while day <= period.end:
         key = bucket_start(day, step)
         buckets[key]["income"] += shop.get(day, (ZERO, 0))[0] + other.get(day, ZERO)
-        buckets[key]["expenses"] += spent.get(day, ZERO)
+        buckets[key]["expenses"] += spent.get(day, ZERO) + cogs.get(day, ZERO)
         day += datetime.timedelta(days=1)
     result = []
     for key in sorted(buckets):
@@ -141,8 +166,11 @@ def expenses_by_category(start, end, limit=7) -> list[dict]:
         .annotate(total=Sum("amount"))
         .order_by("-total")
     )
-    all_total = sum((r["total"] for r in rows), ZERO)
-    result = [
+    cogs = sum(cogs_by_day(start, end).values(), ZERO)
+    all_total = sum((r["total"] for r in rows), ZERO) + cogs
+    result = ([{
+        "name": "Закупка проданного", "color": 1, "amount": float(cogs), "share": float(cogs / all_total * 100),
+    }] if cogs else []) + [
         {
             "name": r["category__name"],
             "color": r["category__color"],
@@ -151,6 +179,7 @@ def expenses_by_category(start, end, limit=7) -> list[dict]:
         }
         for r in rows[:limit]
     ]
+    result.sort(key=lambda r: -r["amount"])
     rest = sum((r["total"] for r in rows[limit:]), ZERO)
     if rest:
         result.append({"name": "Остальные", "color": 0, "amount": float(rest), "share": float(rest / all_total * 100)})
@@ -362,6 +391,12 @@ def _archive_superseded():
         for deal in deals:
             if deal is not newest and now - deal.created_at >= datetime.timedelta(days=STALE_DAYS):
                 Deal.objects.filter(pk=deal.pk).update(archived_at=now)
+
+
+def ensure_order_deal(order) -> Deal:
+    """Карточка заказа: нужна, чтобы записать закупку, даже если заказ старше окна синхронизации."""
+    _sync_order(Order.objects.select_related("panel_deal").prefetch_related("items").get(pk=order.pk))
+    return Deal.objects.get(order_id=order.pk)
 
 
 def _sync_order(order):

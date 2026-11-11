@@ -316,3 +316,16 @@ input:disabled, select:disabled, textarea:disabled { opacity: .5; cursor: not-al
 .anon summary { display: flex; gap: 14px; align-items: baseline; flex-wrap: wrap; padding: 14px 20px; cursor: pointer; }
 .anon .hint { margin: 8px 20px 14px; }
 a.ai-line { color: inherit; }
+.cost-form { display: inline-flex; gap: 8px; align-items: center; margin: 0; } .cost-form input { width: 150px; text-align: right; padding: 8px 12px; }
+.neg-text { color: var(--bad); }
+
+/* калькулятор маржи и вопрос про закупку */
+.dlg.narrow { width: min(460px, calc(100vw - 32px)); }
+.nocost { font-size: 11.5px; color: #ffb86b; font-weight: 600; }
+.calc-reverse { display: grid; grid-template-columns: 140px 1fr; gap: 14px; align-items: end; margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line-soft); }
+.calc-need { display: grid; gap: 2px; } .calc-need b { font-size: 22px; letter-spacing: -.4px; }
+.calc-hero { display: grid; gap: 6px; justify-items: start; margin-bottom: 18px; } .calc-hero b { font-size: 40px; letter-spacing: -1px; } .calc-hero b.neg { color: var(--bad); }
+.calc-list { margin: 0; display: grid; gap: 6px; }
+.calc-list div { display: flex; justify-content: space-between; gap: 14px; padding: 9px 12px; border-radius: 12px; background: rgba(0,0,0,.2); }
+.calc-list dt { color: var(--text-3); } .calc-list dd { margin: 0; font-weight: 700; }
+@media (max-width: 720px) { .calc-reverse { grid-template-columns: 1fr; } }

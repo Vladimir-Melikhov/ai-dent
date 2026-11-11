@@ -23,6 +23,7 @@
         <div class="deal-top"><b>{{ d.title }}</b><span class="origin o-{{ d.origin }}">{{ d.get_origin_display }}</span></div>
         {% if d.client %}<span class="muted">{{ d.client }}</span>{% endif %}
         {% if d.contact %}<a class="phone" href="tel:{{ d.contact }}">{{ d.contact }}</a>{% endif %}
+        {% if d.stage == "won" and d.cost is None %}<span class="nocost">нет закупки — прибыль не посчитана</span>{% endif %}
         <div class="deal-foot"><span class="amt-pill">{{ d.amount|rub }}</span>{% if d.wait_days is not None %}<span class="wait{% if d.stale %} stale{% endif %}">ждёт {{ d.wait_days }} дн.</span>{% elif d.expected_date %}<span class="muted">до {{ d.expected_date|date:"j b" }}</span>{% endif %}</div>
       </article>
       {% endfor %}
@@ -50,6 +51,7 @@
 {% if archive %}<p class="hint">Это архив: карточки не входят в цифры. Откройте карточку, чтобы вернуть её на доску.</p>{% endif %}
 
 {% include "panel/_dialog.html" with action="/deals/save/" new_title="Новая сделка" edit_title="Сделка" %}
+{% include "panel/_cost_dialog.html" %}
 <form id="del-form" method="post" class="hidden">{% csrf_token %}<input type="hidden" name="back" value="{{ request.get_full_path }}"></form>
 <template id="dlg-extra"><button type="button" class="btn danger" data-delete="/deals/{id}/delete/">Удалить</button></template>
 {{ objects|json_script:"objects" }}

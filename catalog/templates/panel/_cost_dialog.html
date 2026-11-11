@@ -1,0 +1,13 @@
+{# Вопрос про закупку перед тем, как заказ или сделка станут оплаченными #}
+<dialog id="cost-dlg" class="dlg narrow">
+  <form method="post" id="cost-form" class="dlg-form">
+    {% csrf_token %}
+    <input type="hidden" name="back" value="{{ request.get_full_path }}">
+    <div class="dlg-head"><h2>Закупка</h2><button type="button" class="round sm" data-close aria-label="Закрыть"><svg><use href="#i-close"/></svg></button></div>
+    <p class="muted" id="cost-text"></p>
+    <label class="fld"><span>Во сколько обошёлся товар, ₽ (всего по заказу)</span>
+      <input name="cost" inputmode="decimal" required placeholder="например 1 700 000" autocomplete="off"></label>
+    <p class="hint">Если закупки не было, впишите 0. Без неё прибыль считалась бы равной выручке.</p>
+    <div class="dlg-foot"><button type="button" class="btn ghost" data-close>Отмена</button><button class="btn primary">Отметить оплаченным</button></div>
+  </form>
+</dialog>

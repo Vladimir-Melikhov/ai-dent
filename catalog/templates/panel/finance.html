@@ -11,7 +11,7 @@
 {% block content %}
 <section class="cards cards-3">
   <article class="glass card"><div class="card-top"><span class="card-title">Доходы</span></div><div class="card-value">{{ totals.revenue|rub }}</div><div class="card-foot"><span class="muted">сайт {{ totals.shop_revenue|rub }} · прочее {{ totals.other_income|rub }}</span></div></article>
-  <article class="glass card"><div class="card-top"><span class="card-title">Расходы</span></div><div class="card-value">{{ totals.expenses|rub }}</div></article>
+  <article class="glass card"><div class="card-top"><span class="card-title">Расходы</span></div><div class="card-value">{{ totals.costs|rub }}</div><div class="card-foot"><span class="muted">закупка проданного {{ totals.cogs|rub }} · прочее {{ totals.expenses|rub }}</span></div></article>
   <article class="glass card"><div class="card-top"><span class="card-title">Прибыль</span></div><div class="card-value {% if totals.profit < 0 %}neg{% endif %}">{{ totals.profit|rub }}</div><div class="card-foot"><span class="muted">{% if totals.margin is not None %}маржа {{ totals.margin|pct }}{% endif %}</span></div></article>
 </section>
 

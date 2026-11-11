@@ -25,7 +25,8 @@ from . import services
 from .access import (
     SESSION_AGE, has_panel_access, login_blocked, login_failed, login_succeeded, panel_required,
 )
-from .forms import CategoryForm, DealForm, EntryForm, ServerForm
+from .forms import CategoryForm, CostForm, DealForm, EntryForm, ServerForm
+from apps.catalog.models import Product
 from .models import Category, Deal, Entry, Server
 
 ZERO = services.ZERO
@@ -155,9 +156,10 @@ def dashboard(request):
         {"key": "revenue", "title": "Выручка", "value": as_float(now["revenue"]), "money": True,
          "delta": services.delta(now["revenue"], before["revenue"]), "spark": [r["income"] for r in rows],
          "hint": f"Сайт {now['shop_revenue']:,.0f} ₽".replace(",", " ")},
-        {"key": "expenses", "title": "Расходы", "value": as_float(now["expenses"]), "money": True,
-         "delta": services.delta(now["expenses"], before["expenses"]), "invert": True,
-         "spark": [r["expenses"] for r in rows], "hint": ""},
+        {"key": "expenses", "title": "Расходы", "value": as_float(now["costs"]), "money": True,
+         "delta": services.delta(now["costs"], before["costs"]), "invert": True,
+         "spark": [r["expenses"] for r in rows],
+         "hint": f"в т.ч. закупка {now['cogs']:,.0f} ₽".replace(",", " ") if now["cogs"] else ""},
         {"key": "profit", "title": "Прибыль", "value": as_float(now["profit"]), "money": True,
          "delta": services.delta(now["profit"], before["profit"]), "spark": [r["profit"] for r in rows],
          "hint": f"Маржа {now['margin']:.0f}%" if now["margin"] is not None else ""},
@@ -255,6 +257,9 @@ def deal_json(deal):
                 actions.append({
                     "label": label, "danger": target == Order.Status.CANCELLED, "url": f"/orders/{deal.order_id}/to/{target}/",
                     "confirm": text.format(number=deal.order.number),
+                    # оплачен — сначала спрашиваем закупку
+                    "ask_cost": target == Order.Status.PAID,
+                    "cost": "" if deal.cost is None else str(deal.cost),
                 })
     if deal.order_id and deal.order.status != Order.Status.PAID:
         actions.append({
@@ -265,6 +270,7 @@ def deal_json(deal):
         "locked": list(DealForm.SYSTEM_LOCKED) if deal.is_system else [], "links": links, "actions": actions,
         "origin": deal.get_origin_display(),
         "title": deal.title, "client": deal.client, "contact": deal.contact, "amount": str(deal.amount),
+        "cost": "" if deal.cost is None else str(deal.cost),
         "stage": deal.stage, "source": deal.source, "note": deal.note,
         "expected_date": deal.expected_date.isoformat() if deal.expected_date else "",
     }
@@ -286,9 +292,14 @@ def deal_stage(request, pk):
         return JsonResponse({"error": "Этап этой карточки следует за заказом"}, status=400)
     if stage not in Deal.Stage.values:
         return JsonResponse({"error": "Неизвестный этап"}, status=400)
+    if stage == Deal.Stage.WON:
+        cost = CostForm(request.POST)
+        if not cost.is_valid():
+            return JsonResponse({"error": "Укажите закупку (0, если её не было)", "need": "cost"}, status=400)
+        deal.cost = cost.cleaned_data["cost"]
     with transaction.atomic():
         deal.stage = stage
-        deal.save(update_fields=["stage", "updated_at"])
+        deal.save(update_fields=["stage", "cost", "updated_at"])
         services.sync_deal(deal)
     return JsonResponse({"ok": True})
 
@@ -479,7 +490,7 @@ def sales(request):
     )
     by_status = {r["status"]: r for r in base.values("status").annotate(n=Count("id"), t=Sum("total_amount"))}
     status = request.GET.get("status", "")
-    qs = base.select_related("invoice")
+    qs = base.select_related("invoice", "panel_deal")
     if status in Order.Status.values:
         qs = qs.filter(status=status)
     page = Paginator(qs, 40).get_page(request.GET.get("page"))
@@ -488,6 +499,9 @@ def sales(request):
         waiting = order.status in (Order.Status.PENDING_CONFIRMATION, Order.Status.CONFIRMED)
         since = order.confirmed_at or order.created_at
         order.wait_days = (now - since).days if waiting else None
+        if order.status == Order.Status.PAID:
+            cost = services.order_cost(order)
+            order.cost, order.profit = (cost, (order.total_amount or ZERO) - cost) if cost else (None, None)
         order.can_confirm = Order.Status.CONFIRMED in allowed_transitions(order)
         order.can_pay = Order.Status.PAID in allowed_transitions(order)
     tiles = []
@@ -518,8 +532,19 @@ def order_status(request, pk, to):
     if to not in {Order.Status.CONFIRMED, Order.Status.PAID, Order.Status.CANCELLED}:
         messages.error(request, "Неизвестный статус")
     else:
+        cost = None
+        if to == Order.Status.PAID:
+            form = CostForm(request.POST)
+            if not form.is_valid():
+                messages.error(request, "Укажите закупку — во сколько обошёлся товар (0, если закупки не было)")
+                return redirect(safe_back(request, "/sales/"))
+            cost = form.cleaned_data["cost"]
         try:
             change_status(order, to, actor=OrderStatusHistory.Actor.DIRECTOR, actor_user=request.user)
+            if cost is not None:
+                deal = services.ensure_order_deal(order)
+                deal.cost = cost
+                deal.save(update_fields=["cost", "updated_at"])
             word = {"confirmed": "подтверждён", "paid": "отмечен оплаченным", "cancelled": "отменён"}[to]
             messages.success(request, f"Заказ №{order.number} {word}")
         except (TransitionError, InvoiceError) as error:
@@ -537,6 +562,19 @@ def ai(request):
     chart = {"series": stats["series"]}
     ctx.update(stats=stats, chart=chart)
     return render(request, "panel/ai.html", ctx)
+
+
+# --- калькулятор маржи
+
+@panel_required
+def margin(request):
+    ctx = page_context(request, "margin")
+    products = [
+        {"name": p.name, "sku": p.sku or "", "price": float(p.price_rub)}
+        for p in Product.objects.filter(is_active=True, price_rub__isnull=False).order_by("name")[:3000]
+    ]
+    ctx.update(products=products)
+    return render(request, "panel/margin.html", ctx)
 
 
 # --- серверы

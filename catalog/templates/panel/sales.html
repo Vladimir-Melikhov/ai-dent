@@ -30,13 +30,16 @@
         <td class="nowrap">{{ o.created_at|date:"d.m.Y H:i" }}</td>
         <td>{{ o.company_name|default:o.buyer_name|default:o.contact_name|default:"—" }}{% if o.contact_phone %}<br><a class="phone" href="tel:{{ o.contact_phone }}">{{ o.contact_phone }}</a>{% endif %}</td>
         <td class="nowrap"><span class="pill st-{{ o.status }}">{{ o.get_status_display }}</span>{% if o.wait_days is not None %} <span class="wait{% if o.wait_days >= 7 %} stale{% endif %}">{{ o.wait_days }} дн.</span>{% endif %}</td>
-        <td class="r nowrap amt">{{ o.total_amount|default_if_none:0|rub }}</td>
+        <td class="r nowrap amt">{{ o.total_amount|default_if_none:0|rub }}{% if o.profit is not None %}<br><span class="wait">прибыль {{ o.profit|rub }}</span>{% endif %}</td>
         <td class="r nowrap">
-          {% if o.can_confirm or o.can_pay %}
-          <form method="post" action="/orders/{{ o.pk }}/to/{% if o.can_pay %}paid{% else %}confirmed{% endif %}/" class="inline" data-confirm="{% if o.can_pay %}Отметить заказ №{{ o.number }} оплаченным? Клиент увидит это в чате.{% else %}Подтвердить заказ №{{ o.number }}? Клиенту уйдёт счёт на почту.{% endif %}">
+          {% if o.can_pay %}
+          <button type="button" class="btn sm primary" data-ask-cost data-url="/orders/{{ o.pk }}/to/paid/" data-text="Заказ №{{ o.number }} на {{ o.total_amount|rub }}: во сколько вам обошёлся этот товар? Клиент увидит оплату в чате.">Оплата пришла</button>
+          {% elif o.can_confirm %}
+          <form method="post" action="/orders/{{ o.pk }}/to/confirmed/" class="inline" data-confirm="Подтвердить заказ №{{ o.number }}? Клиенту уйдёт счёт на почту.">
             {% csrf_token %}<input type="hidden" name="back" value="{{ request.get_full_path }}">
-            <button class="btn sm {% if o.can_pay %}primary{% else %}ghost{% endif %}">{% if o.can_pay %}Оплата пришла{% else %}Подтвердить{% endif %}</button>
+            <button class="btn sm ghost">Подтвердить</button>
           </form>
+          {% elif o.status == "paid" and o.cost is None %}<span class="nocost">нет закупки</span>
           {% endif %}
         </td>
       </tr>
@@ -45,5 +48,6 @@
   </table>
 </section>
 {% include "panel/_pager.html" %}
-<p class="hint">Оплата по счёту на сайте не видна: когда деньги пришли на счёт, нажмите «Оплата пришла» — заказ уйдёт в выручку, а клиент увидит оплату в чате.</p>
+{% include "panel/_cost_dialog.html" %}
+<p class="hint">Оплата по счёту на сайте не видна: когда деньги пришли на счёт, нажмите «Оплата пришла»: панель спросит закупку, заказ уйдёт в выручку, а клиент увидит оплату в чате.</p>
 {% endblock %}

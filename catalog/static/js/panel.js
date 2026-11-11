@@ -34,7 +34,7 @@
     const node = document.getElementById(id);
     return node ? JSON.parse(node.textContent) : {};
   };
-  const csrf = () => ($('#del-form [name=csrfmiddlewaretoken]') || $('[name=csrfmiddlewaretoken]'))?.value || '';
+  const csrf = () => $('[name=csrfmiddlewaretoken]')?.value || '';
 
   // --- окно формы
   const dialog = $('#dlg');
@@ -71,6 +71,7 @@
         else field.value = value;
       }
       const info = objects[id];
+      if (form.elements.cost) form.elements.cost.placeholder = 'не указана';
       // карточка из заказа или чата: этап, сумму и клиента задаёт заказ
       (info.locked || []).forEach((name) => { if (form.elements[name]) form.elements[name].disabled = true; });
       if (links && (info.origin || (info.links || []).length)) {
@@ -94,6 +95,7 @@
         button.textContent = action.label;
         button.dataset.action = action.url;
         button.dataset.confirm = action.confirm;
+        if (action.ask_cost) { button.dataset.askCost = '1'; button.dataset.value = action.cost || ''; }
         $('.dlg-foot', dialog).prepend(button);
       }
       const extra = $('#dlg-extra');
@@ -118,16 +120,18 @@
 
   document.addEventListener('click', (event) => {
     if (event.target.closest('a.phone')) return; // звонок по номеру на карточке не открывает окно
-    const target = event.target.closest('[data-new],[data-edit],[data-close],[data-delete],[data-action],[data-copy],[data-check],[data-check-all]');
+    const target = event.target.closest('[data-new],[data-edit],[data-close],[data-delete],[data-action],[data-ask-cost],[data-copy],[data-check],[data-check-all]');
     if (!target) return;
-    if (target.matches('[data-action]')) {
+    if (target.matches('[data-ask-cost]')) payWithCost(target.dataset.url, target.dataset.text, target.dataset.value || '');
+    else if (target.matches('[data-action]')) {
+      if (target.dataset.askCost) { payWithCost(target.dataset.action, target.dataset.confirm, target.dataset.value || ''); return; }
       if (target.dataset.confirm && !confirm(target.dataset.confirm)) return;
       const form = $('#del-form');
       form.action = target.dataset.action;
       form.submit();
     } else if (target.matches('[data-new]')) openDialog('');
     else if (target.matches('[data-edit]')) openDialog((target.closest('[data-id]') || target).dataset.id);
-    else if (target.matches('[data-close]')) dialog?.close();
+    else if (target.matches('[data-close]')) target.closest('dialog')?.close();
     else if (target.matches('[data-delete]')) {
       if (!confirm('Удалить? Это нельзя отменить.')) return;
       const form = $('#del-form');
@@ -153,6 +157,46 @@
   });
 
   $$('[data-auto]').forEach((select) => select.addEventListener('change', () => select.form.submit()));
+
+  // --- закупка при оплате: вопрос в окне, ответ уходит вместе с действием
+  const costDialog = $('#cost-dlg');
+  let costResolve = null;
+  function askCost(text, value) {
+    if (!costDialog) return Promise.resolve(null);
+    const form = $('#cost-form');
+    $('#cost-text').textContent = text;
+    form.elements.cost.value = value;
+    costDialog.showModal();
+    form.elements.cost.focus();
+    return new Promise((resolve) => { costResolve = resolve; });
+  }
+  if (costDialog) {
+    $('#cost-form').addEventListener('submit', (event) => {
+      event.preventDefault();
+      const value = event.target.elements.cost.value.trim();
+      if (!value) return;
+      const resolve = costResolve;
+      costResolve = null;
+      costDialog.close();
+      resolve?.(value);
+    });
+    costDialog.addEventListener('close', () => { costResolve?.(null); costResolve = null; });
+    costDialog.addEventListener('click', (event) => { if (event.target === costDialog) costDialog.close(); });
+  }
+  async function payWithCost(url, text, value) {
+    const cost = await askCost(text, value);
+    if (cost === null) return;
+    const form = document.createElement('form');
+    form.method = 'post';
+    form.action = url;
+    for (const [name, val] of Object.entries({ csrfmiddlewaretoken: csrf(), back: location.pathname + location.search, cost })) {
+      const input = document.createElement('input');
+      input.type = 'hidden'; input.name = name; input.value = val;
+      form.appendChild(input);
+    }
+    document.body.appendChild(form);
+    form.submit();
+  }
 
   // --- проверка сервера
   async function checkServer(button) {
@@ -203,6 +247,12 @@
       event.preventDefault();
       const body = new FormData();
       body.set('stage', col.dataset.stage);
+      if (col.dataset.stage === 'won') {
+        // выигранная сделка — сначала закупка, иначе прибыль не посчитать
+        const cost = await askCost(`«${dragged.querySelector('b').textContent}»: во сколько вам обошёлся этот товар?`, '');
+        if (cost === null) return;
+        body.set('cost', cost);
+      }
       try {
         const response = await fetch(board.dataset.stageUrl.replace('/0/', `/${dragged.dataset.id}/`), {
           method: 'POST', body, headers: { 'X-CSRFToken': csrf(), 'X-Requested-With': 'fetch' },

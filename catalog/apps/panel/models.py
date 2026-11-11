@@ -63,6 +63,10 @@ class Deal(models.Model):
         "chat.Conversation", null=True, blank=True, on_delete=models.SET_NULL, related_name="panel_deals",
         verbose_name="Диалог",
     )
+    # Закупка по сделке или заказу целиком, ₽. Спрашивается при оплате; пусто — закупка не указана, прибыль = выручке
+    cost = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True, verbose_name="Закупка, ₽"
+    )
     closed_at = models.DateTimeField(null=True, blank=True, verbose_name="Закрыта")
     # В архиве: не показывается на доске и не входит в цифры; сам заказ в магазине не меняется
     archived_at = models.DateTimeField(null=True, blank=True, verbose_name="В архиве с")
@@ -138,3 +142,4 @@ class Server(models.Model):
 
     def __str__(self):
         return self.name
+
