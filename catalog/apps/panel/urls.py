@@ -14,6 +14,8 @@ urlpatterns = [
     path("deals/save/", views.deal_save, name="deal_save"),
     path("deals/<int:pk>/stage/", views.deal_stage, name="deal_stage"),
     path("deals/<int:pk>/delete/", views.deal_delete, name="deal_delete"),
+    path("deals/<int:pk>/archive/", views.deal_archive, name="deal_archive"),
+    path("deals/<int:pk>/delete-order/", views.deal_order_delete, name="deal_order_delete"),
 
     path("finance/", views.finance, name="finance"),
     path("finance/save/", views.entry_save, name="entry_save"),
@@ -25,6 +27,8 @@ urlpatterns = [
     path("categories/<int:pk>/delete/", views.category_delete, name="category_delete"),
 
     path("sales/", views.sales, name="sales"),
+    path("orders/<int:pk>/to/<str:to>/", views.order_status, name="order_status"),
+    path("ai/", views.ai, name="ai"),
 
     path("servers/", views.servers, name="servers"),
     path("servers/save/", views.server_save, name="server_save"),

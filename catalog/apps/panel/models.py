@@ -64,6 +64,8 @@ class Deal(models.Model):
         verbose_name="Диалог",
     )
     closed_at = models.DateTimeField(null=True, blank=True, verbose_name="Закрыта")
+    # В архиве: не показывается на доске и не входит в цифры; сам заказ в магазине не меняется
+    archived_at = models.DateTimeField(null=True, blank=True, verbose_name="В архиве с")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Создана")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлена")
 

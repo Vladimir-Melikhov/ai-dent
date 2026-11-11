@@ -2,13 +2,17 @@
 {% load panel_tags %}
 {% block title %}Продажи{% endblock %}
 {% block h1 %}Продажи сайта{% endblock %}
-{% block sub %}Заказы из магазина за период. Оплаченные идут в выручку автоматически{% endblock %}
+{% block sub %}Оформлено {{ total_n }} на {{ total_sum|rub }}{% if totals.avg_check %} · средний чек оплаченных {{ totals.avg_check|rub }}{% endif %} · по дате оформления{% endblock %}
 
 {% block content %}
-<section class="cards cards-3">
-  <article class="glass card"><div class="card-top"><span class="card-title">Оплачено</span></div><div class="card-value">{{ totals.shop_revenue|rub }}</div><div class="card-foot"><span class="muted">{{ totals.orders }} заказов</span></div></article>
-  <article class="glass card"><div class="card-top"><span class="card-title">Средний чек</span></div><div class="card-value">{{ totals.avg_check|default_if_none:0|rub }}</div></article>
-  <article class="glass card"><div class="card-top"><span class="card-title">Ждут подтверждения</span></div><div class="card-value">{{ pending }}</div><div class="card-foot"><span class="muted">сейчас, по всем датам</span></div></article>
+<section class="cards">
+  {% for t in tiles %}
+  <a class="glass card tile st-{{ t.value }}" href="?p={{ period.code }}&status={{ t.value }}">
+    <div class="card-top"><span class="card-title">{{ t.title }}</span></div>
+    <div class="card-value">{{ t.count }}</div>
+    <div class="card-foot"><span class="muted">{{ t.sum|rub }}{% if t.hint %} · {{ t.hint }}{% endif %}</span></div>
+  </a>
+  {% endfor %}
 </section>
 
 <form class="filters glass" method="get">
@@ -18,19 +22,28 @@
 
 <section class="glass table-wrap">
   <table class="tbl">
-    <thead><tr><th>Заказ</th><th>Создан</th><th>Клиент</th><th>Статус</th><th class="r">Сумма</th></tr></thead>
+    <thead><tr><th>Заказ</th><th>Создан</th><th>Клиент</th><th>Статус</th><th class="r">Сумма</th><th></th></tr></thead>
     <tbody>
       {% for o in page %}
       <tr>
         <td class="nowrap"><b>№{{ o.number }}</b></td>
         <td class="nowrap">{{ o.created_at|date:"d.m.Y H:i" }}</td>
-        <td>{{ o.company_name|default:o.buyer_name|default:o.contact_name|default:"—" }}</td>
-        <td><span class="pill st-{{ o.status }}">{{ o.get_status_display }}</span></td>
+        <td>{{ o.company_name|default:o.buyer_name|default:o.contact_name|default:"—" }}{% if o.contact_phone %}<br><a class="phone" href="tel:{{ o.contact_phone }}">{{ o.contact_phone }}</a>{% endif %}</td>
+        <td class="nowrap"><span class="pill st-{{ o.status }}">{{ o.get_status_display }}</span>{% if o.wait_days is not None %} <span class="wait{% if o.wait_days >= 7 %} stale{% endif %}">{{ o.wait_days }} дн.</span>{% endif %}</td>
         <td class="r nowrap amt">{{ o.total_amount|default_if_none:0|rub }}</td>
+        <td class="r nowrap">
+          {% if o.can_confirm or o.can_pay %}
+          <form method="post" action="/orders/{{ o.pk }}/to/{% if o.can_pay %}paid{% else %}confirmed{% endif %}/" class="inline" data-confirm="{% if o.can_pay %}Отметить заказ №{{ o.number }} оплаченным? Клиент увидит это в чате.{% else %}Подтвердить заказ №{{ o.number }}? Клиенту уйдёт счёт на почту.{% endif %}">
+            {% csrf_token %}<input type="hidden" name="back" value="{{ request.get_full_path }}">
+            <button class="btn sm {% if o.can_pay %}primary{% else %}ghost{% endif %}">{% if o.can_pay %}Оплата пришла{% else %}Подтвердить{% endif %}</button>
+          </form>
+          {% endif %}
+        </td>
       </tr>
-      {% empty %}<tr><td colspan="5" class="empty">Заказов за период нет</td></tr>{% endfor %}
+      {% empty %}<tr><td colspan="6" class="empty">Заказов за период нет</td></tr>{% endfor %}
     </tbody>
   </table>
 </section>
 {% include "panel/_pager.html" %}
+<p class="hint">Оплата по счёту на сайте не видна: когда деньги пришли на счёт, нажмите «Оплата пришла» — заказ уйдёт в выручку, а клиент увидит оплату в чате.</p>
 {% endblock %}

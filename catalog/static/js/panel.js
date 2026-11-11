@@ -87,6 +87,15 @@
         }
         links.hidden = false;
       }
+      for (const action of info.actions || []) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = `btn dlg-delete ${action.danger ? 'danger' : 'ghost'}`;
+        button.textContent = action.label;
+        button.dataset.action = action.url;
+        button.dataset.confirm = action.confirm;
+        $('.dlg-foot', dialog).prepend(button);
+      }
       const extra = $('#dlg-extra');
       if (extra && !(info.locked || []).length) {
         const button = extra.content.firstElementChild.cloneNode(true);
@@ -109,9 +118,14 @@
 
   document.addEventListener('click', (event) => {
     if (event.target.closest('a.phone')) return; // звонок по номеру на карточке не открывает окно
-    const target = event.target.closest('[data-new],[data-edit],[data-close],[data-delete],[data-copy],[data-check],[data-check-all]');
+    const target = event.target.closest('[data-new],[data-edit],[data-close],[data-delete],[data-action],[data-copy],[data-check],[data-check-all]');
     if (!target) return;
-    if (target.matches('[data-new]')) openDialog('');
+    if (target.matches('[data-action]')) {
+      if (target.dataset.confirm && !confirm(target.dataset.confirm)) return;
+      const form = $('#del-form');
+      form.action = target.dataset.action;
+      form.submit();
+    } else if (target.matches('[data-new]')) openDialog('');
     else if (target.matches('[data-edit]')) openDialog((target.closest('[data-id]') || target).dataset.id);
     else if (target.matches('[data-close]')) dialog?.close();
     else if (target.matches('[data-delete]')) {
@@ -130,6 +144,12 @@
 
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Enter' && event.target.matches?.('.deal')) openDialog(event.target.dataset.id);
+  });
+
+  // формы с вопросом перед отправкой (подтвердить заказ, оплата пришла)
+  document.addEventListener('submit', (event) => {
+    const text = event.target.dataset?.confirm;
+    if (text && !confirm(text)) event.preventDefault();
   });
 
   $$('[data-auto]').forEach((select) => select.addEventListener('change', () => select.form.submit()));

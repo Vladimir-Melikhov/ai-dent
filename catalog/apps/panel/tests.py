@@ -388,15 +388,42 @@ def test_quote_becomes_offer_card_with_lead_contact(client):
     assert deal.stage == "offer" and deal.origin == "quote" and deal.client == "Анна" and deal.contact == "+79005556677"
 
 
-def test_anonymous_quote_is_labelled_guest(client):
+def test_anonymous_quote_makes_no_card_but_is_listed(client):
     make_quote()
+    body = client.get("/deals/").content.decode()
+    assert not Deal.objects.exists()
+    assert "КП без контактов · 1" in body and "КП-1" in body
+
+
+def test_quote_gets_card_once_client_leaves_phone(client):
+    conversation = Conversation.objects.create(session=AnonSession.objects.create())
+    make_quote(conversation)
     client.get("/deals/")
-    deal = Deal.objects.get()
-    assert deal.client == "Гость из чата" and deal.contact == ""
+    assert not Deal.objects.exists()
+    Lead.objects.create(number="L9", phone="+79001110000", name="Ира", conversation=conversation, pd_consent_at=timezone.now())
+    client.get("/deals/")
+    assert Deal.objects.get().contact == "+79001110000"
+
+
+def test_legacy_phoneless_quote_card_is_removed(client):
+    quote = make_quote()
+    Deal.objects.create(title="КП", origin="quote", quote=quote, stage="offer", amount=1)
+    client.get("/deals/")
+    assert not Deal.objects.exists()
+
+
+def test_expired_quote_card_goes_to_archive(client):
+    conversation = Conversation.objects.create(session=AnonSession.objects.create())
+    Lead.objects.create(number="L8", phone="+79001110001", name="Ира", conversation=conversation, pd_consent_at=timezone.now())
+    quote = make_quote(conversation)
+    Quote.objects.filter(pk=quote.pk).update(valid_until=timezone.localdate() - datetime.timedelta(days=1))
+    client.get("/deals/")
+    assert Deal.objects.get().archived_at is not None
 
 
 def test_order_after_quote_reuses_the_same_card(client):
     conversation = Conversation.objects.create(session=AnonSession.objects.create())
+    Lead.objects.create(number="L3", phone="+79001110002", name="Ира", conversation=conversation, pd_consent_at=timezone.now())
     make_quote(conversation)
     client.get("/deals/")
     make_order(conversation=conversation)
@@ -429,3 +456,199 @@ def test_dashboard_syncs_cards(client):
     make_order()
     assert client.get("/").status_code == 200
     assert Deal.objects.count() == 1
+
+
+# --- архив, удаление заказа, один клиент — одна карточка
+
+def age(deal, days):
+    Deal.objects.filter(pk=deal.pk).update(created_at=timezone.now() - datetime.timedelta(days=days))
+
+
+def test_archive_hides_card_and_numbers_and_restores(client):
+    make_order()
+    client.get("/deals/")
+    deal = Deal.objects.get()
+    client.post(f"/deals/{deal.pk}/archive/")
+    assert "Заказ №S1" not in client.get("/deals/").content.decode()
+    assert "Заказ №S1" in client.get("/deals/?archive=1").content.decode()
+    assert all(s["count"] == 0 for s in services.pipeline())
+    assert services.deals_summary(*[services.resolve_period("30").start, services.resolve_period("30").end])["open_count"] == 0
+    client.post(f"/deals/{deal.pk}/archive/")
+    assert any(s["count"] == 1 for s in services.pipeline())
+
+
+def test_archived_card_returns_when_order_is_paid(client):
+    order = make_order()
+    client.get("/deals/")
+    deal = Deal.objects.get()
+    client.post(f"/deals/{deal.pk}/archive/")
+    order.status, order.paid_at = Order.Status.PAID, timezone.now()
+    order.save()
+    client.get("/deals/")
+    deal.refresh_from_db()
+    assert deal.archived_at is None and deal.stage == "won"
+
+
+def test_deleting_order_in_admin_removes_card(client):
+    order = make_order()
+    client.get("/deals/")
+    order.delete()
+    client.get("/deals/")
+    assert not Deal.objects.exists()
+
+
+def test_deleting_order_keeps_quote_card(client):
+    conversation = Conversation.objects.create(session=AnonSession.objects.create())
+    Lead.objects.create(number="L4", phone="+79001110003", name="Ира", conversation=conversation, pd_consent_at=timezone.now())
+    make_quote(conversation)
+    order = make_order(conversation=conversation)
+    client.get("/deals/")
+    order.delete()
+    client.get("/deals/")
+    deal = Deal.objects.get()
+    assert deal.stage == "offer" and deal.origin == "quote"
+
+
+def test_unpaid_order_can_be_deleted_from_panel(client):
+    order = make_order()
+    client.get("/deals/")
+    deal = Deal.objects.get()
+    client.post(f"/deals/{deal.pk}/delete-order/")
+    assert not Order.objects.filter(pk=order.pk).exists() and not Deal.objects.exists()
+    # клиент оформил новый заказ — новая карточка
+    make_order(number="S2")
+    client.get("/deals/")
+    assert Deal.objects.get().title == "Заказ №S2"
+
+
+def test_paid_order_cannot_be_deleted_from_panel(client):
+    order = make_order(status=Order.Status.PAID, paid_at=timezone.now())
+    client.get("/deals/")
+    deal = Deal.objects.get()
+    client.post(f"/deals/{deal.pk}/delete-order/")
+    assert Order.objects.filter(pk=order.pk).exists() and Deal.objects.exists()
+
+
+def test_quote_card_merges_into_order_by_phone(client):
+    conversation = Conversation.objects.create(session=AnonSession.objects.create())
+    Lead.objects.create(number="L2", phone="8 900 111-22-33", name="Анна", conversation=conversation, pd_consent_at=timezone.now())
+    make_quote(conversation)
+    client.get("/deals/")
+    # заказ из другого устройства, без чата, телефон записан иначе
+    make_order(contact_phone="+79001112233")
+    client.get("/deals/")
+    deal = Deal.objects.get()
+    assert deal.origin == "order" and deal.stage == "payment" and deal.quote_id and deal.order_id
+
+
+def test_stale_unpaid_card_archived_when_client_orders_again(client):
+    old = make_order(number="OLD")
+    client.get("/deals/")
+    age(Deal.objects.get(order=old), 10)
+    make_order(number="NEW")
+    client.get("/deals/")
+    assert Deal.objects.get(order=old).archived_at is not None
+    assert Deal.objects.get(title="Заказ №NEW").archived_at is None
+
+
+def test_fresh_parallel_orders_both_stay(client):
+    make_order(number="A")
+    make_order(number="B")
+    client.get("/deals/")
+    assert Deal.objects.filter(archived_at__isnull=True).count() == 2
+
+
+def test_waiting_days_shown_and_flagged_stale(client):
+    order = make_order()
+    Order.objects.filter(pk=order.pk).update(created_at=timezone.now() - datetime.timedelta(days=9))
+    assert 'class="wait stale">ждёт 9 дн.' in client.get("/deals/").content.decode()
+
+
+# --- продажи: плитки и статусы
+
+def test_sales_tiles_count_orders_by_status(client):
+    make_order(number="P1")
+    make_order(number="C1", status=Order.Status.CONFIRMED, total_amount=Decimal("500"))
+    make_order(number="C2", status=Order.Status.CONFIRMED, total_amount=Decimal("700"))
+    make_order(number="D1", status=Order.Status.PAID, paid_at=timezone.now())
+    response = client.get("/sales/")
+    tiles = {t["value"]: t for t in response.context["tiles"]}
+    assert tiles["pending_confirmation"]["count"] == 1
+    assert tiles["confirmed"]["count"] == 2 and tiles["confirmed"]["sum"] == 1200
+    assert tiles["paid"]["count"] == 1 and tiles["cancelled"]["count"] == 0
+
+
+def test_payment_by_invoice_marked_from_panel(client, owner):
+    order = make_order(status=Order.Status.CONFIRMED)
+    client.get("/deals/")
+    response = client.post(f"/orders/{order.pk}/to/paid/", {"back": "/deals/"})
+    assert response["Location"] == "/deals/"
+    order.refresh_from_db()
+    assert order.status == "paid" and order.paid_at and order.payment_status == "paid"
+    assert order.status_history.get().actor == "director" and order.status_history.get().actor_user == owner
+    assert Deal.objects.get(order=order).stage == "won"
+    assert not Entry.objects.exists()  # деньги считаются через заказ, дубля дохода нет
+
+
+def test_forbidden_transition_is_reported_not_applied(client):
+    order = make_order(status=Order.Status.PAID, paid_at=timezone.now())
+    client.post(f"/orders/{order.pk}/to/cancelled/")
+    order.refresh_from_db()
+    assert order.status == "paid"
+
+
+def test_unknown_status_rejected(client):
+    order = make_order()
+    client.post(f"/orders/{order.pk}/to/draft/")
+    order.refresh_from_db()
+    assert order.status == "pending_confirmation"
+
+
+def test_order_status_requires_login():
+    order = make_order(status=Order.Status.CONFIRMED)
+    response = Client(HTTP_HOST=PANEL).post(f"/orders/{order.pk}/to/paid/")
+    order.refresh_from_db()
+    assert response.status_code == 302 and order.status == "confirmed"
+
+
+def test_deal_dialog_offers_order_actions(client):
+    make_order(status=Order.Status.CONFIRMED)
+    response = client.get("/deals/")
+    labels = [a["label"] for a in list(response.context["objects"].values())[0]["actions"]]
+    assert "Оплата пришла" in labels and "Отменить заказ" in labels and "Подтвердить заказ" not in labels
+
+
+# --- ИИ и статистика
+
+from apps.chat.models import LLMUsage  # noqa: E402
+
+
+def test_ai_page_counts_cost_and_payback(client):
+    LLMUsage.objects.create(configured_model="m", model="claude-x", cost_usd=Decimal("2.50"), input_tokens=100, output_tokens=50, cache_read_tokens=300)
+    LLMUsage.objects.create(configured_model="m", model="claude-y", cost_usd=Decimal("0.50"), attempt_type="fallback_message")
+    conversation = Conversation.objects.create(session=AnonSession.objects.create())
+    make_order(created_by="ai", status=Order.Status.PAID, paid_at=timezone.now(), total_amount=Decimal("90000"), conversation=conversation)
+    response = client.get("/ai/")
+    stats = response.context["stats"]
+    assert response.status_code == 200
+    assert stats["cost"] == Decimal("3.00") and stats["requests"] == 2
+    assert stats["conversations"] == 1 and stats["chat_orders"] == 1 and stats["chat_paid"] == 90000
+    assert stats["fallback_share"] == 50
+    assert stats["per_order"] == Decimal("3.00")
+    assert [m["model"] for m in stats["models"]] == ["claude-x", "claude-y"]
+
+
+def test_ai_page_empty_period_renders(client):
+    response = client.get("/ai/?p=365")
+    assert response.status_code == 200 and response.context["stats"]["payback"] is None
+
+
+def test_card_age_is_order_age_not_sync_time(client):
+    order = make_order()
+    Order.objects.filter(pk=order.pk).update(created_at=timezone.now() - datetime.timedelta(days=10))
+    body = client.get("/deals/").content.decode()
+    assert "ждёт 10 дн." in body
+    # старый неоплаченный + новый заказ того же клиента: старый уходит в архив сразу
+    make_order(number="NEW")
+    client.get("/deals/")
+    assert Deal.objects.get(order=order).archived_at is not None

@@ -18,7 +18,8 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_GET, require_POST
 
 from apps.accounts.models import User
-from apps.orders.models import Order
+from apps.orders.models import Order, OrderStatusHistory
+from apps.orders.services import InvoiceError, TransitionError, allowed_transitions, change_status
 
 from . import services
 from .access import (
@@ -191,11 +192,18 @@ def deals(request):
     ctx = page_context(request, "deals")
     services.sync_auto_deals()
     origin = request.GET.get("src", "")
-    qs = Deal.objects.select_related("order", "conversation")
+    archive = request.GET.get("archive") == "1"
+    qs = Deal.objects.select_related("order", "conversation").filter(archived_at__isnull=not archive)
     if origin in Deal.Origin.values:
         qs = qs.filter(origin=origin)
     stages = []
     all_deals = list(qs)
+    now = timezone.now()
+    for d in all_deals:
+        # сколько карточка уже ждёт; с недели — тревожный цвет
+        since = (d.order.confirmed_at or d.order.created_at) if d.order_id else d.created_at
+        d.wait_days = (now - since).days if d.is_system and d.stage in Deal.OPEN_STAGES else None
+        d.stale = d.wait_days is not None and d.wait_days >= services.STALE_DAYS
     for stage in Deal.Stage:
         items = [d for d in all_deals if d.stage == stage.value]
         if stage in (Deal.Stage.WON, Deal.Stage.LOST):
@@ -206,7 +214,13 @@ def deals(request):
             "amount": sum((d.amount for d in items), ZERO),
         })
     ctx.update(
-        stages=stages, form=DealForm(), origin=origin, origins=Deal.Origin, summary=services.deals_summary(ctx["period"].start, ctx["period"].end),
+        stages=stages, form=DealForm(), origin=origin, origins=Deal.Origin, archive=archive,
+        archived_count=Deal.objects.filter(archived_at__isnull=False).count(),
+        anon_quotes=[] if archive else [
+            {"quote": q, "link": admin_link("chat/conversation", q.conversation_id) if q.conversation_id else ""}
+            for q in services.anonymous_quotes()
+        ],
+        summary=services.deals_summary(ctx["period"].start, ctx["period"].end),
         objects={d.pk: deal_json(d) for d in all_deals},
     )
     return render(request, "panel/deals.html", ctx)
@@ -216,14 +230,39 @@ def admin_link(app_model, pk):
     return f"{settings.SITE_ORIGIN}/{settings.ADMIN_URL}{app_model}/{pk}/change/"
 
 
+ORDER_ACTIONS = [
+    (Order.Status.CONFIRMED, "Подтвердить заказ",
+     "Подтвердить заказ №{number}? Клиенту уйдёт счёт на почту."),
+    (Order.Status.PAID, "Оплата пришла",
+     "Отметить заказ №{number} оплаченным? Деньги уже на счёте — клиент увидит это в чате."),
+    (Order.Status.CANCELLED, "Отменить заказ", "Отменить заказ №{number}?"),
+]
+
+
 def deal_json(deal):
     links = []
     if deal.order_id:
         links.append(["Заказ в админке", admin_link("orders/order", deal.order_id)])
     if deal.conversation_id:
         links.append(["Диалог в чате", admin_link("chat/conversation", deal.conversation_id)])
+    actions = [{
+        "label": "Вернуть из архива" if deal.archived_at else "В архив",
+        "url": f"/deals/{deal.pk}/archive/", "confirm": "",
+    }]
+    if deal.order_id:
+        for target, label, text in ORDER_ACTIONS:
+            if target in allowed_transitions(deal.order):
+                actions.append({
+                    "label": label, "danger": target == Order.Status.CANCELLED, "url": f"/orders/{deal.order_id}/to/{target}/",
+                    "confirm": text.format(number=deal.order.number),
+                })
+    if deal.order_id and deal.order.status != Order.Status.PAID:
+        actions.append({
+            "label": "Удалить заказ", "danger": True, "url": f"/deals/{deal.pk}/delete-order/",
+            "confirm": f"Удалить заказ №{deal.order.number} вместе со счётом? Клиент сможет оформить новый. Это нельзя отменить.",
+        })
     return {
-        "locked": list(DealForm.SYSTEM_LOCKED) if deal.is_system else [], "links": links,
+        "locked": list(DealForm.SYSTEM_LOCKED) if deal.is_system else [], "links": links, "actions": actions,
         "origin": deal.get_origin_display(),
         "title": deal.title, "client": deal.client, "contact": deal.contact, "amount": str(deal.amount),
         "stage": deal.stage, "source": deal.source, "note": deal.note,
@@ -252,6 +291,35 @@ def deal_stage(request, pk):
         deal.save(update_fields=["stage", "updated_at"])
         services.sync_deal(deal)
     return JsonResponse({"ok": True})
+
+
+@panel_required
+@require_POST
+def deal_archive(request, pk):
+    deal = get_object_or_404(Deal, pk=pk)
+    deal.archived_at = None if deal.archived_at else timezone.now()
+    deal.save(update_fields=["archived_at"])
+    messages.success(request, "Карточка в архиве" if deal.archived_at else "Карточка возвращена на доску")
+    return redirect("panel:deals")
+
+
+@panel_required
+@require_POST
+def deal_order_delete(request, pk):
+    """Удаление неоплаченного заказа вместе с карточкой. Оплаченный — деньги в учёте — только в архив."""
+    deal = get_object_or_404(Deal, pk=pk)
+    order = deal.order
+    if order is None:
+        messages.error(request, "У карточки нет заказа")
+    elif order.status == Order.Status.PAID:
+        messages.error(request, "Оплаченный заказ удалить нельзя: он в учёте. Уберите карточку в архив")
+    else:
+        number = order.number
+        with transaction.atomic():
+            order.delete()
+            services.sync_auto_deals()
+        messages.success(request, f"Заказ №{number} удалён")
+    return redirect("panel:deals")
 
 
 @panel_required
@@ -406,25 +474,69 @@ def category_delete(request, pk):
 def sales(request):
     ctx = page_context(request, "sales")
     period = ctx["period"]
-    qs = (
-        Order.objects.exclude(status=Order.Status.DRAFT)
-        .select_related("invoice")
-        .filter(created_at__date__gte=period.start, created_at__date__lte=period.end)
+    base = Order.objects.exclude(status=Order.Status.DRAFT).filter(
+        created_at__date__gte=period.start, created_at__date__lte=period.end
     )
+    by_status = {r["status"]: r for r in base.values("status").annotate(n=Count("id"), t=Sum("total_amount"))}
     status = request.GET.get("status", "")
+    qs = base.select_related("invoice")
     if status in Order.Status.values:
         qs = qs.filter(status=status)
     page = Paginator(qs, 40).get_page(request.GET.get("page"))
-    now = services.totals(period.start, period.end)
-    by_status = {r["status"]: r for r in qs.values("status").annotate(n=Count("id"), t=Sum("total_amount"))}
+    now = timezone.now()
+    for order in page:
+        waiting = order.status in (Order.Status.PENDING_CONFIRMATION, Order.Status.CONFIRMED)
+        since = order.confirmed_at or order.created_at
+        order.wait_days = (now - since).days if waiting else None
+        order.can_confirm = Order.Status.CONFIRMED in allowed_transitions(order)
+        order.can_pay = Order.Status.PAID in allowed_transitions(order)
+    tiles = []
+    for value, title, hint in [
+        (Order.Status.PENDING_CONFIRMATION, "Ждут подтверждения", "нужно подтвердить и выставить счёт"),
+        (Order.Status.CONFIRMED, "Подтверждены", "счёт выставлен, ждём оплату"),
+        (Order.Status.PAID, "Оплачены", "деньги получены"),
+        (Order.Status.CANCELLED, "Отменены", ""),
+    ]:
+        row = by_status.get(value, {})
+        tiles.append({"value": value, "title": title, "hint": hint, "count": row.get("n", 0), "sum": row.get("t") or ZERO})
+    total_n = sum(r["n"] for r in by_status.values())
+    total_sum = sum((r["t"] or ZERO for r in by_status.values()), ZERO)
     params = request.GET.copy()
     params.pop("page", None)
     ctx.update(
-        page=page, status=status, statuses=Order.Status, totals=now, by_status=by_status,
-        pending=Order.objects.filter(status=Order.Status.PENDING_CONFIRMATION).count(),
-        querystring=params.urlencode(),
+        page=page, status=status, statuses=Order.Status, tiles=tiles, total_n=total_n, total_sum=total_sum,
+        totals=services.totals(period.start, period.end), querystring=params.urlencode(),
     )
     return render(request, "panel/sales.html", ctx)
+
+
+@panel_required
+@require_POST
+def order_status(request, pk, to):
+    """Подтвердить, отметить оплаченным (оплата по счёту сайту не видна) или отменить заказ — как в админке."""
+    order = get_object_or_404(Order, pk=pk)
+    if to not in {Order.Status.CONFIRMED, Order.Status.PAID, Order.Status.CANCELLED}:
+        messages.error(request, "Неизвестный статус")
+    else:
+        try:
+            change_status(order, to, actor=OrderStatusHistory.Actor.DIRECTOR, actor_user=request.user)
+            word = {"confirmed": "подтверждён", "paid": "отмечен оплаченным", "cancelled": "отменён"}[to]
+            messages.success(request, f"Заказ №{order.number} {word}")
+        except (TransitionError, InvoiceError) as error:
+            messages.error(request, str(error))
+    services.sync_auto_deals()
+    return redirect(safe_back(request, "/sales/"))
+
+
+# --- ИИ и статистика
+
+@panel_required
+def ai(request):
+    ctx = page_context(request, "ai")
+    stats = services.ai_stats(ctx["period"])
+    chart = {"series": stats["series"]}
+    ctx.update(stats=stats, chart=chart)
+    return render(request, "panel/ai.html", ctx)
 
 
 # --- серверы

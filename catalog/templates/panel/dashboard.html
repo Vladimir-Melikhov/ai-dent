@@ -66,7 +66,7 @@
         {% if s.url %}<button class="status" data-check="{% url 'panel:server_check' s.pk %}" title="Проверить"><i class="pulse"></i><span>проверить</span></button>{% endif %}</li>
       {% empty %}<li class="empty">Добавьте серверы и сервисы в разделе «Серверы»</li>{% endfor %}
     </ul>
-    <div class="ai-line"><span class="muted">ИИ-консультант за период</span><b>${{ ai_usd|floatformat:2 }}</b></div>
+    <a class="ai-line" href="{% url 'panel:ai' %}"><span class="muted">ИИ-консультант за период</span><b>${{ ai_usd|floatformat:2 }}</b></a>
   </article>
 </section>
 

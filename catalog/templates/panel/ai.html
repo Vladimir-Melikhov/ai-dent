@@ -1,0 +1,54 @@
+{% extends "panel/base.html" %}
+{% load panel_tags %}
+{% block title %}ИИ и статистика{% endblock %}
+{% block h1 %}ИИ-консультант{% endblock %}
+{% block sub %}Сколько он стоит и что приносит · {{ period.start|date:"j E" }} — {{ period.end|date:"j E" }}{% endblock %}
+
+{% block content %}
+<section class="cards">
+  <article class="glass card"><div class="card-top"><span class="card-title">Расход на ИИ</span></div>
+    <div class="card-value">${{ stats.cost|floatformat:2 }}</div>
+    <div class="card-foot"><span class="muted">{% if stats.cost_rub is not None %}≈ {{ stats.cost_rub|rub }} по курсу {{ stats.rate|floatformat:2 }}{% else %}курс доллара не загружен{% endif %}</span></div></article>
+  <article class="glass card"><div class="card-top"><span class="card-title">Диалогов</span></div>
+    <div class="card-value">{{ stats.conversations }}</div>
+    <div class="card-foot"><span class="muted">{{ stats.client_messages }} реплик клиентов{% if stats.per_conversation %} · ${{ stats.per_conversation|floatformat:2 }} за диалог{% endif %}</span></div></article>
+  <article class="glass card"><div class="card-top"><span class="card-title">Заявки и КП</span></div>
+    <div class="card-value">{{ stats.leads }} / {{ stats.quotes }}</div>
+    <div class="card-foot"><span class="muted">заявок / КП{% if stats.per_lead %} · ${{ stats.per_lead|floatformat:2 }} за заявку{% endif %}</span></div></article>
+  <article class="glass card"><div class="card-top"><span class="card-title">Заказы из чата</span></div>
+    <div class="card-value">{{ stats.chat_orders }}</div>
+    <div class="card-foot"><span class="muted">оплачено на {{ stats.chat_paid|rub }}{% if stats.per_order %} · ${{ stats.per_order|floatformat:2 }} за заказ{% endif %}</span></div></article>
+</section>
+
+<section class="row main-row">
+  <article class="glass panel chart-panel">
+    <div class="panel-head"><div><h2>Расход на ИИ</h2><p class="muted">{% if period.days <= 31 %}по дням{% elif period.days <= 120 %}по неделям{% else %}по месяцам{% endif %}, доллары</p></div></div>
+    <div id="chart-ai" class="chart" role="img" aria-label="Расход на ИИ по периодам"></div>
+    <details class="table-view"><summary>Показать таблицей</summary><div id="table-ai"></div></details>
+  </article>
+  <article class="glass panel">
+    <div class="panel-head"><div><h2>Окупаемость</h2><p class="muted">Оплаченные заказы из чата к расходу на ИИ</p></div></div>
+    <div class="payback">{% if stats.payback %}<b>×{{ stats.payback|floatformat:0 }}</b><span class="muted">на каждый рубль ИИ — {{ stats.payback|floatformat:0 }} ₽ оплаченных заказов</span>{% else %}<b>—</b><span class="muted">{% if not stats.cost %}расхода на ИИ за период нет{% else %}оплаченных заказов из чата пока нет{% endif %}</span>{% endif %}</div>
+    <div class="mini-stats">
+      <div><b>{{ stats.requests }}</b><span>запросов к модели</span></div>
+      <div><b>{{ stats.cache_share|default_if_none:0|floatformat:0 }}%</b><span>из кэша (дешевле)</span></div>
+      <div><b>{% if stats.latency %}{{ stats.latency|floatformat:0 }}{% else %}—{% endif %}</b><span>мс на ответ</span></div>
+      <div><b>{{ stats.fallback_share|default_if_none:0|floatformat:0 }}%</b><span>на резервной модели</span></div>
+    </div>
+  </article>
+</section>
+
+<section class="glass table-wrap">
+  <table class="tbl">
+    <thead><tr><th>Модель</th><th class="r">Запросов</th><th class="r">Расход</th></tr></thead>
+    <tbody>
+      {% for m in stats.models %}<tr><td>{{ m.model }}</td><td class="r">{{ m.requests }}</td><td class="r amt">${{ m.cost|floatformat:2 }}</td></tr>
+      {% empty %}<tr><td colspan="3" class="empty">За период запросов к модели не было</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</section>
+<p class="hint">Расход берётся из учёта запросов к Claude (по цене каждой попытки), рубли — по курсу ЦБ. Лимит в сутки задаётся в настройках сервера.</p>
+
+{{ chart|json_script:"ai-data" }}
+{% endblock %}
+{% block scripts %}{% load static %}<script src="{% static 'js/panel-ai.js' %}" defer></script>{% endblock %}

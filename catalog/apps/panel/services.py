@@ -5,11 +5,12 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from django.db import IntegrityError, transaction
-from django.db.models import Count, Q, Sum
+from django.db.models import Avg, Count, Q, Sum
 from django.db.models.functions import Coalesce, TruncDate
 from django.utils import timezone
 
-from apps.chat.models import LLMUsage, Quote
+from apps.catalog.currency import rate_on
+from apps.chat.models import Conversation, LLMUsage, Message, Quote
 from apps.leads.models import Lead
 from apps.orders.models import Order
 
@@ -160,7 +161,7 @@ def pipeline() -> list[dict]:
     """Воронка: открытые сделки по этапам (на сейчас)."""
     rows = {
         r["stage"]: r
-        for r in Deal.objects.filter(stage__in=Deal.OPEN_STAGES).values("stage").annotate(n=Count("id"), total=Sum("amount"))
+        for r in Deal.objects.filter(stage__in=Deal.OPEN_STAGES, archived_at__isnull=True).values("stage").annotate(n=Count("id"), total=Sum("amount"))
     }
     return [
         {
@@ -174,9 +175,10 @@ def pipeline() -> list[dict]:
 
 
 def deals_summary(start, end) -> dict:
-    open_qs = Deal.objects.filter(stage__in=Deal.OPEN_STAGES)
-    won = Deal.objects.filter(stage=Deal.Stage.WON, closed_at__date__gte=start, closed_at__date__lte=end)
-    lost = Deal.objects.filter(stage=Deal.Stage.LOST, closed_at__date__gte=start, closed_at__date__lte=end)
+    live = Deal.objects.filter(archived_at__isnull=True)
+    open_qs = live.filter(stage__in=Deal.OPEN_STAGES)
+    won = live.filter(stage=Deal.Stage.WON, closed_at__date__gte=start, closed_at__date__lte=end)
+    lost = live.filter(stage=Deal.Stage.LOST, closed_at__date__gte=start, closed_at__date__lte=end)
     won_agg = won.aggregate(n=Count("id"), total=Sum("amount"))
     lost_n = lost.count()
     closed = (won_agg["n"] or 0) + lost_n
@@ -292,6 +294,74 @@ def sync_auto_deals() -> None:
     quotes = Quote.objects.filter(Q(created_at__gte=since) | Q(panel_deal__isnull=False)).select_related("user")
     for quote in quotes:
         _sync_quote(quote)
+    _drop_orphans()
+    _archive_superseded()
+    _archive_expired_quotes()
+
+
+STALE_DAYS = 7
+
+
+def phone_key(phone) -> str:
+    """Последние 10 цифр: +7 900…, 8 900… и 900… — один и тот же клиент."""
+    digits = "".join(ch for ch in str(phone or "") if ch.isdigit())
+    return digits[-10:] if len(digits) >= 10 else ""
+
+
+def _drop_orphans():
+    """Заказ или КП удалили — карточка уходит вместе с ним; остался только КП — карточка снова «КП отправлено»."""
+    for deal in Deal.objects.exclude(origin=Deal.Origin.MANUAL).filter(order__isnull=True):
+        if deal.quote_id:
+            if deal.origin != Deal.Origin.QUOTE or deal.stage != Deal.Stage.OFFER:
+                deal.origin, deal.stage, deal.closed_at = Deal.Origin.QUOTE, Deal.Stage.OFFER, None
+                deal.title, deal.amount = f"КП №{deal.quote.number}", deal.quote.total
+                deal.save()
+        else:
+            deal.delete()
+    Deal.objects.filter(origin=Deal.Origin.QUOTE, quote__isnull=True, order__isnull=True).delete()
+    # карточки КП без телефона (заведены раньше) — в список «КП без контактов»
+    for deal in Deal.objects.filter(origin=Deal.Origin.QUOTE, order__isnull=True):
+        if not phone_key(deal.contact):
+            deal.delete()
+
+
+def _archive_expired_quotes():
+    """КП истекло, заказа нет — карточка мертва: в архив."""
+    Deal.objects.filter(
+        origin=Deal.Origin.QUOTE, order__isnull=True, stage=Deal.Stage.OFFER, archived_at__isnull=True,
+        expected_date__lt=timezone.localdate(),
+    ).update(archived_at=timezone.now())
+
+
+def anonymous_quotes():
+    """КП последних 30 дней, по которым не с кем связаться и нет заказа."""
+    since = timezone.now() - datetime.timedelta(days=AUTO_WINDOW_DAYS)
+    taken = set(Deal.objects.exclude(conversation__isnull=True).values_list("conversation_id", flat=True))
+    result = []
+    for quote in Quote.objects.filter(created_at__gte=since, panel_deal__isnull=True).select_related("user"):
+        if quote.conversation_id in taken or phone_key(quote_contact(quote)[1]):
+            continue
+        result.append(quote)
+    return result
+
+
+def _archive_superseded():
+    """Клиент вернулся с новым заказом, а старый неоплаченный висит больше недели — старый уходит в архив."""
+    now = timezone.now()
+    groups = defaultdict(list)
+    for deal in Deal.objects.filter(
+        archived_at__isnull=True, stage__in=(Deal.Stage.PAYMENT, Deal.Stage.OFFER)
+    ).exclude(origin=Deal.Origin.MANUAL):
+        key = phone_key(deal.contact)
+        if key:
+            groups[key].append(deal)
+    for deals in groups.values():
+        if len(deals) < 2:
+            continue
+        newest = max(deals, key=lambda d: d.created_at)
+        for deal in deals:
+            if deal is not newest and now - deal.created_at >= datetime.timedelta(days=STALE_DAYS):
+                Deal.objects.filter(pk=deal.pk).update(archived_at=now)
 
 
 def _sync_order(order):
@@ -302,8 +372,16 @@ def _sync_order(order):
     if deal is None and order.conversation_id:
         # Клиент сначала просил КП в чате, потом оформил заказ — та же карточка, а не вторая
         deal = Deal.objects.filter(conversation_id=order.conversation_id, order__isnull=True).order_by("id").first()
+    if deal is None and phone_key(order.contact_phone):
+        # КП в одном чате, заказ из другого или без чата: тот же клиент по телефону
+        key = phone_key(order.contact_phone)
+        for candidate in Deal.objects.filter(origin=Deal.Origin.QUOTE, order__isnull=True).order_by("id"):
+            if phone_key(candidate.contact) == key:
+                deal = candidate
+                break
     fields = {
-        "origin": Deal.Origin.ORDER, "order": order, "conversation_id": order.conversation_id,
+        "origin": Deal.Origin.ORDER, "order": order,
+        "conversation_id": order.conversation_id or (deal.conversation_id if deal else None),
         "title": f"Заказ №{order.number}", "amount": order.total_amount or ZERO, "stage": stage,
         "client": order.company_name or order.buyer_name or order.contact_name or "",
         "contact": order.contact_phone or "", "source": "Сайт",
@@ -312,12 +390,16 @@ def _sync_order(order):
         try:
             with transaction.atomic():
                 deal = Deal.objects.create(note=order_summary(order), **fields)
+                # возраст карточки — возраст заказа, а не момент, когда мы её завели
+                Deal.objects.filter(pk=deal.pk).update(created_at=order.created_at)
         except IntegrityError:
             return
     else:
         changed = {k: v for k, v in fields.items() if getattr(deal, k) != v}
         if not deal.note.strip():
             changed["note"] = order_summary(order)
+        if deal.archived_at and stage == Deal.Stage.WON:
+            changed["archived_at"] = None  # деньги пришли — карточка возвращается из архива
         if changed:
             for key, value in changed.items():
                 setattr(deal, key, value)
@@ -336,13 +418,83 @@ def _sync_quote(quote):
             existing.save(update_fields=["quote", "updated_at"])
         return
     name, phone = quote_contact(quote)
+    if not phone_key(phone):
+        return  # без телефона связаться нечем: карточку не заводим, КП видно в списке «КП без контактов»
     try:
         with transaction.atomic():
             deal = Deal.objects.create(
                 origin=Deal.Origin.QUOTE, quote=quote, conversation_id=quote.conversation_id,
-                title=f"КП №{quote.number}", client=name or "Гость из чата", contact=phone, source="Чат",
+                title=f"КП №{quote.number}", client=name or "Клиент из чата", contact=phone, source="Чат",
                 amount=quote.total, stage=Deal.Stage.OFFER, expected_date=quote.valid_until, note=quote_summary(quote),
             )
+            Deal.objects.filter(pk=deal.pk).update(created_at=quote.created_at)
     except IntegrityError:
         return
     sync_deal(deal)
+
+
+# --- ИИ-консультант: расходы и отдача
+
+def _day_bounds(start, end):
+    since = timezone.make_aware(datetime.datetime.combine(start, datetime.time.min))
+    until = timezone.make_aware(datetime.datetime.combine(end + datetime.timedelta(days=1), datetime.time.min))
+    return since, until
+
+
+def ai_stats(period: Period) -> dict:
+    since, until = _day_bounds(period.start, period.end)
+    usage = LLMUsage.objects.filter(created_at__gte=since, created_at__lt=until)
+    agg = usage.aggregate(
+        cost=Sum("cost_usd"), requests=Count("id"), tokens_in=Sum("input_tokens"), tokens_out=Sum("output_tokens"),
+        cache_read=Sum("cache_read_tokens"), cache_w5=Sum("cache_write_5m_tokens"), cache_w1=Sum("cache_write_1h_tokens"),
+        latency=Avg("latency_ms"), fallback=Count("id", filter=Q(attempt_type=LLMUsage.AttemptType.FALLBACK)),
+    )
+    cost = agg["cost"] or ZERO
+    rate = rate_on("USD")
+    cost_rub = cost * rate if rate else None
+
+    conversations = Conversation.objects.filter(created_at__gte=since, created_at__lt=until).count()
+    client_messages = Message.objects.filter(
+        role=Message.Role.USER, created_at__gte=since, created_at__lt=until
+    ).count()
+    leads = Lead.objects.filter(created_at__gte=since, created_at__lt=until).count()
+    quotes = Quote.objects.filter(created_at__gte=since, created_at__lt=until).count()
+    chat_orders = Order.objects.filter(created_by=Order.CreatedBy.AI, created_at__gte=since, created_at__lt=until).exclude(
+        status=Order.Status.DRAFT
+    )
+    chat_orders_n = chat_orders.count()
+    chat_paid = chat_orders.filter(status=Order.Status.PAID).aggregate(t=Sum("total_amount"))["t"] or ZERO
+
+    reads = agg["cache_read"] or 0
+    total_in = (agg["tokens_in"] or 0) + reads + (agg["cache_w5"] or 0) + (agg["cache_w1"] or 0)
+
+    def per(count):
+        return (cost / count) if count and cost else None
+
+    # расход по дням, неделям или месяцам — как на обзоре
+    step = bucket_step(period.days)
+    daily = defaultdict(lambda: {"cost": ZERO, "requests": 0})
+    for row in usage.annotate(day=TruncDate("created_at")).values("day").annotate(c=Sum("cost_usd"), n=Count("id")):
+        bucket = daily[bucket_start(row["day"], step)]
+        bucket["cost"] += row["c"] or ZERO
+        bucket["requests"] += row["n"]
+    series_rows = [
+        {"date": key.isoformat(), "step": step, "cost": float(v["cost"]), "requests": v["requests"]}
+        for key, v in sorted(daily.items())
+    ]
+    models = [
+        {"model": row["model"], "requests": row["n"], "cost": row["c"] or ZERO}
+        for row in usage.values("model").annotate(n=Count("id"), c=Sum("cost_usd")).order_by("-c")
+    ]
+    return {
+        "cost": cost, "cost_rub": cost_rub, "rate": rate, "requests": agg["requests"],
+        "tokens_in": total_in, "tokens_out": agg["tokens_out"] or 0,
+        "cache_share": (reads / total_in * 100) if total_in else None,
+        "fallback_share": (agg["fallback"] / agg["requests"] * 100) if agg["requests"] else None,
+        "latency": agg["latency"],
+        "conversations": conversations, "client_messages": client_messages, "leads": leads, "quotes": quotes,
+        "chat_orders": chat_orders_n, "chat_paid": chat_paid,
+        "per_conversation": per(conversations), "per_lead": per(leads), "per_order": per(chat_orders_n),
+        "payback": (chat_paid / cost_rub) if cost_rub else None,
+        "series": series_rows, "models": models,
+    }

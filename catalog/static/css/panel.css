@@ -304,3 +304,15 @@ body.auth { display: grid; place-items: center; padding: 24px; }
 
 .col-head b { white-space: nowrap; } .col-head .sum { white-space: nowrap; }
 .deal-top b { overflow-wrap: anywhere; }
+.wait { font-size: 12px; color: var(--text-2); } .wait.stale { color: #ffb86b; font-weight: 700; }
+/* поля, которые правит заказ, а не менеджер */
+input:disabled, select:disabled, textarea:disabled { opacity: .5; cursor: not-allowed; }
+
+/* продажи: плитки статусов, действие в строке; ИИ: окупаемость; КП без контактов */
+.tile { display: block; } .tile.st-pending_confirmation .card-value { color: #f0b44c; } .tile.st-paid .card-value { color: var(--good); } .tile.st-cancelled .card-value { color: var(--text-2); }
+.inline { display: inline; margin: 0; }
+.payback { display: grid; gap: 4px; margin-bottom: 18px; } .payback b { font-size: 40px; letter-spacing: -1px; }
+.anon { margin-top: 16px; padding: 4px 0; border-radius: 18px; }
+.anon summary { display: flex; gap: 14px; align-items: baseline; flex-wrap: wrap; padding: 14px 20px; cursor: pointer; }
+.anon .hint { margin: 8px 20px 14px; }
+a.ai-line { color: inherit; }
