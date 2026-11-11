@@ -143,6 +143,7 @@ def safe_back(request, fallback):
 @panel_required
 def dashboard(request):
     ctx = page_context(request, "dashboard")
+    services.sync_auto_deals()
     period, prev = ctx["period"], ctx["period"].previous
     now, before = services.totals(period.start, period.end), services.totals(prev.start, prev.end)
     rows = services.series(period)
@@ -188,8 +189,13 @@ def greeting():
 @panel_required
 def deals(request):
     ctx = page_context(request, "deals")
+    services.sync_auto_deals()
+    origin = request.GET.get("src", "")
+    qs = Deal.objects.select_related("order", "conversation")
+    if origin in Deal.Origin.values:
+        qs = qs.filter(origin=origin)
     stages = []
-    all_deals = list(Deal.objects.all())
+    all_deals = list(qs)
     for stage in Deal.Stage:
         items = [d for d in all_deals if d.stage == stage.value]
         if stage in (Deal.Stage.WON, Deal.Stage.LOST):
@@ -200,14 +206,25 @@ def deals(request):
             "amount": sum((d.amount for d in items), ZERO),
         })
     ctx.update(
-        stages=stages, form=DealForm(), summary=services.deals_summary(ctx["period"].start, ctx["period"].end),
+        stages=stages, form=DealForm(), origin=origin, origins=Deal.Origin, summary=services.deals_summary(ctx["period"].start, ctx["period"].end),
         objects={d.pk: deal_json(d) for d in all_deals},
     )
     return render(request, "panel/deals.html", ctx)
 
 
+def admin_link(app_model, pk):
+    return f"{settings.SITE_ORIGIN}/{settings.ADMIN_URL}{app_model}/{pk}/change/"
+
+
 def deal_json(deal):
+    links = []
+    if deal.order_id:
+        links.append(["Заказ в админке", admin_link("orders/order", deal.order_id)])
+    if deal.conversation_id:
+        links.append(["Диалог в чате", admin_link("chat/conversation", deal.conversation_id)])
     return {
+        "locked": list(DealForm.SYSTEM_LOCKED) if deal.is_system else [], "links": links,
+        "origin": deal.get_origin_display(),
         "title": deal.title, "client": deal.client, "contact": deal.contact, "amount": str(deal.amount),
         "stage": deal.stage, "source": deal.source, "note": deal.note,
         "expected_date": deal.expected_date.isoformat() if deal.expected_date else "",
@@ -226,6 +243,8 @@ def deal_stage(request, pk):
     """Перенос карточки по воронке (перетаскивание)."""
     deal = get_object_or_404(Deal, pk=pk)
     stage = request.POST.get("stage")
+    if deal.is_system:
+        return JsonResponse({"error": "Этап этой карточки следует за заказом"}, status=400)
     if stage not in Deal.Stage.values:
         return JsonResponse({"error": "Неизвестный этап"}, status=400)
     with transaction.atomic():
@@ -238,7 +257,11 @@ def deal_stage(request, pk):
 @panel_required
 @require_POST
 def deal_delete(request, pk):
-    get_object_or_404(Deal, pk=pk).delete()
+    deal = get_object_or_404(Deal, pk=pk)
+    if deal.is_system:
+        messages.error(request, "Карточка из заказа или чата удаляется вместе с ним")
+        return redirect("panel:deals")
+    deal.delete()
     messages.success(request, "Сделка удалена")
     return redirect("panel:deals")
 

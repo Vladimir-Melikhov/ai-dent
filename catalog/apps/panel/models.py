@@ -36,6 +36,11 @@ class Deal(models.Model):
         WON = "won", "Выиграна"
         LOST = "lost", "Проиграна"
 
+    class Origin(models.TextChoices):
+        MANUAL = "manual", "Вручную"
+        ORDER = "order", "С сайта"
+        QUOTE = "quote", "Из чата"
+
     OPEN_STAGES = (Stage.NEW, Stage.NEGOTIATION, Stage.OFFER, Stage.PAYMENT)
 
     title = models.CharField(max_length=160, verbose_name="Сделка")
@@ -46,6 +51,18 @@ class Deal(models.Model):
     source = models.CharField(max_length=80, blank=True, default="", verbose_name="Источник")
     expected_date = models.DateField(null=True, blank=True, verbose_name="Ожидаем закрыть")
     note = models.TextField(blank=True, default="", verbose_name="Заметка")
+    # Карточки с сайта и из чата ведёт система: этап следует за статусом заказа, а деньги уже учтены заказом
+    origin = models.CharField(max_length=10, choices=Origin.choices, default=Origin.MANUAL, verbose_name="Откуда")
+    order = models.OneToOneField(
+        "orders.Order", null=True, blank=True, on_delete=models.SET_NULL, related_name="panel_deal", verbose_name="Заказ"
+    )
+    quote = models.OneToOneField(
+        "chat.Quote", null=True, blank=True, on_delete=models.SET_NULL, related_name="panel_deal", verbose_name="КП"
+    )
+    conversation = models.ForeignKey(
+        "chat.Conversation", null=True, blank=True, on_delete=models.SET_NULL, related_name="panel_deals",
+        verbose_name="Диалог",
+    )
     closed_at = models.DateTimeField(null=True, blank=True, verbose_name="Закрыта")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Создана")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлена")
@@ -58,6 +75,10 @@ class Deal(models.Model):
 
     def __str__(self):
         return self.title
+
+    @property
+    def is_system(self):
+        return self.origin != self.Origin.MANUAL
 
 
 class Entry(models.Model):

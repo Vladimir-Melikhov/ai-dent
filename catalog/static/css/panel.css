@@ -232,7 +232,7 @@ textarea { resize: vertical; }
 .swatch input:checked + i { outline-color: var(--text); } .swatch input:focus-visible + i { outline-color: var(--accent); }
 
 /* сделки */
-.board { display: grid; grid-template-columns: repeat(6, minmax(210px, 1fr)); gap: 14px; overflow-x: auto; padding-bottom: 8px; align-items: start; }
+.board { display: grid; grid-template-columns: repeat(6, minmax(250px, 1fr)); gap: 14px; overflow-x: auto; padding-bottom: 8px; align-items: start; }
 .col { padding: 14px; min-height: 320px; transition: border-color .15s, background .15s; }
 .col.over { border-color: var(--accent); background: rgba(110,168,255,.08); }
 .col-head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
@@ -287,3 +287,20 @@ body.auth { display: grid; place-items: center; padding: 24px; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 @media (forced-colors: active) { .bar-fill, .dot { forced-color-adjust: none; } }
 .dot.line { background: var(--text); height: 3px; width: 14px; border-radius: 2px; }
+
+/* стеклянный зуб за блоками: стекло карточек размывает его, как матовое */
+.bg::before { content: ""; position: absolute; right: -4vw; top: 50%; width: min(78vh, 62vw); aspect-ratio: 1051 / 1024; transform: translateY(-46%) rotate(-6deg);
+  background: url(../img/teeth.png) center / contain no-repeat; opacity: .34; filter: saturate(.8) brightness(.85); }
+@media (max-width: 720px) { .bg::before { right: -30vw; width: 110vw; opacity: .38; } }
+
+/* значки происхождения и телефон на карточке сделки */
+.deal-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.origin { flex: none; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; background: var(--glass-strong); color: var(--text-2); }
+.origin.o-order { color: var(--accent); background: rgba(110,168,255,.14); } .origin.o-quote { color: #b9a9ff; background: rgba(144,133,233,.16); }
+.deal.system { cursor: pointer; border-style: dashed; }
+.phone { font-size: 12.5px; color: var(--text-2); width: max-content; } .phone:hover { color: var(--accent); }
+.dlg-links { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.dlg-links[hidden] { display: none; }
+
+.col-head b { white-space: nowrap; } .col-head .sum { white-space: nowrap; }
+.deal-top b { overflow-wrap: anywhere; }

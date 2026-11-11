@@ -5,6 +5,7 @@
     <input type="hidden" name="id" value="">
     <input type="hidden" name="back" value="{{ request.get_full_path }}">
     <div class="dlg-head"><h2></h2><button type="button" class="round sm" data-close aria-label="Закрыть"><svg><use href="#i-close"/></svg></button></div>
+    <div class="dlg-links" hidden></div>
     <div class="grid2">
       {% for field in form %}{% include "panel/_field.html" %}{% endfor %}
       {{ extra_fields }}

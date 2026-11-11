@@ -30,6 +30,15 @@ class DealForm(forms.ModelForm):
             "note": forms.Textarea(attrs={"rows": 3}),
         }
 
+    # У карточек с сайта и из чата этап, сумму и клиента задаёт заказ; менеджер правит только заметку и срок
+    SYSTEM_LOCKED = ("title", "client", "contact", "amount", "stage", "source")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance.pk and self.instance.is_system:
+            for name in self.SYSTEM_LOCKED:
+                self.fields[name].disabled = True
+
     def clean_amount(self):
         return self.cleaned_data.get("amount") or Decimal("0")
 

@@ -314,3 +314,118 @@ def test_wrong_password_stays_generic():
     User.objects.create_superuser("+79990000005", "pass-12345")
     response = Client(HTTP_HOST=PANEL).post("/login/", {"phone": "+79990000005", "password": "nope"})
     assert "Неверный телефон или пароль" in response.content.decode()
+
+
+# --- карточки из заказов и КП
+
+from apps.accounts.models import AnonSession  # noqa: E402
+from apps.chat.models import Conversation, Quote  # noqa: E402
+from apps.leads.models import Lead  # noqa: E402
+
+
+def make_order(number="S1", status=Order.Status.PENDING_CONFIRMATION, **kwargs):
+    defaults = dict(total_amount=Decimal("12000"), contact_name="Иван", contact_phone="+79001112233")
+    return Order.objects.create(number=number, status=status, **{**defaults, **kwargs})
+
+
+def make_quote(conversation=None, number="КП-1"):
+    return Quote.objects.create(
+        number=number, conversation=conversation, total=Decimal("50000"), valid_until=timezone.localdate(),
+        items=[{"name": "Лупа", "quantity": 1, "unit_price_rub": 50000, "line_total_rub": 50000}],
+    )
+
+
+def test_order_becomes_card_in_payment_stage(client):
+    order = make_order()
+    client.get("/deals/")
+    deal = Deal.objects.get(order=order)
+    assert deal.stage == "payment" and deal.origin == "order" and deal.client == "Иван" and deal.contact == "+79001112233"
+    assert deal.amount == 12000
+
+
+def test_card_follows_order_status_and_creates_no_income(client):
+    order = make_order()
+    client.get("/deals/")
+    order.status, order.paid_at = Order.Status.PAID, timezone.now()
+    order.save()
+    client.get("/deals/")
+    deal = Deal.objects.get(order=order)
+    assert deal.stage == "won" and deal.closed_at is not None
+    assert not Entry.objects.exists()  # деньги уже в выручке через заказ
+    order.status = Order.Status.CANCELLED
+    order.save()
+    client.get("/deals/")
+    deal.refresh_from_db()
+    assert deal.stage == "lost"
+
+
+def test_draft_orders_are_ignored(client):
+    make_order(status=Order.Status.DRAFT)
+    client.get("/deals/")
+    assert not Deal.objects.exists()
+
+
+def test_old_orders_are_not_dumped_into_the_board(client):
+    order = make_order()
+    Order.objects.filter(pk=order.pk).update(created_at=timezone.now() - datetime.timedelta(days=60))
+    client.get("/deals/")
+    assert not Deal.objects.exists()
+
+
+def test_sync_is_idempotent(client):
+    make_order()
+    for _ in range(3):
+        client.get("/deals/")
+    assert Deal.objects.count() == 1
+
+
+def test_quote_becomes_offer_card_with_lead_contact(client):
+    conversation = Conversation.objects.create(session=AnonSession.objects.create())
+    Lead.objects.create(number="L1", phone="+79005556677", name="Анна", conversation=conversation, pd_consent_at=timezone.now())
+    quote = make_quote(conversation)
+    client.get("/deals/")
+    deal = Deal.objects.get(quote=quote)
+    assert deal.stage == "offer" and deal.origin == "quote" and deal.client == "Анна" and deal.contact == "+79005556677"
+
+
+def test_anonymous_quote_is_labelled_guest(client):
+    make_quote()
+    client.get("/deals/")
+    deal = Deal.objects.get()
+    assert deal.client == "Гость из чата" and deal.contact == ""
+
+
+def test_order_after_quote_reuses_the_same_card(client):
+    conversation = Conversation.objects.create(session=AnonSession.objects.create())
+    make_quote(conversation)
+    client.get("/deals/")
+    make_order(conversation=conversation)
+    client.get("/deals/")
+    deal = Deal.objects.get()  # одна карточка, а не две
+    assert deal.stage == "payment" and deal.origin == "order" and deal.quote_id and deal.order_id
+
+
+def test_system_card_cannot_be_moved_deleted_or_retitled(client):
+    make_order()
+    client.get("/deals/")
+    deal = Deal.objects.get()
+    assert client.post(f"/deals/{deal.pk}/stage/", {"stage": "won"}).status_code == 400
+    client.post(f"/deals/{deal.pk}/delete/")
+    assert Deal.objects.filter(pk=deal.pk).exists()
+    client.post("/deals/save/", {"id": deal.pk, "title": "Взлом", "amount": "1", "stage": "won", "note": "заметка"})
+    deal.refresh_from_db()
+    assert deal.title.startswith("Заказ") and deal.amount == 12000 and deal.stage == "payment" and deal.note == "заметка"
+
+
+def test_origin_filter(client):
+    make_order()
+    Deal.objects.create(title="Ручная", amount=1)
+    client.get("/deals/")
+    body = client.get("/deals/?src=manual").content.decode()
+    assert "Ручная" in body and "Заказ №S1" not in body
+
+
+def test_dashboard_syncs_cards(client):
+    make_order()
+    assert client.get("/").status_code == 200
+    assert Deal.objects.count() == 1

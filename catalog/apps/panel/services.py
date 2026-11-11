@@ -4,11 +4,13 @@ from collections import defaultdict
 from dataclasses import dataclass
 from decimal import Decimal
 
-from django.db.models import Count, Sum
+from django.db import IntegrityError, transaction
+from django.db.models import Count, Q, Sum
 from django.db.models.functions import Coalesce, TruncDate
 from django.utils import timezone
 
-from apps.chat.models import LLMUsage
+from apps.chat.models import LLMUsage, Quote
+from apps.leads.models import Lead
 from apps.orders.models import Order
 
 from .models import Category, Deal, Entry
@@ -226,7 +228,8 @@ def sync_deal(deal: Deal) -> None:
         deal.closed_at = now
 
     entry = Entry.objects.filter(deal=deal).first()
-    if deal.stage != Deal.Stage.WON or deal.amount <= 0:
+    # Системные карточки денег не создают: оплаченный заказ уже в выручке
+    if deal.stage != Deal.Stage.WON or deal.amount <= 0 or deal.is_system:
         if entry:
             entry.delete()
         return
@@ -241,3 +244,105 @@ def sync_deal(deal: Deal) -> None:
         kind=Category.Kind.INCOME, category=category, amount=deal.amount, title=deal.title,
         date=timezone.localtime(deal.closed_at).date(), deal=deal,
     )
+
+
+# --- карточки из заказов сайта и КП чата
+
+AUTO_WINDOW_DAYS = 30
+ORDER_STAGE = {
+    Order.Status.PENDING_CONFIRMATION: Deal.Stage.PAYMENT,
+    Order.Status.CONFIRMED: Deal.Stage.PAYMENT,
+    Order.Status.PAID: Deal.Stage.WON,
+    Order.Status.CANCELLED: Deal.Stage.LOST,
+}
+
+
+def order_summary(order) -> str:
+    lines = [f"{i.product_name} × {i.quantity} — {i.line_total} ₽" for i in order.items.all()]
+    place = ", ".join(x for x in (order.delivery_city, order.delivery_address) if x)
+    return "\n".join(lines + ([f"Доставка: {place}"] if place else []) + ([f"Email: {order.contact_email}"] if order.contact_email else []))
+
+
+def quote_summary(quote) -> str:
+    return "\n".join(f"{i['name']} × {i['quantity']} — {i['line_total_rub']} ₽" for i in quote.items)
+
+
+def quote_contact(quote):
+    """Имя и телефон клиента КП: из заявки агента по диалогу, иначе из аккаунта. Аноним — пусто."""
+    lead = Lead.objects.filter(conversation_id=quote.conversation_id).order_by("-id").first() if quote.conversation_id else None
+    if lead:
+        return lead.name, lead.phone
+    if quote.user_id:
+        return quote.user.first_name, quote.user.phone
+    return "", ""
+
+
+def sync_auto_deals() -> None:
+    """Заводит и двигает карточки по заказам сайта и КП чата. Идемпотентна: вызывается при открытии воронки.
+
+    Берутся заказы и КП за последние 30 дней и всё, у чего карточка уже есть."""
+    since = timezone.now() - datetime.timedelta(days=AUTO_WINDOW_DAYS)
+    orders = (
+        Order.objects.exclude(status=Order.Status.DRAFT)
+        .filter(Q(created_at__gte=since) | Q(panel_deal__isnull=False))
+        .select_related("panel_deal").prefetch_related("items")
+    )
+    for order in orders:
+        _sync_order(order)
+    quotes = Quote.objects.filter(Q(created_at__gte=since) | Q(panel_deal__isnull=False)).select_related("user")
+    for quote in quotes:
+        _sync_quote(quote)
+
+
+def _sync_order(order):
+    stage = ORDER_STAGE.get(order.status)
+    if stage is None:
+        return
+    deal = getattr(order, "panel_deal", None)
+    if deal is None and order.conversation_id:
+        # Клиент сначала просил КП в чате, потом оформил заказ — та же карточка, а не вторая
+        deal = Deal.objects.filter(conversation_id=order.conversation_id, order__isnull=True).order_by("id").first()
+    fields = {
+        "origin": Deal.Origin.ORDER, "order": order, "conversation_id": order.conversation_id,
+        "title": f"Заказ №{order.number}", "amount": order.total_amount or ZERO, "stage": stage,
+        "client": order.company_name or order.buyer_name or order.contact_name or "",
+        "contact": order.contact_phone or "", "source": "Сайт",
+    }
+    if deal is None:
+        try:
+            with transaction.atomic():
+                deal = Deal.objects.create(note=order_summary(order), **fields)
+        except IntegrityError:
+            return
+    else:
+        changed = {k: v for k, v in fields.items() if getattr(deal, k) != v}
+        if not deal.note.strip():
+            changed["note"] = order_summary(order)
+        if changed:
+            for key, value in changed.items():
+                setattr(deal, key, value)
+            deal.save()
+    sync_deal(deal)
+
+
+def _sync_quote(quote):
+    if Deal.objects.filter(quote=quote).exists():
+        return
+    # По диалогу уже есть карточка (заказ или другое КП) — новая не нужна, только привязка
+    existing = Deal.objects.filter(conversation_id=quote.conversation_id).order_by("id").first() if quote.conversation_id else None
+    if existing is not None:
+        if existing.quote_id is None:
+            existing.quote = quote
+            existing.save(update_fields=["quote", "updated_at"])
+        return
+    name, phone = quote_contact(quote)
+    try:
+        with transaction.atomic():
+            deal = Deal.objects.create(
+                origin=Deal.Origin.QUOTE, quote=quote, conversation_id=quote.conversation_id,
+                title=f"КП №{quote.number}", client=name or "Гость из чата", contact=phone, source="Чат",
+                amount=quote.total, stage=Deal.Stage.OFFER, expected_date=quote.valid_until, note=quote_summary(quote),
+            )
+    except IntegrityError:
+        return
+    sync_deal(deal)

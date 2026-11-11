@@ -60,6 +60,9 @@
     form.elements.id.value = id || '';
     $('h2', dialog).textContent = id ? dialog.dataset.titleEdit : dialog.dataset.titleNew;
     $$('.dlg-delete', dialog).forEach((node) => node.remove());
+    $$('[name]', form).forEach((field) => { field.disabled = false; });
+    const links = $('.dlg-links', dialog);
+    if (links) { links.hidden = true; links.replaceChildren(); }
     if (id && objects[id]) {
       for (const [name, value] of Object.entries(objects[id])) {
         const field = form.elements[name];
@@ -67,8 +70,25 @@
         if (field instanceof RadioNodeList) field.value = String(value);
         else field.value = value;
       }
+      const info = objects[id];
+      // карточка из заказа или чата: этап, сумму и клиента задаёт заказ
+      (info.locked || []).forEach((name) => { if (form.elements[name]) form.elements[name].disabled = true; });
+      if (links && (info.origin || (info.links || []).length)) {
+        const badge = document.createElement('span');
+        badge.className = 'tag';
+        badge.textContent = info.origin;
+        links.appendChild(badge);
+        for (const [label, href] of info.links || []) {
+          const a = document.createElement('a');
+          a.className = 'btn ghost sm';
+          a.href = href; a.target = '_blank'; a.rel = 'noopener noreferrer';
+          a.textContent = label;
+          links.appendChild(a);
+        }
+        links.hidden = false;
+      }
       const extra = $('#dlg-extra');
-      if (extra) {
+      if (extra && !(info.locked || []).length) {
         const button = extra.content.firstElementChild.cloneNode(true);
         button.dataset.delete = button.dataset.delete.replace('{id}', id);
         button.classList.add('dlg-delete');
@@ -88,6 +108,7 @@
   }
 
   document.addEventListener('click', (event) => {
+    if (event.target.closest('a.phone')) return; // звонок по номеру на карточке не открывает окно
     const target = event.target.closest('[data-new],[data-edit],[data-close],[data-delete],[data-copy],[data-check],[data-check-all]');
     if (!target) return;
     if (target.matches('[data-new]')) openDialog('');
