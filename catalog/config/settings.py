@@ -2,6 +2,8 @@ from pathlib import Path
 import os
 from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
+from django.urls import reverse_lazy
+from django.templatetags.static import static
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -40,6 +42,7 @@ ADMIN_URL = ADMIN_URL.strip("/") + "/"
 AUTH_USER_MODEL = "accounts.User"
 
 INSTALLED_APPS = [
+    "unfold",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -47,12 +50,160 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django.contrib.humanize",
+
     "apps.accounts",
     "apps.catalog",
     "apps.orders",
     "apps.chat",
     "apps.leads",
 ]
+
+UNFOLD = {
+    "STYLES": [
+            lambda request: static("css/admin.css"),
+        ],
+    "SITE_TITLE": "Ai-Dent",
+    "SITE_HEADER": "Ai-Dent",
+    "SITE_SUBHEADER": "Панель управления",
+    "SITE_SYMBOL": "medical_services",
+
+    "SHOW_HISTORY": True,
+    "SHOW_VIEW_ON_SITE": False,
+    "SHOW_BACK_BUTTON": True,
+    "SHOW_UI_WARNINGS": False,
+
+    "THEME": "light",
+    "BORDER_RADIUS": "10px",
+
+    "COLORS": {
+        "base": {
+            "50": "#FAFAFA",
+            "100": "#F5F5F5",
+            "200": "#E5E5E5",
+            "300": "#D4D4D4",
+            "400": "#A3A3A3",
+            "500": "#737373",
+            "600": "#525252",
+            "700": "#404040",
+            "800": "#262626",
+            "900": "#171717",
+            "950": "#0A0A0A",
+        },
+        "primary": {
+            "50": "#F5F5F5",
+            "100": "#E5E5E5",
+            "200": "#D4D4D4",
+            "300": "#A3A3A3",
+            "400": "#737373",
+            "500": "#525252",
+            "600": "#404040",
+            "700": "#333333",
+            "800": "#262626",
+            "900": "#171717",
+            "950": "#0A0A0A",
+        },
+    },
+
+    "SIDEBAR": {
+        "show_search": True,
+        "show_all_applications": False,
+        "navigation": [
+            {
+                "title": "Магазин",
+                "separator": True,
+                "collapsible": False,
+                "items": [
+                    {
+                        "title": "Товары",
+                        "icon": "inventory_2",
+                        "link": reverse_lazy("admin:catalog_product_changelist"),
+                    },
+                    {
+                        "title": "Категории",
+                        "icon": "category",
+                        "link": reverse_lazy("admin:catalog_category_changelist"),
+                    },
+                    {
+                        "title": "Бренды",
+                        "icon": "branding_watermark",
+                        "link": reverse_lazy("admin:catalog_brand_changelist"),
+                    },
+                    {
+                        "title": "Курсы валют",
+                        "icon": "currency_exchange",
+                        "link": reverse_lazy("admin:catalog_currencyrate_changelist"),
+                    },
+                ],
+            },
+            {
+                "title": "Заказы",
+                "separator": True,
+                "collapsible": False,
+                "items": [
+                    {
+                        "title": "Все заказы",
+                        "icon": "shopping_bag",
+                        "link": reverse_lazy("admin:orders_order_changelist"),
+                    },
+                    {
+                        "title": "Счета",
+                        "icon": "receipt_long",
+                        "link": reverse_lazy("admin:orders_invoice_changelist"),
+                    },
+                    {
+                        "title": "Платежи",
+                        "icon": "payments",
+                        "link": reverse_lazy("admin:orders_payment_changelist"),
+                    },
+                ],
+            },
+            {
+                "title": "ИИ-консультант",
+                "separator": True,
+                "collapsible": False,
+                "items": [
+                    {
+                        "title": "Диалоги",
+                        "icon": "forum",
+                        "link": reverse_lazy("admin:chat_conversation_changelist"),
+                    },
+                    {
+                        "title": "База знаний",
+                        "icon": "library_books",
+                        "link": reverse_lazy("admin:chat_knowledgebaseversion_changelist"),
+                    },
+                    {
+                        "title": "Коммерческие предложения",
+                        "icon": "description",
+                        "link": reverse_lazy("admin:chat_quote_changelist"),
+                    },
+                    {
+                        "title": "Расходы ИИ",
+                        "icon": "monitoring",
+                        "link": reverse_lazy("admin:chat_llmusage_changelist"),
+                    },
+                ],
+            },
+            {
+                "title": "Пользователи",
+                "separator": True,
+                "collapsible": False,
+                "items": [
+                    {
+                        "title": "Пользователи",
+                        "icon": "group",
+                        "link": reverse_lazy("admin:accounts_user_changelist"),
+                    },
+                    {
+                        "title": "Гостевые сессии",
+                        "icon": "person_outline",
+                        "link": reverse_lazy("admin:accounts_anonsession_changelist"),
+                    },
+                ],
+            },
+        ],
+    },
+}
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",

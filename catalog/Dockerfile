@@ -1,5 +1,5 @@
 FROM python:3.12-slim
-# Пакеты Debian — с зеркала Яндекса: deb.debian.org с сервера в России отдаёт их еле-еле
+
 ARG DEBIAN_MIRROR=http://mirror.yandex.ru
 
 ENV PYTHONUNBUFFERED=1 \

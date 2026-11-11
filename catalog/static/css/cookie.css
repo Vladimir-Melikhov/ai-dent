@@ -59,7 +59,25 @@
 .cookie-banner__accept:hover { background: var(--accent-hover); }
 
 @media (max-width: 560px) {
-  .cookie-banner { left: 10px; right: 10px; bottom: 10px; padding: 16px; }
-  .cookie-banner__inner { flex-direction: column; align-items: stretch; }
-  .cookie-banner__accept { width: 100%; }
+  .cookie-banner {
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    padding: 10px 12px;
+  }
+
+  .cookie-banner__inner {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .cookie-banner__text {
+    line-height: 1.4;
+  }
+
+  .cookie-banner__accept {
+    width: 100%;
+    height: 36px;
+  }
 }

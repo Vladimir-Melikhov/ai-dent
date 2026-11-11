@@ -1,44 +1,117 @@
+
 {% extends "admin/change_list.html" %}
 {% load humanize %}
 
 {% block extrastyle %}
   {{ block.super }}
   <style>
-    .usage-daily { margin-bottom: 24px; overflow-x: auto; }
-    .usage-daily table { width: 100%; }
-    /* #changelist — чтобы перебить отступы шапки таблиц списка в стилях админки */
-    #changelist .usage-daily th, #changelist .usage-daily td { padding: 8px 10px; white-space: nowrap; text-align: right; }
-    #changelist .usage-daily th:first-child, #changelist .usage-daily td:first-child { text-align: left; }
+    .usage-daily {
+      margin-bottom: 28px;
+      overflow-x: auto;
+      border: 1px solid #dedede;
+      border-radius: 10px;
+      background: #fff;
+    }
+
+    .usage-daily table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .usage-daily th,
+    .usage-daily td {
+      padding: 11px 13px;
+      white-space: nowrap;
+      text-align: right;
+      border-bottom: 1px solid #ededed;
+    }
+
+    .usage-daily th {
+      background: #f5f5f5;
+      color: #525252;
+      font-weight: 600;
+    }
+
+    .usage-daily th:first-child,
+    .usage-daily td:first-child {
+      text-align: left;
+    }
+
+    .usage-daily tbody tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .usage-daily tbody tr:hover {
+      background: #fafafa;
+    }
+
+    .usage-heading {
+      margin: 0 0 14px;
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .usage-empty {
+      padding: 20px;
+      color: #737373;
+    }
   </style>
 {% endblock %}
 
 {% block result_list %}
-  <h2>Сводка по дням за {{ summary_days }} дней (по Москве)</h2>
+  <h2 class="usage-heading">
+    Сводка по дням за {{ summary_days }} дней (по Москве)
+  </h2>
+
   {% if daily %}
-  <div class="usage-daily">
-  <table>
-    <thead>
-      <tr>
-        <th>День</th><th>Диалогов</th><th>Запросов</th><th>Ввод</th><th>Чтение из кэша</th><th>Запись в кэш</th>
-        <th>Вывод</th><th>Стоимость, $</th><th>На диалог, $</th><th>Доля кэша</th><th>Резервная модель</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for d in daily %}
-      <tr>
-        <td>{{ d.day|date:"d.m.Y" }}</td><td>{{ d.dialogs }}</td><td>{{ d.requests }}</td>
-        <td>{{ d.input|intcomma }}</td><td>{{ d.read|intcomma }}</td><td>{{ d.write|intcomma }}</td><td>{{ d.output|intcomma }}</td>
-        <td><strong>{{ d.cost|floatformat:2 }}</strong></td>
-        <td>{% if d.per_dialog is not None %}{{ d.per_dialog|floatformat:2 }}{% else %}—{% endif %}</td>
-        <td>{% widthratio d.cache_share 1 100 %} %</td><td>{% widthratio d.fallback_share 1 100 %} %</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  </div>
+    <div class="usage-daily">
+      <table>
+        <thead>
+          <tr>
+            <th>День</th>
+            <th>Диалогов</th>
+            <th>Запросов</th>
+            <th>Ввод</th>
+            <th>Чтение из кэша</th>
+            <th>Запись в кэш</th>
+            <th>Вывод</th>
+            <th>Стоимость, $</th>
+            <th>На диалог, $</th>
+            <th>Доля кэша</th>
+            <th>Резервная модель</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for d in daily %}
+            <tr>
+              <td>{{ d.day|date:"d.m.Y" }}</td>
+              <td>{{ d.dialogs }}</td>
+              <td>{{ d.requests }}</td>
+              <td>{{ d.input|intcomma }}</td>
+              <td>{{ d.read|intcomma }}</td>
+              <td>{{ d.write|intcomma }}</td>
+              <td>{{ d.output|intcomma }}</td>
+              <td><strong>{{ d.cost|floatformat:2 }}</strong></td>
+              <td>
+                {% if d.per_dialog is not None %}
+                  {{ d.per_dialog|floatformat:2 }}
+                {% else %}
+                  —
+                {% endif %}
+              </td>
+              <td>{% widthratio d.cache_share 1 100 %} %</td>
+              <td>{% widthratio d.fallback_share 1 100 %} %</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   {% else %}
-  <p>Обращений к модели пока не было.</p>
+    <div class="usage-daily usage-empty">
+      Обращений к модели пока не было.
+    </div>
   {% endif %}
-  <h2>Попытки запросов</h2>
+
+  <h2 class="usage-heading">Попытки запросов</h2>
   {{ block.super }}
 {% endblock %}

@@ -1,11 +1,11 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
-
+from unfold.admin import ModelAdmin
 from .models import User, AnonSession, ShortlistItem
 
 
 @admin.register(User)
-class UserAdmin(BaseUserAdmin):
+class UserAdmin(BaseUserAdmin, ModelAdmin):
     ordering = ["phone"]
     list_display = ["phone", "first_name", "role", "is_staff", "is_active"]
     list_filter = ["role", "is_staff", "is_active"]
@@ -25,10 +25,10 @@ class UserAdmin(BaseUserAdmin):
 
 
 @admin.register(AnonSession)
-class AnonSessionAdmin(admin.ModelAdmin):
+class AnonSessionAdmin(ModelAdmin):
     list_display = ["session_id", "merged_into", "created_at", "last_seen_at"]
 
 
 @admin.register(ShortlistItem)
-class ShortlistItemAdmin(admin.ModelAdmin):
+class ShortlistItemAdmin(ModelAdmin):
     list_display = ["product", "user", "session", "created_at"]

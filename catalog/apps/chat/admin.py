@@ -2,6 +2,8 @@ import datetime
 from decimal import Decimal
 from zoneinfo import ZoneInfo
 
+from unfold.admin import ModelAdmin, TabularInline
+
 from django import forms
 from django.contrib import admin, messages
 from django.db.models import Count, Exists, OuterRef, Q, Subquery, Sum
@@ -37,7 +39,7 @@ class ReadOnlyMixin:
         return False
 
 
-class MessageInline(ReadOnlyMixin, admin.TabularInline):
+class MessageInline(ReadOnlyMixin, TabularInline):
     model = Message
     fields = ["created_at", "role", "content", "event_type"]
     readonly_fields = fields
@@ -49,7 +51,7 @@ class MessageInline(ReadOnlyMixin, admin.TabularInline):
 
 
 @admin.register(Conversation)
-class ConversationAdmin(ReadOnlyMixin, admin.ModelAdmin):
+class ConversationAdmin(ReadOnlyMixin, ModelAdmin):
     list_display = ["id", "owner", "status", "created_at", "last_message_at", "messages_count", "cost", "has_order", "has_lead"]
     list_filter = ["status"]
     search_fields = ["user__phone"]
@@ -126,7 +128,7 @@ class KnowledgeBaseForm(forms.ModelForm):
 
 
 @admin.register(KnowledgeBaseVersion)
-class KnowledgeBaseVersionAdmin(admin.ModelAdmin):
+class KnowledgeBaseVersionAdmin(ModelAdmin):
     form = KnowledgeBaseForm
     list_display = ["id", "created_at", "is_active", "source", "size", "comment", "created_by"]
     list_display_links = ["id", "created_at"]
@@ -186,7 +188,7 @@ class KnowledgeBaseVersionAdmin(admin.ModelAdmin):
 
 
 @admin.register(Quote)
-class QuoteAdmin(ReadOnlyMixin, admin.ModelAdmin):
+class QuoteAdmin(ReadOnlyMixin, ModelAdmin):
     list_display = ["number", "created_at", "total", "valid_until", "owner", "pdf", "dialog"]
     search_fields = ["number"]
     fields = ["number", "created_at", "valid_until", "total", "items", "owner", "pdf", "dialog"]
@@ -242,7 +244,7 @@ def daily_usage(days: int = SUMMARY_DAYS) -> list[dict]:
 
 
 @admin.register(LLMUsage)
-class LLMUsageAdmin(ReadOnlyMixin, admin.ModelAdmin):
+class LLMUsageAdmin(ReadOnlyMixin, ModelAdmin):
     """Сводка по дням сверху, ниже — попытки запросов (при фолбэке их две на запрос)."""
 
     change_list_template = "admin/chat/llmusage/change_list.html"

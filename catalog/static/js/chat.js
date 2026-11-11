@@ -328,7 +328,7 @@ if (root) {
   function setActive(on) {
     if (!inlineMode || root.classList.contains("is-active") === on) return;
     root.classList.toggle("is-active", on);
-    requestAnimationFrame(() => root.scrollIntoView({ block: on ? "nearest" : "center", behavior: "smooth" }));
+    requestAnimationFrame(() => root.scrollIntoView({ block: on ? "end" : "center", behavior: "smooth" }));
     document.dispatchEvent(new CustomEvent("aidentchat:active", { detail: { active: on } }));
   }
 

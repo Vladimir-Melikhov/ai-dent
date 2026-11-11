@@ -1,10 +1,17 @@
+
 {% extends "admin/change_list.html" %}
 
 {% block object-tools-items %}
-  <li>
-    <form method="post" action="{% url 'admin:catalog_currencyrate_update' %}" style="display:inline">
+  <li class="ai-dent-admin-action-item">
+    <form
+      method="post"
+      action="{% url 'admin:catalog_currencyrate_update' %}"
+      class="ai-dent-admin-action-form"
+    >
       {% csrf_token %}
-      <button type="submit" class="button" style="padding:6px 12px;cursor:pointer">Обновить курсы ЦБ</button>
+      <button type="submit" class="ai-dent-admin-action">
+        Обновить курсы ЦБ
+      </button>
     </form>
   </li>
   {{ block.super }}

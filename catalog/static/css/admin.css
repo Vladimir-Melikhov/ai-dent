@@ -1,0 +1,97 @@
+
+/* Ai-Dent — Django Unfold admin */
+
+:root {
+    color-scheme: light;
+}
+
+body {
+    background: #e5e5e5;
+}
+
+/* Общий вид кнопок */
+
+.ai-dent-admin-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 36px;
+    padding: 8px 15px;
+    border: 1px solid #262626;
+    border-radius: 7px;
+    background: #262626;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color .15s ease;
+}
+
+.ai-dent-admin-action:hover {
+    background: #404040;
+}
+
+.ai-dent-admin-action-form {
+    display: inline-flex;
+    margin: 0;
+}
+
+/* Статусы заказа */
+
+.ai-dent-order-status-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 12px 0;
+}
+
+.ai-dent-order-status-button {
+    min-height: 36px;
+    padding: 8px 14px;
+    border: 1px solid #404040;
+    border-radius: 7px;
+    background: #262626;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.ai-dent-order-status-button:hover {
+    background: #404040;
+}
+
+.ai-dent-order-status-danger {
+    border-color: #991b1b;
+    background: #991b1b;
+}
+
+.ai-dent-order-status-danger:hover {
+    background: #7f1d1d;
+}
+
+/* Статистика LLM */
+
+.usage-daily {
+    max-width: 100%;
+}
+
+.usage-daily table {
+    font-variant-numeric: tabular-nums;
+}
+
+/* Адаптация */
+
+@media (max-width: 767px) {
+    .ai-dent-order-status-row {
+        gap: 6px;
+    }
+
+    .ai-dent-order-status-button {
+        flex: 1 1 auto;
+    }
+
+    .ai-dent-admin-action-item {
+        margin-bottom: 8px;
+    }
+}

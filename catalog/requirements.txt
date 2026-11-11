@@ -9,3 +9,4 @@ redis==8.1.0
 reportlab==4.2.5
 gunicorn==23.0.0
 websockets==16.1.1
+django-unfold==0.96.0

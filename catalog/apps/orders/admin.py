@@ -1,7 +1,7 @@
 """Админка заказов: статус только действиями, правка состава до подтверждения."""
 
 from decimal import Decimal
-
+from unfold.admin import ModelAdmin, TabularInline
 from django import forms
 from django.contrib import admin, messages
 from django.db import transaction
@@ -65,7 +65,7 @@ class ItemFormSet(BaseInlineFormSet):
         return result
 
 
-class OrderItemInline(admin.TabularInline):
+class OrderItemInline(TabularInline):
     model = OrderItem
     formset = ItemFormSet
     extra = 0
@@ -98,7 +98,7 @@ class OrderItemInline(admin.TabularInline):
         return rub_text(item.source_price)
 
 
-class ReadOnlyInline(admin.TabularInline):
+class ReadOnlyInline(TabularInline):
     extra = 0
     can_delete = False
 
@@ -171,7 +171,7 @@ ALWAYS_READONLY = ["number", "status", "created_by", "conversation_link", "creat
 
 
 @admin.register(Order)
-class OrderAdmin(admin.ModelAdmin):
+class OrderAdmin(ModelAdmin):
     form = OrderAdminForm
     change_form_template = "admin/orders/order/change_form.html"
     list_display = ["number", "created_at", "status", "total_amount", "created_by", "buyer_type", "contact_phone",
@@ -331,12 +331,12 @@ class OrderAdmin(admin.ModelAdmin):
 
 
 @admin.register(CartItem)
-class CartItemAdmin(admin.ModelAdmin):
+class CartItemAdmin(ModelAdmin):
     list_display = ["product", "quantity", "user", "session", "created_at"]
 
 
 @admin.register(Invoice)
-class InvoiceAdmin(admin.ModelAdmin):
+class InvoiceAdmin(ModelAdmin):
     list_display = ["number", "order", "issued_at", "legacy", "emailed_at"]
     readonly_fields = ["order", "number", "pdf_path", "issued_at", "due_date", "legacy", "emailed_at"]
 
@@ -345,6 +345,6 @@ class InvoiceAdmin(admin.ModelAdmin):
 
 
 @admin.register(Payment)
-class PaymentAdmin(admin.ModelAdmin):
+class PaymentAdmin(ModelAdmin):
     list_display = ["order", "provider", "amount", "status"]
     list_filter = ["provider", "status"]

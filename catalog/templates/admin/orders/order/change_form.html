@@ -1,13 +1,19 @@
+
 {% extends "admin/change_form.html" %}
-{# Статус меняется только этими кнопками; правки состава сохраняются вместе с нажатием #}
 
 {% block submit_buttons_bottom %}
   {% if status_buttons %}
-  <div class="submit-row order-status-row">
-    {% for name, label in status_buttons %}
-      <input type="submit" name="{{ name }}" value="{{ label }}"{% if name == "_status_cancelled" %} class="deletelink"{% endif %}>
-    {% endfor %}
-  </div>
+    <div class="ai-dent-order-status-row">
+      {% for name, label in status_buttons %}
+        <input
+          type="submit"
+          name="{{ name }}"
+          value="{{ label }}"
+          class="ai-dent-order-status-button{% if name == '_status_cancelled' %} ai-dent-order-status-danger{% endif %}"
+        >
+      {% endfor %}
+    </div>
   {% endif %}
+
   {{ block.super }}
 {% endblock %}
