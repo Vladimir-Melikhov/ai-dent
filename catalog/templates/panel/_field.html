@@ -1,0 +1,4 @@
+<label class="fld{% if field.field.widget.input_type == 'textarea' or field.name == 'note' or field.name == 'purpose' %} wide{% endif %}">
+  <span>{{ field.label }}</span>
+  {{ field }}
+</label>

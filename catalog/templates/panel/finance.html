@@ -1,0 +1,50 @@
+{% extends "panel/base.html" %}
+{% load panel_tags %}
+{% block title %}Финансы{% endblock %}
+{% block h1 %}Финансы{% endblock %}
+{% block sub %}Доходы и расходы за период · продажи сайта учитываются автоматически{% endblock %}
+{% block actions %}
+<a class="btn ghost" href="{% url 'panel:finance_export' %}?{{ querystring }}"><svg><use href="#i-down"/></svg>CSV</a>
+<button class="btn primary" data-new="dlg"><svg><use href="#i-plus"/></svg>Операция</button>
+{% endblock %}
+
+{% block content %}
+<section class="cards cards-3">
+  <article class="glass card"><div class="card-top"><span class="card-title">Доходы</span></div><div class="card-value">{{ totals.revenue|rub }}</div><div class="card-foot"><span class="muted">сайт {{ totals.shop_revenue|rub }} · прочее {{ totals.other_income|rub }}</span></div></article>
+  <article class="glass card"><div class="card-top"><span class="card-title">Расходы</span></div><div class="card-value">{{ totals.expenses|rub }}</div></article>
+  <article class="glass card"><div class="card-top"><span class="card-title">Прибыль</span></div><div class="card-value {% if totals.profit < 0 %}neg{% endif %}">{{ totals.profit|rub }}</div><div class="card-foot"><span class="muted">{% if totals.margin is not None %}маржа {{ totals.margin|pct }}{% endif %}</span></div></article>
+</section>
+
+<form class="filters glass" method="get">
+  <input type="hidden" name="p" value="{{ period.code }}">
+  <select name="kind" data-auto><option value="">Всё</option><option value="income" {% if kind == 'income' %}selected{% endif %}>Доходы</option><option value="expense" {% if kind == 'expense' %}selected{% endif %}>Расходы</option></select>
+  <select name="category" data-auto><option value="">Все категории</option>{% for c in categories %}<option value="{{ c.pk }}" {% if category_id == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.get_kind_display }} · {{ c.name }}</option>{% endfor %}</select>
+  <input type="search" name="q" value="{{ q }}" placeholder="Поиск по описанию">
+  <button class="btn ghost">Найти</button>
+</form>
+
+<section class="glass table-wrap">
+  <table class="tbl">
+    <thead><tr><th>Дата</th><th>Категория</th><th>Описание</th><th class="r">Сумма</th><th></th></tr></thead>
+    <tbody>
+      {% for e in page %}
+      <tr>
+        <td class="nowrap">{{ e.date|date:"d.m.Y" }}</td>
+        <td><span class="cat"><i class="dot c{{ e.category.color }}"></i>{{ e.category.name }}</span></td>
+        <td>{{ e.title|default:"—" }}{% if e.deal_id %} <span class="tag">сделка</span>{% endif %}</td>
+        <td class="r nowrap amt {% if e.kind == 'income' %}in{% endif %}">{% if e.kind == 'income' %}+{% else %}−{% endif %}{{ e.amount|rub:2 }}</td>
+        <td class="r nowrap">{% if not e.deal_id %}<button class="icon" data-edit="dlg" data-id="{{ e.pk }}" aria-label="Изменить"><svg><use href="#i-edit"/></svg></button>
+          <button class="icon" data-delete="{% url 'panel:entry_delete' e.pk %}" aria-label="Удалить"><svg><use href="#i-trash"/></svg></button>{% endif %}</td>
+      </tr>
+      {% empty %}<tr><td colspan="5" class="empty">Операций за период нет</td></tr>{% endfor %}
+    </tbody>
+    {% if page.object_list %}<tfoot><tr><td colspan="3">Итого по фильтру</td><td class="r nowrap">+{{ filtered_income|rub }} / −{{ filtered_expenses|rub }}</td><td></td></tr></tfoot>{% endif %}
+  </table>
+</section>
+{% include "panel/_pager.html" %}
+
+{% include "panel/_dialog.html" with action="/finance/save/" new_title="Новая операция" edit_title="Операция" %}
+<form id="del-form" method="post" class="hidden">{% csrf_token %}<input type="hidden" name="back" value="{{ request.get_full_path }}"></form>
+{{ objects|json_script:"objects" }}
+{{ category_kinds|json_script:"category-kinds" }}
+{% endblock %}

@@ -1,0 +1,36 @@
+{% extends "panel/base.html" %}
+{% load panel_tags %}
+{% block title %}Продажи{% endblock %}
+{% block h1 %}Продажи сайта{% endblock %}
+{% block sub %}Заказы из магазина за период. Оплаченные идут в выручку автоматически{% endblock %}
+
+{% block content %}
+<section class="cards cards-3">
+  <article class="glass card"><div class="card-top"><span class="card-title">Оплачено</span></div><div class="card-value">{{ totals.shop_revenue|rub }}</div><div class="card-foot"><span class="muted">{{ totals.orders }} заказов</span></div></article>
+  <article class="glass card"><div class="card-top"><span class="card-title">Средний чек</span></div><div class="card-value">{{ totals.avg_check|default_if_none:0|rub }}</div></article>
+  <article class="glass card"><div class="card-top"><span class="card-title">Ждут подтверждения</span></div><div class="card-value">{{ pending }}</div><div class="card-foot"><span class="muted">сейчас, по всем датам</span></div></article>
+</section>
+
+<form class="filters glass" method="get">
+  <input type="hidden" name="p" value="{{ period.code }}">
+  <select name="status" data-auto><option value="">Все статусы</option>{% for s in statuses %}{% if s.value != 'draft' %}<option value="{{ s.value }}" {% if status == s.value %}selected{% endif %}>{{ s.label }}</option>{% endif %}{% endfor %}</select>
+</form>
+
+<section class="glass table-wrap">
+  <table class="tbl">
+    <thead><tr><th>Заказ</th><th>Создан</th><th>Клиент</th><th>Статус</th><th class="r">Сумма</th></tr></thead>
+    <tbody>
+      {% for o in page %}
+      <tr>
+        <td class="nowrap"><b>№{{ o.number }}</b></td>
+        <td class="nowrap">{{ o.created_at|date:"d.m.Y H:i" }}</td>
+        <td>{{ o.company_name|default:o.buyer_name|default:o.contact_name|default:"—" }}</td>
+        <td><span class="pill st-{{ o.status }}">{{ o.get_status_display }}</span></td>
+        <td class="r nowrap amt">{{ o.total_amount|default_if_none:0|rub }}</td>
+      </tr>
+      {% empty %}<tr><td colspan="5" class="empty">Заказов за период нет</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</section>
+{% include "panel/_pager.html" %}
+{% endblock %}

@@ -1,0 +1,32 @@
+{% extends "panel/base.html" %}
+{% load panel_tags %}
+{% block title %}Сделки{% endblock %}
+{% block h1 %}Сделки{% endblock %}
+{% block sub %}В работе {{ summary.open_count }} на {{ summary.open_amount|rub }} · выиграно за период {{ summary.won_count }} на {{ summary.won_amount|rub }}{% endblock %}
+{% block actions %}<button class="btn primary" data-new="dlg"><svg><use href="#i-plus"/></svg>Новая сделка</button>{% endblock %}
+{% block tools %}{% endblock %}
+
+{% block content %}
+<section class="board" data-stage-url="/deals/0/stage/">
+  {% for stage in stages %}
+  <div class="col glass" data-stage="{{ stage.value }}">
+    <div class="col-head"><span class="stage-dot s-{{ stage.value }}"></span><b>{{ stage.label }}</b><span class="count">{{ stage.items|length }}</span><span class="muted sum">{{ stage.amount|rub }}</span></div>
+    <div class="col-body">
+      {% for d in stage.items %}
+      <article class="deal" draggable="true" data-id="{{ d.pk }}" tabindex="0" data-edit="dlg">
+        <b>{{ d.title }}</b>
+        {% if d.client %}<span class="muted">{{ d.client }}</span>{% endif %}
+        <div class="deal-foot"><span class="amt-pill">{{ d.amount|rub }}</span>{% if d.expected_date %}<span class="muted">до {{ d.expected_date|date:"j b" }}</span>{% endif %}</div>
+      </article>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</section>
+<p class="hint">Перетаскивайте карточки между этапами. Выигранная сделка сама становится доходом, а если вернуть её в работу — доход уберётся.</p>
+
+{% include "panel/_dialog.html" with action="/deals/save/" new_title="Новая сделка" edit_title="Сделка" %}
+<form id="del-form" method="post" class="hidden">{% csrf_token %}</form>
+<template id="dlg-extra"><button type="button" class="btn danger" data-delete="/deals/{id}/delete/">Удалить</button></template>
+{{ objects|json_script:"objects" }}
+{% endblock %}

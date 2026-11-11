@@ -1,0 +1,75 @@
+{% extends "panel/base.html" %}
+{% load panel_tags %}
+{% block title %}Обзор{% endblock %}
+{% block h1 %}{{ greeting }}{% endblock %}
+{% block sub %}Что происходит в бизнесе: {{ period.start|date:"j E" }} — {{ period.end|date:"j E" }}{% endblock %}
+{% block actions %}<a class="btn ghost" href="{% url 'panel:finance_export' %}?p={{ period.code }}"><svg><use href="#i-down"/></svg>Экспорт</a>{% endblock %}
+
+{% block content %}
+<section class="cards" aria-label="Главные цифры">
+  {% for card in cards %}
+  <article class="glass card" data-card="{{ card.key }}">
+    <div class="card-top"><span class="card-title">{{ card.title }}</span>
+      {% if card.delta is not None %}<span class="chip {% if card.delta == 0 %}flat{% elif card.invert %}{% if card.delta > 0 %}bad{% else %}good{% endif %}{% else %}{% if card.delta > 0 %}good{% else %}bad{% endif %}{% endif %}">
+        <svg><use href="{% if card.delta >= 0 %}#i-up{% else %}#i-arrow-down{% endif %}"/></svg>{{ card.delta|floatformat:"0" }}%</span>{% endif %}
+    </div>
+    <div class="card-value">{% if card.money %}{{ card.value|rub }}{% else %}{{ card.value }}{% endif %}</div>
+    <div class="card-foot"><span class="muted">{{ card.hint|default:"к прошлому периоду" }}</span><svg class="spark" data-spark="{{ forloop.counter0 }}" aria-hidden="true"></svg></div>
+  </article>
+  {% endfor %}
+</section>
+
+<section class="row main-row">
+  <article class="glass panel chart-panel">
+    <div class="panel-head">
+      <div><h2>Доходы и расходы</h2><p class="muted">{% if period.days <= 31 %}по дням{% elif period.days <= 120 %}по неделям{% else %}по месяцам{% endif %} · разница — прибыль</p></div>
+      <div class="legend"><span><i class="dot c1"></i>Доходы</span><span><i class="dot c2"></i>Расходы</span><span><i class="dot line"></i>Прибыль</span></div>
+    </div>
+    <div id="chart-flow" class="chart" role="img" aria-label="Доходы и расходы за период"></div>
+    <details class="table-view"><summary>Показать таблицей</summary><div id="table-flow"></div></details>
+  </article>
+
+  <article class="glass panel">
+    <div class="panel-head"><div><h2>Сделки в работе</h2><p class="muted">{{ deals.open_count }} шт. на {{ deals.open_amount|rub }}</p></div>
+      <a class="more" href="{% url 'panel:deals' %}">Все</a></div>
+    <div id="chart-pipeline" class="bars" role="img" aria-label="Воронка сделок"></div>
+    <div class="mini-stats">
+      <div><b>{{ deals.won_count }}</b><span>выиграно · {{ deals.won_amount|rub }}</span></div>
+      <div><b>{{ deals.conversion|pct }}</b><span>конверсия</span></div>
+    </div>
+  </article>
+</section>
+
+<section class="row three">
+  <article class="glass panel">
+    <div class="panel-head"><div><h2>Куда уходят деньги</h2><p class="muted">Расходы по категориям</p></div><a class="more" href="{% url 'panel:categories' %}?p={{ period.code }}">Категории</a></div>
+    <div id="chart-expenses" class="bars" role="img" aria-label="Расходы по категориям"></div>
+  </article>
+
+  <article class="glass panel">
+    <div class="panel-head"><div><h2>Последние события</h2><p class="muted">Поступления и траты</p></div><a class="more" href="{% url 'panel:finance' %}">Все</a></div>
+    <ul class="feed">
+      {% for item in recent %}
+      <li><span class="avatar {% if item.sign == '+' %}in{% else %}out{% endif %}">{{ item.sign }}</span>
+        <div class="feed-body"><b>{{ item.title }}</b><span class="muted">{{ item.hint }} · {{ item.when|date:"j E" }}</span></div>
+        <span class="amt {% if item.sign == '+' %}in{% endif %}">{{ item.sign }}{{ item.amount|rub }}</span></li>
+      {% empty %}<li class="empty">Пока пусто — добавьте первую операцию в «Финансах»</li>{% endfor %}
+    </ul>
+  </article>
+
+  <article class="glass panel">
+    <div class="panel-head"><div><h2>Инфраструктура</h2><p class="muted">Серверы и сервисы · {{ servers_cost|rub }}/мес</p></div><a class="more" href="{% url 'panel:servers' %}">Все</a></div>
+    <ul class="feed">
+      {% for s in servers %}
+      <li><span class="avatar srv"><svg><use href="#i-server"/></svg></span>
+        <div class="feed-body"><b>{{ s.name }}</b><span class="muted">{{ s.purpose|default:s.get_kind_display|truncatechars:48 }}</span></div>
+        {% if s.url %}<button class="status" data-check="{% url 'panel:server_check' s.pk %}" title="Проверить"><i class="pulse"></i><span>проверить</span></button>{% endif %}</li>
+      {% empty %}<li class="empty">Добавьте серверы и сервисы в разделе «Серверы»</li>{% endfor %}
+    </ul>
+    <div class="ai-line"><span class="muted">ИИ-консультант за период</span><b>${{ ai_usd|floatformat:2 }}</b></div>
+  </article>
+</section>
+
+{{ data|json_script:"dash-data" }}
+{% endblock %}
+{% block scripts %}{% load static %}<script src="{% static 'js/panel-charts.js' %}" defer></script>{% endblock %}

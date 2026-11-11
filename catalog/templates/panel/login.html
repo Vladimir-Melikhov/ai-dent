@@ -1,0 +1,17 @@
+{% extends "panel/base.html" %}
+{% block title %}Вход{% endblock %}
+{% block bodyclass %}auth{% endblock %}
+{% block shell %}
+<main class="login glass">
+  <div class="brand big"><span class="brand-mark">А</span><span class="brand-name">Штаб</span></div>
+  <p class="sub">Управление бизнесом Ай-Дент</p>
+  <form method="post" novalidate>
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ next }}">
+    <label class="fld"><span>Телефон</span><input name="phone" type="tel" autocomplete="username" value="{{ phone }}" placeholder="+7 900 000-00-00" required autofocus></label>
+    <label class="fld"><span>Пароль</span><input name="password" type="password" autocomplete="current-password" required></label>
+    {% if error %}<p class="err" role="alert">{{ error }}</p>{% endif %}
+    <button class="btn primary full">Войти</button>
+  </form>
+</main>
+{% endblock %}

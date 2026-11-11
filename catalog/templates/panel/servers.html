@@ -1,0 +1,42 @@
+{% extends "panel/base.html" %}
+{% load panel_tags %}
+{% block title %}Серверы{% endblock %}
+{% block h1 %}Серверы и сервисы{% endblock %}
+{% block sub %}Всё, на чём держится бизнес: что где лежит, зачем нужно и куда входить · {{ total_cost|rub }} в месяц{% endblock %}
+{% block tools %}{% endblock %}
+{% block actions %}<button class="btn ghost" data-check-all><svg><use href="#i-pulse"/></svg>Проверить все</button><button class="btn primary" data-new="dlg"><svg><use href="#i-plus"/></svg>Добавить</button>{% endblock %}
+
+{% block content %}
+<section class="servers">
+  {% for s in servers %}
+  <article class="glass srv-card">
+    <div class="srv-top">
+      <span class="avatar srv"><svg><use href="#i-server"/></svg></span>
+      <div class="srv-title"><b>{{ s.name }}</b><span class="muted">{{ s.get_kind_display }}{% if s.provider %} · {{ s.provider }}{% endif %}</span></div>
+      {% if s.url %}<button class="status" data-check="{% url 'panel:server_check' s.pk %}" title="Проверить, отвечает ли"><i class="pulse"></i><span>проверить</span></button>{% endif %}
+    </div>
+    {% if s.purpose %}<p class="srv-purpose">{{ s.purpose }}</p>{% endif %}
+    <dl class="srv-meta">
+      {% if s.url %}<div><dt>Адрес</dt><dd><a href="{{ s.url }}" target="_blank" rel="noopener noreferrer">{{ s.url }}</a></dd></div>{% endif %}
+      {% if s.address %}<div><dt>IP / хост</dt><dd><button class="copy" data-copy="{{ s.address }}" title="Скопировать">{{ s.address }}</button></dd></div>{% endif %}
+      {% if s.login %}<div><dt>Логин</dt><dd><button class="copy" data-copy="{{ s.login }}" title="Скопировать">{{ s.login }}</button></dd></div>{% endif %}
+      {% if s.monthly_cost %}<div><dt>В месяц</dt><dd>{{ s.monthly_cost|rub }}</dd></div>{% endif %}
+    </dl>
+    {% if s.note %}<p class="muted srv-note">{{ s.note }}</p>{% endif %}
+    <div class="srv-actions">
+      {% if s.login_url %}<a class="btn primary sm" href="{{ s.login_url }}" target="_blank" rel="noopener noreferrer"><svg><use href="#i-link"/></svg>Войти</a>{% elif s.url %}<a class="btn primary sm" href="{{ s.url }}" target="_blank" rel="noopener noreferrer"><svg><use href="#i-link"/></svg>Открыть</a>{% endif %}
+      <span class="grow"></span>
+      <button class="icon" data-edit="dlg" data-id="{{ s.pk }}" aria-label="Изменить"><svg><use href="#i-edit"/></svg></button>
+      <button class="icon" data-delete="{% url 'panel:server_delete' s.pk %}" aria-label="Удалить"><svg><use href="#i-trash"/></svg></button>
+    </div>
+  </article>
+  {% empty %}
+  <div class="glass empty-big"><p>Здесь будут все ваши серверы и сервисы: сайт, API, база, почта, домены.</p><button class="btn primary" data-new="dlg">Добавить первый</button></div>
+  {% endfor %}
+</section>
+<p class="hint">Пароли здесь не хранятся — для них менеджер паролей. Тут только куда и под каким логином входить.</p>
+
+{% include "panel/_dialog.html" with action="/servers/save/" new_title="Новый сервер" edit_title="Сервер" %}
+<form id="del-form" method="post" class="hidden">{% csrf_token %}</form>
+{{ objects|json_script:"objects" }}
+{% endblock %}

@@ -91,6 +91,8 @@ services:
     environment:
       # Домены сайта (aident24.ru, www.aident24.ru); пусто — :80 без HTTPS (локальный стенд)
       SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+      # Хост панели управления (имя как у секретного пути админки); пусто — http://panel.localhost
+      PANEL_ADDRESS: ${PANEL_ADDRESS:-http://panel.localhost}
     ports:
       - "80:80"
       - "443:443"

@@ -50,3 +50,25 @@
         reverse_proxy catalog:8000
     }
 }
+
+# Панель управления бизнесом — отдельный хост с неугадываемым именем (PANEL_ADDRESS из .env).
+# Без PANEL_ADDRESS работает только на локальном стенде: http://panel.localhost
+# Django отдаёт на нём одну панель, остальные адреса сайта там не существуют.
+{$PANEL_ADDRESS:http://panel.localhost} {
+    encode gzip
+
+    header {
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "same-origin"
+        X-Robots-Tag "noindex, nofollow"
+    }
+
+    handle /media/* {
+        respond 404
+    }
+
+    handle {
+        reverse_proxy catalog:8000
+    }
+}

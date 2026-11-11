@@ -1,0 +1,7 @@
+{% if page.has_other_pages %}
+<nav class="pager">
+  {% if page.has_previous %}<a class="btn ghost" href="?{{ querystring }}&page={{ page.previous_page_number }}">Назад</a>{% endif %}
+  <span class="muted">{{ page.number }} из {{ page.paginator.num_pages }}</span>
+  {% if page.has_next %}<a class="btn ghost" href="?{{ querystring }}&page={{ page.next_page_number }}">Дальше</a>{% endif %}
+</nav>
+{% endif %}

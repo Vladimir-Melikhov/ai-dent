@@ -125,7 +125,7 @@ def test_api_role_has_no_access_to_personal_data():
     try:
         with conn.cursor() as cur:
             for table in ["accounts_user", "accounts_anonsession", "orders_order", "orders_invoice",
-                          "leads_lead", "django_session"]:
+                          "leads_lead", "django_session", "panel_entry", "panel_deal", "panel_server"]:
                 with pytest.raises(psycopg2.errors.InsufficientPrivilege):
                     cur.execute(f"SELECT 1 FROM {table} LIMIT 1")
             # Статус и владельца диалога меняет только Django

@@ -1,0 +1,17 @@
+{# Окно создания и правки: поля заполняет panel.js из словаря объектов #}
+<dialog id="dlg" class="dlg" data-title-new="{{ new_title }}" data-title-edit="{{ edit_title }}">
+  <form method="post" action="{{ action }}" class="dlg-form">
+    {% csrf_token %}
+    <input type="hidden" name="id" value="">
+    <input type="hidden" name="back" value="{{ request.get_full_path }}">
+    <div class="dlg-head"><h2></h2><button type="button" class="round sm" data-close aria-label="Закрыть"><svg><use href="#i-close"/></svg></button></div>
+    <div class="grid2">
+      {% for field in form %}{% include "panel/_field.html" %}{% endfor %}
+      {{ extra_fields }}
+    </div>
+    <div class="dlg-foot">
+      <button type="button" class="btn ghost" data-close>Отмена</button>
+      <button class="btn primary">Сохранить</button>
+    </div>
+  </form>
+</dialog>

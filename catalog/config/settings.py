@@ -33,6 +33,13 @@ ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "ALLOWED_HOSTS")
 
 CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS")
 
+# Панель управления бизнесом живёт на своём хосте с неугадываемым именем (как секретный путь админки).
+# Пусто — панель выключена. Хост попадает в ALLOWED_HOSTS и CSRF_TRUSTED_ORIGINS сам.
+PANEL_HOST = env("PANEL_HOST", default="").lower()
+if PANEL_HOST:
+    ALLOWED_HOSTS = [*ALLOWED_HOSTS, PANEL_HOST]
+    CSRF_TRUSTED_ORIGINS = [*CSRF_TRUSTED_ORIGINS, f"{'http' if DEBUG else 'https'}://{PANEL_HOST}"]
+
 # Секретный путь к админке. На проде обязателен, локально (DEBUG=True) по умолчанию admin/.
 ADMIN_URL = env("DJANGO_ADMIN_URL", "ADMIN_URL", default="admin/" if DEBUG else None)
 if not ADMIN_URL:
@@ -56,6 +63,7 @@ INSTALLED_APPS = [
     "apps.orders",
     "apps.chat",
     "apps.leads",
+    "apps.panel",
 ]
 
 UNFOLD = {
@@ -207,6 +215,7 @@ UNFOLD = {
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "apps.panel.middleware.PanelHostMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",

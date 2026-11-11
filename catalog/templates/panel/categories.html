@@ -1,0 +1,42 @@
+{% extends "panel/base.html" %}
+{% load panel_tags %}
+{% block title %}Категории{% endblock %}
+{% block h1 %}Категории{% endblock %}
+{% block sub %}Типы доходов и расходов. Суммы — за выбранный период{% endblock %}
+{% block actions %}<button class="btn primary" data-new="dlg"><svg><use href="#i-plus"/></svg>Категория</button>{% endblock %}
+
+{% block content %}
+<section class="row two">
+  {% for group in groups %}
+  <article class="glass panel">
+    <div class="panel-head"><h2>{{ group.label }}</h2></div>
+    <ul class="feed">
+      {% for item in group.items %}
+      <li><span class="avatar sw c{{ item.obj.color }}"></span>
+        <div class="feed-body"><b>{{ item.obj.name }}</b><span class="muted">{{ item.count }} операц.</span></div>
+        <span class="amt">{{ item.sum|rub }}</span>
+        <button class="icon" data-edit="dlg" data-id="{{ item.obj.pk }}" aria-label="Изменить"><svg><use href="#i-edit"/></svg></button>
+        <button class="icon" data-delete="{% url 'panel:category_delete' item.obj.pk %}" aria-label="Удалить"><svg><use href="#i-trash"/></svg></button></li>
+      {% empty %}<li class="empty">Нет категорий</li>{% endfor %}
+    </ul>
+  </article>
+  {% endfor %}
+</section>
+
+<dialog id="dlg" class="dlg" data-title-new="Новая категория" data-title-edit="Категория">
+  <form method="post" action="/categories/save/" class="dlg-form">
+    {% csrf_token %}
+    <input type="hidden" name="id" value="">
+    <div class="dlg-head"><h2></h2><button type="button" class="round sm" data-close aria-label="Закрыть"><svg><use href="#i-close"/></svg></button></div>
+    <div class="grid2">
+      {% for field in form %}{% if field.name != "color" %}{% include "panel/_field.html" %}{% endif %}{% endfor %}
+      <div class="fld wide"><span>Цвет в графиках</span>
+        <div class="swatches">{% for i in colors %}<label class="swatch"><input type="radio" name="color" value="{{ i }}" {% if i == 1 %}checked{% endif %}><i class="c{{ i }}"></i></label>{% endfor %}</div>
+      </div>
+    </div>
+    <div class="dlg-foot"><button type="button" class="btn ghost" data-close>Отмена</button><button class="btn primary">Сохранить</button></div>
+  </form>
+</dialog>
+<form id="del-form" method="post" class="hidden">{% csrf_token %}</form>
+{{ objects|json_script:"objects" }}
+{% endblock %}
