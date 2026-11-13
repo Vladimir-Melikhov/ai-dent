@@ -1,9 +1,12 @@
 import csv
 import datetime
 import json
+import os
+import re
 import time
 import urllib.error
 import urllib.request
+from decimal import Decimal
 
 from django.conf import settings
 from django.contrib import messages
@@ -11,15 +14,19 @@ from django.contrib.auth import authenticate, login, logout
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Count, Q, Sum
-from django.http import HttpResponse, JsonResponse
+from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_GET, require_POST
 
 from apps.accounts.models import User
+from apps.chat.models import Quote
+from apps.chat.quote_pdf import generate_quote_pdf
 from apps.orders.models import Order, OrderStatusHistory
-from apps.orders.services import InvoiceError, TransitionError, allowed_transitions, change_status
+from apps.orders.services import (
+    InvoiceError, TransitionError, allowed_transitions, change_status, invoice_available, invoice_path,
+)
 
 from . import services
 from .access import (
@@ -377,6 +384,7 @@ def finance(request):
         filtered_expenses=sums.get("expense", ZERO), totals=now, querystring=params.urlencode(),
         objects={e.pk: entry_json(e) for e in page},
         category_kinds={c.pk: c.kind for c in Category.objects.all()},
+        structure=services.expense_structure(period),
     )
     return render(request, "panel/finance.html", ctx)
 
@@ -575,6 +583,137 @@ def margin(request):
     ]
     ctx.update(products=products)
     return render(request, "panel/margin.html", ctx)
+
+
+# --- КП и счета
+
+@panel_required
+def documents(request):
+    ctx = page_context(request, "documents")
+    quotes, invoices = services.recent_documents()
+    products = [
+        {"id": p.pk, "name": p.name, "sku": p.sku or "", "price": float(p.price_rub)}
+        for p in Product.objects.filter(is_active=True, price_rub__isnull=False).order_by("name")[:3000]
+    ]
+    made = request.GET.get("made", "")
+    result = None
+    if made.startswith("quote:"):
+        found = next((q for q in quotes if str(q.pk) == made[6:]), None)
+        if found:
+            result = {"kind": "КП", "done": "КП готово", "number": found.number, "total": found.total, "url": f"/docs/quote/{found.pk}.pdf",
+                      "discount": any(i.get("list_price_rub") for i in found.items)}
+    elif made.startswith("invoice:"):
+        found = next((o for o in invoices if o.number == made[8:]), None)
+        if found:
+            result = {"kind": "Счёт", "done": "Счёт выставлен", "number": found.number, "total": found.total_amount,
+                      "url": f"/docs/invoice/{found.number}.pdf",
+                      "discount": any(i.list_unit_price for i in found.items.all()),
+                      "order": f"/sales/?status={found.status}"}
+    for quote in quotes:
+        quote.discounted = any(i.get("list_price_rub") for i in quote.items)
+    for order in invoices:
+        order.discounted = any(i.list_unit_price for i in order.items.all())
+        order.has_pdf = invoice_available(order)
+    ctx.update(
+        products=products, quotes=quotes, invoices=invoices, result=result, valid_days=14,
+        form=request.session.pop("doc_form", {}),
+    )
+    return render(request, "panel/documents.html", ctx)
+
+
+def document_lines(request):
+    try:
+        raw = json.loads(request.POST.get("items", "[]"))
+    except ValueError:
+        raw = []
+    return services.parse_lines(raw)
+
+
+def remember_form(request):
+    """Введённое не пропадает, если документ не получился."""
+    request.session["doc_form"] = {k: v for k, v in request.POST.items() if k in {
+        "phone", "buyer_type", "name", "inn", "contact_name", "email", "delivery", "comment",
+        "valid_days", "items",
+    }}
+
+
+@panel_required
+@require_POST
+def quote_create(request):
+    try:
+        lines = document_lines(request)
+        try:
+            days = int(request.POST.get("valid_days") or 14)
+        except ValueError:
+            days = 0
+        if not 1 <= days <= 365:
+            raise services.DocumentError("Срок действия — от 1 до 365 дней")
+        quote = services.create_quote(
+            request.user, client_name=request.POST.get("name", "").strip()[:160],
+            client_phone=request.POST.get("phone", "").strip()[:30], valid_days=days, lines=lines,
+        )
+    except services.DocumentError as error:
+        remember_form(request)
+        messages.error(request, str(error))
+        return redirect("panel:documents")
+    return redirect(f"/docs/?made=quote:{quote.pk}")
+
+
+@panel_required
+@require_POST
+def invoice_create(request):
+    try:
+        lines = document_lines(request)
+        delivery = parse_money(request.POST.get("delivery", ""))
+        order = services.create_invoice(
+            request.user, buyer_type=request.POST.get("buyer_type", ""), name=request.POST.get("name", "")[:255],
+            inn="".join(ch for ch in request.POST.get("inn", "") if ch.isdigit()),
+            contact_name=request.POST.get("contact_name", "")[:255], phone=request.POST.get("phone", "").strip()[:30],
+            email=request.POST.get("email", "").strip()[:254], delivery=delivery,
+            comment=request.POST.get("comment", "")[:1000], lines=lines,
+        )
+    except (services.DocumentError, InvoiceError, TransitionError) as error:
+        remember_form(request)
+        messages.error(request, str(error))
+        return redirect("panel:documents")
+    services.sync_auto_deals()
+    return redirect(f"/docs/?made=invoice:{order.number}")
+
+
+def parse_money(raw):
+    raw = re.sub(r"[\s\u00a0₽]", "", raw).replace(",", ".")
+    if not raw:
+        return None
+    try:
+        value = Decimal(raw).quantize(Decimal("0.01"))
+    except ArithmeticError:
+        raise services.DocumentError("Доставка: введите сумму цифрами")
+    if value < 0:
+        raise services.DocumentError("Доставка не может быть отрицательной")
+    return value or None
+
+
+@panel_required
+@require_GET
+def quote_file(request, pk):
+    quote = get_object_or_404(Quote, pk=pk)
+    if not services.is_panel_quote(quote):
+        raise Http404
+    path = os.path.join(settings.MEDIA_ROOT, quote.pdf_path) if quote.pdf_path else ""
+    if not path or not os.path.exists(path):
+        quote.pdf_path = generate_quote_pdf(quote)
+        Quote.objects.filter(pk=quote.pk).update(pdf_path=quote.pdf_path)
+        path = os.path.join(settings.MEDIA_ROOT, quote.pdf_path)
+    return FileResponse(open(path, "rb"), content_type="application/pdf", filename=f"{quote.number}.pdf")
+
+
+@panel_required
+@require_GET
+def invoice_file(request, number):
+    order = get_object_or_404(Order.objects.select_related("invoice"), number=number)
+    if not invoice_available(order):
+        raise Http404
+    return FileResponse(open(invoice_path(order.invoice), "rb"), content_type="application/pdf", filename=f"{order.number}.pdf")
 
 
 # --- серверы

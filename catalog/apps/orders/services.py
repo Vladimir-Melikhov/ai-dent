@@ -418,7 +418,10 @@ def edit_order_items(order, changes: list[dict], actor_user=None) -> Order:
             item.line_total = value * item.quantity
             # Окончательная цена менеджера: при подтверждении по курсу не пересчитывается
             item.price_overridden = True
-            item.save(update_fields=["unit_price", "line_total", "price_overridden"])
+            # Снижение цены — скидка: запоминаем цену по прайсу, чтобы счёт её показал; вернули цену — скидки нет
+            base = item.list_unit_price or before
+            item.list_unit_price = base if value < base else None
+            item.save(update_fields=["unit_price", "line_total", "price_overridden", "list_unit_price"])
             log(A.PRICE_CHANGED, {"item": item.product_name, "before": str(before), "after": str(value),
                                   "diff": str(value - before), "percent": _percent(before, value)}, total_before)
         else:

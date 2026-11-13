@@ -150,3 +150,35 @@ def _draw_wrapped_text(
         y -= line_height
 
     return y
+
+
+# ─── Скидка ───
+
+ACCENT = colors.HexColor("#1f6f8b")
+DISCOUNT = colors.HexColor("#b4472d")
+
+
+def discount_percent(list_price, price):
+    """Процент скидки к цене по прайсу, до десятых; None — скидки нет."""
+    from decimal import ROUND_HALF_UP, Decimal
+
+    if list_price is None or price is None or Decimal(list_price) <= Decimal(price):
+        return None
+    pct = (Decimal(list_price) - Decimal(price)) / Decimal(list_price) * 100
+    return pct.quantize(Decimal("0.1"), rounding=ROUND_HALF_UP)
+
+
+def percent_text(pct) -> str:
+    text = f"{pct:.1f}".rstrip("0").rstrip(".")
+    return text.replace(".", ",") + "%"
+
+
+def discount_summary(rows):
+    """rows: (цена до скидки или None, цена, количество). Возвращает (сумма по прайсу, скидка ₽, скидка %) или None."""
+    from decimal import Decimal
+
+    full = sum((Decimal(lp if lp is not None and Decimal(lp) > Decimal(p) else p) * q for lp, p, q in rows), Decimal(0))
+    paid = sum((Decimal(p) * q for _, p, q in rows), Decimal(0))
+    if full <= paid:
+        return None
+    return full, full - paid, ((full - paid) / full * 100)

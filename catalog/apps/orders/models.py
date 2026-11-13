@@ -148,6 +148,10 @@ class OrderItem(models.Model):
     exchange_rate = models.DecimalField(
         max_digits=14, decimal_places=6, null=True, blank=True, verbose_name="Курс ЦБ"
     )
+    # Цена по прайсу до скидки менеджера: пусто — скидки нет. В счёте скидка видна по разнице цен
+    list_unit_price = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True, verbose_name="Цена до скидки, ₽"
+    )
     # Цену задал менеджер (скидка) — при подтверждении по курсу не пересчитывается
     price_overridden = models.BooleanField(default=False, verbose_name="Цена менеджера")
 

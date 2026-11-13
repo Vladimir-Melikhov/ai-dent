@@ -31,6 +31,12 @@ urlpatterns = [
     path("ai/", views.ai, name="ai"),
     path("margin/", views.margin, name="margin"),
 
+    path("docs/", views.documents, name="documents"),
+    path("docs/quote/", views.quote_create, name="quote_create"),
+    path("docs/invoice/", views.invoice_create, name="invoice_create"),
+    path("docs/quote/<uuid:pk>.pdf", views.quote_file, name="quote_file"),
+    path("docs/invoice/<str:number>.pdf", views.invoice_file, name="invoice_file"),
+
     path("servers/", views.servers, name="servers"),
     path("servers/save/", views.server_save, name="server_save"),
     path("servers/<int:pk>/delete/", views.server_delete, name="server_delete"),

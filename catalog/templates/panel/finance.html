@@ -15,6 +15,22 @@
   <article class="glass card"><div class="card-top"><span class="card-title">Прибыль</span></div><div class="card-value {% if totals.profit < 0 %}neg{% endif %}">{{ totals.profit|rub }}</div><div class="card-foot"><span class="muted">{% if totals.margin is not None %}маржа {{ totals.margin|pct }}{% endif %}</span></div></article>
 </section>
 
+<section class="row main-row">
+  <article class="glass panel chart-panel">
+    <div class="panel-head">
+      <div><h2>Куда вложены деньги</h2><p class="muted">Расходы по времени, цвет — категория · {% if period.days <= 31 %}по дням{% elif period.days <= 120 %}по неделям{% else %}по месяцам{% endif %}</p></div>
+    </div>
+    <div id="chart-spend" class="chart" role="img" aria-label="Расходы по категориям во времени"></div>
+    <div id="legend-spend" class="legend wrap"></div>
+    <details class="table-view"><summary>Показать таблицей</summary><div id="table-spend"></div></details>
+  </article>
+  <article class="glass panel">
+    <div class="panel-head"><div><h2>Структура расходов</h2><p class="muted">Всего {{ totals.costs|rub }}</p></div></div>
+    <div id="spend-groups" class="spend-groups"></div>
+    {% if structure.servers_monthly %}<p class="hint">Серверы и сервисы по реестру — {{ structure.servers_monthly|rub }} в месяц. В расходы попадают только внесённые операции.</p>{% endif %}
+  </article>
+</section>
+
 <form class="filters glass" method="get">
   <input type="hidden" name="p" value="{{ period.code }}">
   <select name="kind" data-auto><option value="">Всё</option><option value="income" {% if kind == 'income' %}selected{% endif %}>Доходы</option><option value="expense" {% if kind == 'expense' %}selected{% endif %}>Расходы</option></select>
@@ -47,4 +63,6 @@
 <form id="del-form" method="post" class="hidden">{% csrf_token %}<input type="hidden" name="back" value="{{ request.get_full_path }}"></form>
 {{ objects|json_script:"objects" }}
 {{ category_kinds|json_script:"category-kinds" }}
+{{ structure|json_script:"spend-data" }}
 {% endblock %}
+{% block scripts %}{% load static %}<script src="{% static 'js/panel-finance.js' %}" defer></script>{% endblock %}

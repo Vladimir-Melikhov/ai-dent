@@ -10,7 +10,10 @@ from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas
 
 from .models import Order, OrderItem
-from .pdf import INK, LINE, MUTED, SELLER, _draw_gradient_box, _draw_wrapped_text, _fonts
+from .pdf import (
+    DISCOUNT, INK, LINE, MUTED, SELLER, _draw_gradient_box, _draw_wrapped_text, _fonts, discount_percent,
+    discount_summary, percent_text,
+)
 from .services import rub_text
 
 INVOICES_DIR = "invoices"
@@ -37,7 +40,8 @@ def buyer_lines(order) -> list[str]:
         lines.append(order.buyer_name)
     elif order.contact_name:
         lines.append(order.contact_name)
-    lines.append(f"Телефон: {order.contact_phone}")
+    if order.contact_phone:
+        lines.append(f"Телефон: {order.contact_phone}")
     if order.contact_email:
         lines.append(f"Email: {order.contact_email}")
     return lines
@@ -271,6 +275,15 @@ def generate_invoice_pdf(order, issued_at) -> str:
             rub_text(item.line_total),
         )
 
+        pct = discount_percent(item.list_unit_price, item.unit_price)
+        if pct is not None:
+            # Скидка видна в строке: цена по прайсу и процент
+            y -= 4.6 * mm
+            c.setFont(reg, 8)
+            c.setFillColor(DISCOUNT)
+            c.drawString(left, y, f"Скидка {percent_text(pct)} · цена по прайсу {rub_text(item.list_unit_price)}")
+            c.setFont(reg, 9.5)
+
         y -= 5.5 * mm
 
         c.setStrokeColor(LINE)
@@ -316,6 +329,21 @@ def generate_invoice_pdf(order, issued_at) -> str:
     # ─── Итого ───
 
     y -= 2 * mm
+
+    summary = discount_summary(
+        [(i.list_unit_price, i.unit_price, i.quantity) for i in invoice_items(order) if i.kind == OrderItem.Kind.PRODUCT]
+    )
+    if summary:
+        full, saved, saved_pct = summary
+        c.setFont(reg, 9.5)
+        c.setFillColor(MUTED)
+        c.drawString(120 * mm, y, "Сумма по прайсу:")
+        c.drawRightString(right, y, rub_text(full))
+        y -= 6 * mm
+        c.setFillColor(DISCOUNT)
+        c.drawString(120 * mm, y, f"Скидка {percent_text(saved_pct)}:")
+        c.drawRightString(right, y, "−" + rub_text(saved))
+        y -= 8 * mm
 
     c.setFont(bold, 14)
     c.setFillColor(INK)

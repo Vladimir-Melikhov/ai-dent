@@ -1,0 +1,106 @@
+{% extends "panel/base.html" %}
+{% load panel_tags static %}
+{% block title %}КП и счета{% endblock %}
+{% block h1 %}КП и счета{% endblock %}
+{% block sub %}Выберите товары и скидку — PDF готов сразу. Скидка видна в документе{% endblock %}
+{% block tools %}{% endblock %}
+
+{% block content %}
+{% if result %}
+<section class="glass result">
+  <div><span class="chip good">{{ result.done }}</span>
+    <b>{{ result.kind }} № {{ result.number }}</b>
+    <span class="muted">на {{ result.total|rub:2 }}{% if result.discount %} · со скидкой{% endif %}</span></div>
+  <div class="result-actions">
+    <a class="btn primary" href="{{ result.url }}" target="_blank" rel="noopener"><svg><use href="#i-down"/></svg>Открыть PDF</a>
+    {% if result.order %}<a class="btn ghost" href="{{ result.order }}">Заказ в продажах</a>{% endif %}
+  </div>
+</section>
+{% endif %}
+
+<form id="doc-form" method="post" class="row main-row doc-builder" autocomplete="off">
+  {% csrf_token %}
+  <input type="hidden" name="items" id="doc-items">
+  <article class="glass panel">
+    <div class="panel-head"><div><h2>Товары</h2><p class="muted">Начните вводить название или артикул — цена подставится из каталога</p></div></div>
+    <div class="lines-head"><span>Товар</span><span>Кол-во</span><span class="r">Цена</span><span>Скидка, %</span><span class="r">Сумма</span><span></span></div>
+    <div id="lines" class="lines"></div>
+    <div class="lines-tools">
+      <button type="button" class="btn ghost sm" id="add-line"><svg><use href="#i-plus"/></svg>Товар</button>
+      <label class="fld inline-fld"><span>Скидка на все позиции, %</span><input id="all-discount" inputmode="decimal" placeholder="0"></label>
+      <button type="button" class="btn ghost sm" id="apply-all">Применить ко всем</button>
+    </div>
+
+    <div class="panel-head spaced"><div><h2>Кому</h2><p class="muted">Для КП достаточно имени. Для счёта нужны данные покупателя</p></div></div>
+    <div class="grid2">
+      <label class="fld"><span>Покупатель</span>
+        <select name="buyer_type" id="buyer-type">
+          <option value="legal">Юрлицо</option><option value="ip">ИП</option><option value="individual">Физлицо</option></select></label>
+      <label class="fld"><span id="name-label">Организация</span><input name="name" id="buyer-name" maxlength="160" placeholder="ООО «Стом-Центр»"></label>
+      <label class="fld" id="inn-fld"><span>ИНН</span><input name="inn" inputmode="numeric" maxlength="12" placeholder="10 цифр"></label>
+      <label class="fld" id="contact-fld"><span>Контактное лицо</span><input name="contact_name" maxlength="160"></label>
+      <label class="fld"><span>Телефон</span><input name="phone" inputmode="tel" data-phone-mask placeholder="+7 900 000 00 00"></label>
+      <label class="fld"><span>Email (необязательно)</span><input name="email" type="email" maxlength="254"></label>
+      <label class="fld"><span>Доставка, ₽ (необязательно)</span><input name="delivery" id="delivery" inputmode="decimal" placeholder="0"></label>
+      <label class="fld"><span>КП действует, дней</span><input name="valid_days" inputmode="numeric" value="{{ valid_days }}"></label>
+      <label class="fld wide"><span>Комментарий к счёту</span><input name="comment" maxlength="1000"></label>
+    </div>
+  </article>
+
+  <aside class="glass panel doc-summary">
+    <div class="panel-head"><div><h2>Итог</h2><p class="muted" id="sum-note">Добавьте товары</p></div></div>
+    <dl class="calc-list">
+      <div><dt>Сумма по прайсу</dt><dd id="s-full">—</dd></div>
+      <div class="disc"><dt id="s-disc-name">Скидка</dt><dd id="s-disc">—</dd></div>
+      <div id="row-delivery" hidden><dt>Доставка</dt><dd id="s-delivery">—</dd></div>
+    </dl>
+    <div class="calc-hero"><span class="muted">К оплате</span><b id="s-total">—</b></div>
+    <div class="doc-buttons">
+      <button class="btn primary full" formaction="{% url 'panel:quote_create' %}" id="make-quote"><svg><use href="#i-doc"/></svg>Сформировать КП</button>
+      <button class="btn ghost full" formaction="{% url 'panel:invoice_create' %}" id="make-invoice"
+        data-confirm="Выставить счёт? Будет создан подтверждённый заказ — он появится в «Продажах», дальше отметьте оплату.">Выставить счёт</button>
+    </div>
+    <p class="hint">КП — без реквизитов, для согласования цены; с телефоном клиента заведётся карточка «КП отправлено». Счёт создаёт заказ с реквизитами для оплаты.</p>
+  </aside>
+</form>
+
+<section class="row two">
+  <article class="glass panel">
+    <div class="panel-head"><div><h2>Последние КП</h2><p class="muted">Собранные в панели</p></div></div>
+    <ul class="feed">
+      {% for q in quotes %}
+      <li><span class="avatar srv"><svg><use href="#i-doc"/></svg></span>
+        <div class="feed-body"><b>{{ q.number }}{% if q.discounted %} <span class="tag">скидка</span>{% endif %}</b><span class="muted">{{ q.client_name|default:"без имени" }} · {{ q.created_at|date:"j E" }}, до {{ q.valid_until|date:"j E" }}</span></div>
+        <span class="amt">{{ q.total|rub }}</span>
+        <a class="icon" href="{% url 'panel:quote_file' q.pk %}" target="_blank" rel="noopener" aria-label="Открыть PDF"><svg><use href="#i-down"/></svg></a></li>
+      {% empty %}<li class="empty">КП из панели пока нет</li>{% endfor %}
+    </ul>
+  </article>
+  <article class="glass panel">
+    <div class="panel-head"><div><h2>Последние счета</h2><p class="muted">Выставленные из панели</p></div><a class="more" href="{% url 'panel:sales' %}">Продажи</a></div>
+    <ul class="feed">
+      {% for o in invoices %}
+      <li><span class="avatar srv"><svg><use href="#i-doc"/></svg></span>
+        <div class="feed-body"><b>{{ o.number }}{% if o.discounted %} <span class="tag">скидка</span>{% endif %}</b><span class="muted">{{ o.company_name|default:o.buyer_name|default:"—" }} · {{ o.get_status_display }}</span></div>
+        <span class="amt">{{ o.total_amount|rub }}</span>
+        {% if o.has_pdf %}<a class="icon" href="{% url 'panel:invoice_file' o.number %}" target="_blank" rel="noopener" aria-label="Открыть PDF"><svg><use href="#i-down"/></svg></a>{% endif %}</li>
+      {% empty %}<li class="empty">Счетов из панели пока нет</li>{% endfor %}
+    </ul>
+  </article>
+</section>
+
+<template id="line-tpl">
+  <div class="line">
+    <input class="l-product" list="products" required placeholder="Название или артикул" aria-label="Товар">
+    <input class="l-qty" inputmode="numeric" value="1" aria-label="Количество">
+    <span class="l-price r">—</span>
+    <input class="l-disc" inputmode="decimal" placeholder="0" aria-label="Скидка, %">
+    <b class="l-sum r">—</b>
+    <button type="button" class="icon l-del" aria-label="Убрать"><svg><use href="#i-trash"/></svg></button>
+  </div>
+</template>
+<datalist id="products">{% for p in products %}<option value="{{ p.name }}{% if p.sku %} · {{ p.sku }}{% endif %}"></option>{% endfor %}</datalist>
+{{ products|json_script:"doc-products" }}
+{{ form|json_script:"doc-restore" }}
+{% endblock %}
+{% block scripts %}<script src="{% static 'js/panel-docs.js' %}" defer></script>{% endblock %}

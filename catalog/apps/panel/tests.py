@@ -759,3 +759,167 @@ def test_margin_calculator_page(client):
     response = client.get("/margin/")
     assert response.status_code == 200 and "Микроскоп" in response.content.decode()
     assert Client(HTTP_HOST=PANEL).get("/margin/").status_code == 302
+
+
+# --- финансы: куда вложены деньги
+
+def test_expense_structure_splits_purchase_from_operations(client):
+    today = timezone.localdate()
+    Entry.objects.create(kind="expense", category=category("expense", "Реклама"), amount=Decimal("30000"), date=today)
+    Entry.objects.create(kind="expense", category=category("expense", "Серверы и сервисы"), amount=Decimal("10000"), date=today)
+    Entry.objects.create(kind="expense", category=category("expense", services.PURCHASE_CATEGORY), amount=Decimal("60000"), date=today)
+    order = make_order(status=Order.Status.CONFIRMED, total_amount=Decimal("500000"))
+    client.post(f"/orders/{order.pk}/to/paid/", {"cost": "400000"})
+
+    data = services.expense_structure(services.resolve_period("30"))
+    purchase, operating = data["groups"]
+    assert purchase["total"] == 460_000 and operating["total"] == 40_000 and data["total"] == 500_000
+    assert [i["name"] for i in purchase["items"]] == [services.SOLD_GOODS, services.PURCHASE_CATEGORY]
+    assert {i["name"] for i in operating["items"]} == {"Реклама", "Серверы и сервисы"}
+    assert round(purchase["share"] + operating["share"]) == 100
+    # столбцы по времени сходятся с итогом
+    assert sum(sum(r["values"]) for r in data["rows"]) == 500_000
+
+    page = client.get("/finance/")
+    assert page.status_code == 200 and "Куда вложены деньги" in page.content.decode()
+    assert page.context["structure"]["total"] == 500_000
+
+
+def test_expense_structure_empty_period(client):
+    data = services.expense_structure(services.resolve_period("7"))
+    assert data["total"] == 0 and data["series"] == [] and client.get("/finance/").status_code == 200
+
+
+# --- КП и счета со скидкой
+
+@pytest.fixture
+def microscope():
+    from apps.catalog.models import Brand, Category as ProductCategory, Product
+
+    return Product.objects.create(
+        name="Микроскоп EXTARO", sku="EX-1", brand=Brand.objects.create(name="Zumax"),
+        category=ProductCategory.objects.create(name="Микроскопы"), price=Decimal("1000000"),
+    )
+
+
+def items_json(product, qty=1, discount="0"):
+    import json
+
+    return json.dumps([{"id": product.pk, "qty": qty, "discount": discount}])
+
+
+def test_documents_page_opens(client, microscope):
+    response = client.get("/docs/")
+    assert response.status_code == 200 and "Микроскоп EXTARO" in response.content.decode()
+    assert Client(HTTP_HOST=PANEL).get("/docs/").status_code == 302
+
+
+def test_quote_with_discount(client, microscope, settings, tmp_path):
+    settings.MEDIA_ROOT = tmp_path
+    response = client.post("/docs/quote/", {
+        "name": "ООО Стом", "phone": "+7 900 123 45 67", "valid_days": "10", "items": items_json(microscope, 2, "10"),
+    })
+    from apps.chat.models import Quote
+    from apps.chat.quote_pdf import quote_document
+
+    quote = Quote.objects.get()
+    assert response.status_code == 302 and str(quote.pk) in response["Location"]
+    assert quote.total == Decimal("1800000.00") and quote.client_name == "ООО Стом"
+    assert quote.items[0]["list_price_rub"] == "1000000.00" and quote.items[0]["unit_price_rub"] == "900000.00"
+    doc = quote_document(quote)
+    assert doc["discount"]["percent"] == "10%" and doc["discount"]["saved"] == "−200 000 ₽" and doc["lines"][0]["discount"] == "−10%"
+    assert doc["total"] == "1 800 000 ₽" and "ИНН" not in str(doc)
+    # КП с телефоном — карточка «КП отправлено»
+    deal = Deal.objects.get(quote=quote)
+    assert deal.stage == Deal.Stage.OFFER and deal.amount == Decimal("1800000.00")
+    pdf = client.get(f"/docs/quote/{quote.pk}.pdf")
+    assert pdf.status_code == 200 and b"".join(pdf.streaming_content).startswith(b"%PDF")
+
+
+def test_quote_without_discount_and_without_phone_is_not_lost_contact(client, microscope, settings, tmp_path):
+    settings.MEDIA_ROOT = tmp_path
+    client.post("/docs/quote/", {"name": "Клиент", "valid_days": "14", "items": items_json(microscope)})
+    from apps.chat.models import Quote
+    from apps.chat.quote_pdf import quote_document
+
+    quote = Quote.objects.get()
+    assert quote_document(quote)["discount"] is None and quote.items[0]["list_price_rub"] is None
+    assert not Deal.objects.exists() and services.anonymous_quotes() == []
+
+
+def test_chat_quote_is_not_served_by_panel(client, microscope):
+    from apps.chat.models import Quote
+
+    quote = Quote.objects.create(
+        number="KP-20260101-ABC123", items=[], total=Decimal("1"), valid_until=timezone.localdate(),
+    )
+    assert client.get(f"/docs/quote/{quote.pk}.pdf").status_code == 404
+
+
+@pytest.mark.parametrize("bad", ["", "[]", "not json"])
+def test_quote_needs_items(client, bad):
+    response = client.post("/docs/quote/", {"name": "X", "items": bad}, follow=True)
+    assert "хотя бы один товар" in response.content.decode()
+
+
+def test_discount_over_limit_is_refused(client, microscope):
+    response = client.post("/docs/quote/", {"items": items_json(microscope, 1, "100")}, follow=True)
+    assert "скидка" in response.content.decode()
+    from apps.chat.models import Quote
+
+    assert not Quote.objects.exists()
+
+
+def test_invoice_with_discount_creates_confirmed_order(client, microscope, settings, tmp_path):
+    settings.MEDIA_ROOT = tmp_path
+    response = client.post("/docs/invoice/", {
+        "buyer_type": "legal", "name": "ООО Стом", "inn": "7707083893", "contact_name": "Иван",
+        "phone": "+7 900 123 45 67", "delivery": "5 000", "items": items_json(microscope, 1, "15"),
+    })
+    order = Order.objects.get()
+    assert response.status_code == 302 and order.number in response["Location"]
+    assert order.status == Order.Status.CONFIRMED and order.invoice.pdf_path
+    item = order.items.get(kind="product")
+    assert item.list_unit_price == Decimal("1000000.00") and item.unit_price == Decimal("850000.00")
+    assert order.total_amount == Decimal("855000.00") and order.company_name == "ООО Стом"
+    from apps.orders.invoice import buyer_lines
+    from apps.orders.pdf import discount_percent, discount_summary
+
+    assert str(discount_percent(item.list_unit_price, item.unit_price)) == "15.0"
+    assert discount_summary([(item.list_unit_price, item.unit_price, 1)])[1] == Decimal("150000")
+    assert "Телефон: +7 900 123 45 67" in buyer_lines(order)
+    pdf = client.get(f"/docs/invoice/{order.number}.pdf")
+    assert pdf.status_code == 200 and b"".join(pdf.streaming_content).startswith(b"%PDF")
+    # заказ пошёл обычным путём: виден в сделках и продажах
+    assert Deal.objects.get(order=order).stage == Deal.Stage.PAYMENT
+    assert order.number in client.get("/sales/").content.decode()
+
+
+def test_invoice_bad_inn_creates_nothing(client, microscope):
+    response = client.post("/docs/invoice/", {
+        "buyer_type": "legal", "name": "ООО", "inn": "1234567890", "items": items_json(microscope),
+    }, follow=True)
+    assert "ИНН" in response.content.decode() and not Order.objects.exists()
+
+
+def test_invoice_for_individual_needs_no_inn(client, microscope, settings, tmp_path):
+    settings.MEDIA_ROOT = tmp_path
+    client.post("/docs/invoice/", {"buyer_type": "individual", "name": "Пётр Петров", "items": items_json(microscope)})
+    order = Order.objects.get()
+    assert order.status == Order.Status.CONFIRMED and order.items.get(kind="product").list_unit_price is None
+
+
+def test_manager_price_cut_in_admin_remembers_list_price(microscope):
+    from apps.orders.models import OrderItem
+    from apps.orders.services import edit_order_items
+
+    order = make_order(status=Order.Status.PENDING_CONFIRMATION, total_amount=Decimal("100"))
+    item = OrderItem.objects.create(
+        order=order, product=microscope, product_name="М", unit_price=Decimal("1000"), quantity=1, line_total=Decimal("1000"),
+    )
+    edit_order_items(order, [{"action": "price", "item_id": item.pk, "value": "900"}])
+    item.refresh_from_db()
+    assert item.list_unit_price == Decimal("1000.00")
+    edit_order_items(order, [{"action": "price", "item_id": item.pk, "value": "1000"}])
+    item.refresh_from_db()
+    assert item.list_unit_price is None

@@ -329,3 +329,40 @@ a.ai-line { color: inherit; }
 .calc-list div { display: flex; justify-content: space-between; gap: 14px; padding: 9px 12px; border-radius: 12px; background: rgba(0,0,0,.2); }
 .calc-list dt { color: var(--text-3); } .calc-list dd { margin: 0; font-weight: 700; }
 @media (max-width: 720px) { .calc-reverse { grid-template-columns: 1fr; } }
+
+/* финансы: структура расходов */
+.legend.wrap { flex-wrap: wrap; margin-top: 12px; row-gap: 6px; }
+.spend-groups { display: grid; gap: 14px; }
+.spend-group { padding: 14px; border-radius: 16px; background: var(--glass); border: 1px solid var(--line-soft); display: grid; gap: 10px; }
+.spend-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.spend-head b { font-size: 17px; letter-spacing: -.3px; } .spend-head small { color: var(--text-2); font-size: 12.5px; font-weight: 600; }
+.spend-group > p { margin: -6px 0 0; font-size: 12px; color: var(--text-3); }
+.spend-split { display: flex; height: 10px; border-radius: 5px; overflow: hidden; background: var(--line-soft); }
+.spend-split i { display: block; height: 100%; }
+
+/* КП и счета */
+.result { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; padding: 18px 22px; margin-bottom: 16px; border-color: rgba(52,199,123,.35); }
+.result > div:first-child { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.result-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.doc-builder { align-items: start; }
+.doc-summary { position: sticky; top: 16px; }
+.doc-summary .calc-list .disc dd, .doc-summary .calc-list .disc dt { color: #ffb08f; }
+.doc-buttons { display: grid; gap: 10px; }
+.panel-head.spaced { margin-top: 26px; }
+.lines-head, .line { display: grid; grid-template-columns: minmax(180px, 1fr) 70px 110px 90px 120px 36px; gap: 10px; align-items: center; }
+.lines-head { padding: 0 2px 8px; font-size: 12px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: .5px; }
+.lines { display: grid; gap: 8px; }
+.line .l-price, .line .l-sum { white-space: nowrap; }
+.line .l-price.was { text-decoration: line-through; color: var(--text-3); }
+.lines-tools { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-top: 14px; }
+.inline-fld { min-width: 190px; margin-left: auto; }
+.inline-fld input { width: 100px; }
+@media (max-width: 1100px) { .doc-summary { position: static; } }
+@media (max-width: 720px) {
+  .lines-head { display: none; }
+  .line { grid-template-columns: 1fr 1fr 36px; padding: 12px; border-radius: 14px; background: var(--glass); }
+  .line .l-product { grid-column: 1 / -1; }
+  .line .l-price { display: none; }
+  .inline-fld { margin-left: 0; }
+}
+[hidden] { display: none !important; }

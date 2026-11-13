@@ -147,7 +147,10 @@ class Quote(models.Model):
         "accounts.AnonSession", null=True, blank=True, on_delete=models.SET_NULL, related_name="quotes",
         verbose_name="Гостевая сессия",
     )
-    # Снапшот: товар, название, цена в рублях, исходная цена и валюта, курс, количество, сумма
+    # КП из панели: для кого оно. У КП из чата пусто — клиента знает диалог
+    client_name = models.CharField(max_length=160, null=True, blank=True, verbose_name="Клиент")
+    client_phone = models.CharField(max_length=30, null=True, blank=True, verbose_name="Телефон клиента")
+    # Снапшот: товар, название, цена в рублях (после скидки), цена до скидки и процент, исходная цена и валюта, курс, количество, сумма
     items = models.JSONField(default=list, verbose_name="Позиции")
     total = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="Итог, ₽")
     valid_until = models.DateField(verbose_name="Действует до")

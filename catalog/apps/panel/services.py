@@ -1,5 +1,6 @@
 """Цифры панели. Продажи сайта берутся из оплаченных заказов, всё остальное — из операций панели."""
 import datetime
+import uuid
 from collections import defaultdict
 from dataclasses import dataclass
 from decimal import Decimal
@@ -10,11 +11,13 @@ from django.db.models.functions import Coalesce, TruncDate
 from django.utils import timezone
 
 from apps.catalog.currency import rate_on
+from apps.catalog.models import Product
 from apps.chat.models import Conversation, LLMUsage, Message, Quote
 from apps.leads.models import Lead
-from apps.orders.models import Order
+from apps.orders.models import MAX_ITEM_QUANTITY, Order, OrderItem, OrderStatusHistory
+from apps.orders.services import InvoiceError, TransitionError, change_status, valid_inn
 
-from .models import Category, Deal, Entry
+from .models import Category, Deal, Entry, Server
 
 ZERO = Decimal("0")
 PERIODS = {"7": ("Неделя", 7), "30": ("Месяц", 30), "90": ("Квартал", 90), "365": ("Год", 365)}
@@ -186,6 +189,79 @@ def expenses_by_category(start, end, limit=7) -> list[dict]:
     return result
 
 
+PURCHASE_CATEGORY = "Закупка вне заказов"
+SOLD_GOODS = "Закупка проданного"
+
+
+def expense_structure(period: Period) -> dict:
+    """Куда ушли деньги: закупка товара отдельно от операционки и ресурсов, по категориям и по времени.
+
+    Закупка — себестоимость проданного (указывается при оплате) и категория «Закупка вне заказов».
+    Операционка и ресурсы — все остальные категории расходов."""
+    step = bucket_step(period.days)
+    cogs = cogs_by_day(period.start, period.end)
+    entries = list(
+        Entry.objects.filter(kind=Category.Kind.EXPENSE, date__gte=period.start, date__lte=period.end)
+        .select_related("category")
+    )
+    # (группа, название, цвет) → сумма всего и по корзинам времени
+    totals = defaultdict(lambda: ZERO)
+    buckets = defaultdict(lambda: defaultdict(lambda: ZERO))
+    colors = {}
+
+    def add(group, name, color, day, amount):
+        key = (group, name)
+        totals[key] += amount
+        buckets[bucket_start(day, step)][key] += amount
+        colors[key] = color
+
+    for day, amount in cogs.items():
+        if amount:
+            add("purchase", SOLD_GOODS, 1, day, amount)
+    for entry in entries:
+        group = "purchase" if entry.category.name == PURCHASE_CATEGORY else "operating"
+        add(group, entry.category.name, entry.category.color, entry.date, entry.amount)
+
+    grand = sum(totals.values(), ZERO)
+
+    def group_block(key, title, hint):
+        items = sorted(((k, v) for k, v in totals.items() if k[0] == key), key=lambda kv: -kv[1])
+        total = sum((v for _, v in items), ZERO)
+        return {
+            "key": key, "title": title, "hint": hint, "total": float(total),
+            "share": float(total / grand * 100) if grand else 0,
+            "items": [{
+                "name": k[1], "color": colors[k], "amount": float(v),
+                "share": float(v / total * 100) if total else 0,
+            } for k, v in items],
+        }
+
+    groups = [
+        group_block("purchase", "Закупка товара", "себестоимость проданного и закупка вне заказов"),
+        group_block("operating", "Операционка и ресурсы", "реклама, серверы, ИИ, доставка, налоги, зарплата и прочее"),
+    ]
+    # серии для столбцов: сначала закупка, затем операционка, внутри — от крупных к мелким
+    keys = [(k, v) for g in ("purchase", "operating") for k, v in sorted(
+        ((k, v) for k, v in totals.items() if k[0] == g), key=lambda kv: -kv[1])]
+    series_meta = [{"group": k[0], "name": k[1], "color": colors[k], "amount": float(v)} for k, v in keys]
+    rows, day = [], period.start
+    seen = set()
+    while day <= period.end:
+        start = bucket_start(day, step)
+        if start not in seen:
+            seen.add(start)
+            values = buckets.get(start, {})
+            rows.append({
+                "date": start.isoformat(), "step": step,
+                "values": [float(values.get(k, ZERO)) for k, _ in keys],
+            })
+        day += datetime.timedelta(days=1)
+    return {
+        "total": float(grand), "groups": groups, "series": series_meta, "rows": rows,
+        "servers_monthly": float(Server.objects.aggregate(t=Sum("monthly_cost"))["t"] or ZERO),
+    }
+
+
 def pipeline() -> list[dict]:
     """Воронка: открытые сделки по этапам (на сейчас)."""
     rows = {
@@ -300,6 +376,8 @@ def quote_summary(quote) -> str:
 
 def quote_contact(quote):
     """Имя и телефон клиента КП: из заявки агента по диалогу, иначе из аккаунта. Аноним — пусто."""
+    if quote.client_phone:
+        return quote.client_name or "", quote.client_phone
     lead = Lead.objects.filter(conversation_id=quote.conversation_id).order_by("-id").first() if quote.conversation_id else None
     if lead:
         return lead.name, lead.phone
@@ -368,7 +446,8 @@ def anonymous_quotes():
     taken = set(Deal.objects.exclude(conversation__isnull=True).values_list("conversation_id", flat=True))
     result = []
     for quote in Quote.objects.filter(created_at__gte=since, panel_deal__isnull=True).select_related("user"):
-        if quote.conversation_id in taken or phone_key(quote_contact(quote)[1]):
+        # КП, собранные в панели, владелец отправляет сам — это не потерянные контакты из чата
+        if is_panel_quote(quote) or quote.conversation_id in taken or phone_key(quote_contact(quote)[1]):
             continue
         result.append(quote)
     return result
@@ -533,3 +612,157 @@ def ai_stats(period: Period) -> dict:
         "payback": (chat_paid / cost_rub) if cost_rub else None,
         "series": series_rows, "models": models,
     }
+
+
+# --- КП и счета из панели
+
+PANEL_QUOTE_MARK = "-P"
+MAX_DISCOUNT = Decimal("99")
+CENT = Decimal("0.01")
+
+
+class DocumentError(Exception):
+    """Не хватает данных для КП или счёта — текст для владельца."""
+
+
+def is_panel_quote(quote) -> bool:
+    # у КП из чата номер заканчивается шестью hex-цифрами; у панельных после дефиса стоит «P»
+    return PANEL_QUOTE_MARK in quote.number
+
+
+def parse_lines(raw) -> list[dict]:
+    """Позиции из формы: [{"id", "qty", "discount"}] → товар, количество, цена до и после скидки."""
+    if not isinstance(raw, list) or not raw:
+        raise DocumentError("Добавьте хотя бы один товар")
+    products = Product.objects.in_bulk([r.get("id") for r in raw if isinstance(r, dict) and str(r.get("id", "")).isdigit()])
+    lines = []
+    for row in raw:
+        product = products.get(int(row["id"])) if isinstance(row, dict) and str(row.get("id", "")).isdigit() else None
+        if product is None:
+            raise DocumentError("Один из товаров не найден в каталоге — выберите его из списка")
+        if not product.is_active or product.price_rub is None:
+            raise DocumentError(f"{product.name}: у товара нет цены в рублях или он выключен")
+        try:
+            quantity = int(row.get("qty"))
+            discount = Decimal(str(row.get("discount") or "0").replace(",", "."))
+        except (TypeError, ValueError, ArithmeticError):
+            raise DocumentError(f"{product.name}: проверьте количество и скидку")
+        if not 1 <= quantity <= MAX_ITEM_QUANTITY:
+            raise DocumentError(f"{product.name}: количество — от 1 до {MAX_ITEM_QUANTITY}")
+        if not ZERO <= discount <= MAX_DISCOUNT:
+            raise DocumentError(f"{product.name}: скидка — от 0 до {MAX_DISCOUNT}%")
+        listed = product.price_rub
+        unit = (listed * (100 - discount) / 100).quantize(CENT)
+        lines.append({
+            "product": product, "quantity": quantity, "list": listed, "unit": unit,
+            "discount": discount if unit < listed else ZERO,
+        })
+    return lines
+
+
+def create_quote(user, *, client_name, client_phone, valid_days, lines) -> Quote:
+    """КП по выбранным товарам со скидкой; PDF строится по снапшоту. С телефоном клиента заводится и карточка сделки."""
+    from apps.chat.quote_pdf import generate_quote_pdf
+
+    quote_id = uuid.uuid4()
+    today = timezone.localdate()
+    items = []
+    for line in lines:
+        product = line["product"]
+        items.append({
+            "product_id": product.id, "name": product.name, "quantity": line["quantity"],
+            "unit_price_rub": str(line["unit"]), "line_total_rub": str(line["unit"] * line["quantity"]),
+            "list_price_rub": str(line["list"]) if line["discount"] else None,
+            "discount_pct": str(line["discount"]) if line["discount"] else None,
+            "source_price": str(product.price), "source_currency": product.currency,
+            "exchange_rate": str(rate_on(product.currency)) if product.currency != "RUB" else None,
+        })
+    quote = Quote.objects.create(
+        id=quote_id, number=f"KP-{today:%Y%m%d}{PANEL_QUOTE_MARK}{quote_id.hex[:5].upper()}",
+        user=None, client_name=client_name or None, client_phone=client_phone or None, items=items,
+        total=sum((Decimal(i["line_total_rub"]) for i in items), ZERO),
+        valid_until=today + datetime.timedelta(days=valid_days),
+    )
+    quote.pdf_path = generate_quote_pdf(quote)
+    Quote.objects.filter(pk=quote.pk).update(pdf_path=quote.pdf_path)
+    if phone_key(client_phone):
+        deal = Deal.objects.create(
+            origin=Deal.Origin.QUOTE, quote=quote, title=f"КП №{quote.number}", client=client_name or "Клиент",
+            contact=client_phone, source="Панель", amount=quote.total, stage=Deal.Stage.OFFER,
+            expected_date=quote.valid_until, note=quote_summary(quote),
+        )
+        sync_deal(deal)
+    return quote
+
+
+BUYER_TYPES = {"individual": Order.BuyerType.INDIVIDUAL, "ip": Order.BuyerType.IP, "legal": Order.BuyerType.LEGAL}
+
+
+def create_invoice(user, *, buyer_type, name, inn, contact_name, phone, email, delivery, comment, lines) -> Order:
+    """Заказ от имени владельца и счёт по нему: цены со скидкой, в счёте видна цена по прайсу.
+
+    Заказ идёт обычным путём: подтверждён, счёт выставлен, дальше «Оплата пришла» в продажах."""
+    if buyer_type not in BUYER_TYPES:
+        raise DocumentError("Выберите, кому выставляется счёт: физлицо, ИП или юрлицо")
+    if not name.strip():
+        raise DocumentError("Укажите название организации или ФИО покупателя")
+    length = {"ip": 12, "legal": 10}.get(buyer_type)
+    if length and not valid_inn(inn, length):
+        raise DocumentError(f"ИНН {'ИП' if length == 12 else 'организации'} — {length} цифр, проверьте номер")
+    fields = {"buyer_type": BUYER_TYPES[buyer_type], "contact_phone": phone or None, "contact_email": email or None,
+              "comment": comment}
+    if buyer_type == "legal":
+        fields.update(company_name=name.strip(), inn=inn, contact_name=contact_name.strip() or None)
+    elif buyer_type == "ip":
+        fields.update(buyer_name=name.strip(), inn=inn, contact_name=name.strip())
+    else:
+        fields.update(buyer_name=name.strip(), contact_name=name.strip())
+    today = timezone.localdate()
+    with transaction.atomic():
+        order = Order.objects.create(
+            status=Order.Status.PENDING_CONFIRMATION, payment_status=Order.PaymentStatus.NONE, currency="RUB",
+            created_by=Order.CreatedBy.CATALOG, number=f"tmp-{uuid.uuid4().hex}", **fields,
+        )
+        order.number = f"AD-{timezone.now():%Y%m%d}-{order.id:04d}"
+        total = ZERO
+        for line in lines:
+            product = line["product"]
+            foreign = product.currency != Product.Currency.RUB
+            total += line["unit"] * line["quantity"]
+            OrderItem.objects.create(
+                order=order, product=product, product_name=product.name, unit_price=line["unit"],
+                quantity=line["quantity"], line_total=line["unit"] * line["quantity"], selected_options=[],
+                list_unit_price=line["list"] if line["discount"] else None,
+                source_price=product.price, source_currency=product.currency,
+                exchange_rate=rate_on(product.currency, today) if foreign else None,
+                # цену задали мы: при подтверждении по курсу не пересчитывается
+                price_overridden=True,
+            )
+        if delivery:
+            OrderItem.objects.create(
+                order=order, kind=OrderItem.Kind.DELIVERY, product_name="Доставка", quantity=1,
+                unit_price=delivery, line_total=delivery,
+            )
+            total += delivery
+        order.total_amount = order.total_at_creation = total
+        order.save()
+        OrderStatusHistory.objects.create(
+            order=order, from_status=Order.Status.DRAFT, to_status=Order.Status.PENDING_CONFIRMATION,
+            actor=OrderStatusHistory.Actor.DIRECTOR, actor_user=user,
+        )
+    # счёт строится при подтверждении; сбой PDF откатывает подтверждение, заказ остаётся ждать
+    try:
+        return change_status(order, Order.Status.CONFIRMED, actor=OrderStatusHistory.Actor.DIRECTOR, actor_user=user)
+    except (InvoiceError, TransitionError):
+        order.delete()
+        raise
+
+
+def recent_documents(limit=15):
+    """Последние КП и счета, собранные в панели."""
+    quotes = [q for q in Quote.objects.filter(number__contains=PANEL_QUOTE_MARK).order_by("-created_at")[:limit]]
+    invoices = list(
+        Order.objects.filter(status_history__from_status=Order.Status.DRAFT, status_history__actor=OrderStatusHistory.Actor.DIRECTOR)
+        .select_related("invoice").prefetch_related("items").distinct().order_by("-created_at")[:limit]
+    )
+    return quotes, invoices
