@@ -71,7 +71,9 @@ def quote_document(quote) -> dict:
         "brand": SELLER["brand"],
         "tagline": SELLER["tagline"],
         "title": f"КОММЕРЧЕСКОЕ ПРЕДЛОЖЕНИЕ № {quote.number}",
-        "dates": f"от {quote.created_at:%d.%m.%Y} · действует до {quote.valid_until:%d.%m.%Y}",
+        "dates": f"от {quote.created_at:%d.%m.%Y}"
+                 + (f" · ред. {quote.revision} от {quote.revised_at:%d.%m.%Y}" if quote.revision > 1 and quote.revised_at else "")
+                 + f" · действует до {quote.valid_until:%d.%m.%Y}",
         "client": quote.client_name or "",
         "lines": lines,
         # комплектация и характеристики из снапшота КП; пусто — блока нет

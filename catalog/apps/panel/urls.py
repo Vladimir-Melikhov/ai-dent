@@ -33,6 +33,7 @@ urlpatterns = [
 
     path("docs/", views.documents, name="documents"),
     path("docs/quote/", views.quote_create, name="quote_create"),
+    path("docs/quote/<uuid:pk>/revise/", views.quote_revise, name="quote_revise"),
     path("docs/invoice/", views.invoice_create, name="invoice_create"),
     path("docs/quote/<uuid:pk>.pdf", views.quote_file, name="quote_file"),
     path("docs/invoice/<str:number>.pdf", views.invoice_file, name="invoice_file"),

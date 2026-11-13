@@ -186,7 +186,7 @@
     }
   }
 
-  const stageColors = { new: '--c1', negotiation: '--c7', offer: '--c4', payment: '--c2' };
+  const stageColors = { new: '--c1', offer: '--c4', payment: '--c2' };
   drawBars('chart-pipeline', data.pipeline.map((s) => ({
     name: `${s.label} · ${s.count}`, value: s.amount || s.count, color: css(stageColors[s.stage]), text: rub(s.amount),
   })), 'Сделок в работе нет');

@@ -19,9 +19,12 @@
     <div class="col-head"><span class="stage-dot s-{{ stage.value }}"></span><b>{{ stage.label }}</b><span class="count">{{ stage.items|length }}</span><span class="muted sum">{{ stage.amount|rub }}</span></div>
     <div class="col-body">
       {% for d in stage.items %}
-      <article class="deal{% if d.is_system %} system{% endif %}" draggable="true" data-id="{{ d.pk }}" tabindex="0" data-edit="dlg">
+      <article class="deal{% if d.is_system %} system{% endif %}" data-id="{{ d.pk }}" tabindex="0" data-edit="dlg">
         <div class="deal-top"><b>{{ d.title }}</b><span class="origin o-{{ d.origin }}">{{ d.origin_label }}</span></div>
         {% if d.client %}<span class="muted">{{ d.client }}</span>{% endif %}
+        {% if d.invoice_outdated %}<span class="nocost">КП обновлено — счёт на старую сумму</span>{% endif %}
+        {% if d.quote_id and d.quote.revision > 1 %}<span class="muted from-quote">КП ред. {{ d.quote.revision }}</span>{% endif %}
+        {% if d.old_quotes.all %}<span class="muted from-quote">КП: версий {{ d.old_quotes.all|length|add:1 }}</span>{% endif %}
         {% if d.quote_id and d.order_id %}<span class="muted from-quote">по КП №{{ d.quote.number }}</span>{% endif %}
         {% if d.contact %}<a class="phone" href="tel:{{ d.contact }}">{{ d.contact }}</a>{% endif %}
         {% if d.stage == "won" and d.cost is None %}<span class="nocost">нет закупки — прибыль не посчитана</span>{% endif %}

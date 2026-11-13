@@ -4,6 +4,7 @@ import json
 import os
 import re
 import time
+import uuid
 import urllib.error
 import urllib.request
 from decimal import Decimal
@@ -202,7 +203,7 @@ def deals(request):
     services.sync_auto_deals()
     origin = request.GET.get("src", "")
     archive = request.GET.get("archive") == "1"
-    qs = Deal.objects.select_related("order", "conversation", "quote").filter(archived_at__isnull=not archive)
+    qs = Deal.objects.select_related("order", "conversation", "quote").prefetch_related("old_quotes__quote").filter(archived_at__isnull=not archive)
     # КП и счета, собранные в панели, — «Вручную»; «Из чата» и «С сайта» — только то, что пришло от клиентов
     made_here = Q(origin=Deal.Origin.MANUAL) | Q(source=Deal.PANEL_SOURCE)
     if origin == Deal.Origin.MANUAL:
@@ -258,14 +259,44 @@ def deal_json(deal):
         links.append(["Заказ в админке", admin_link("orders/order", deal.order_id)])
     if deal.quote_id:
         links.append([f"КП №{deal.quote.number}", admin_link("chat/quote", deal.quote_id)])
+    if deal.quote_id and (services.is_panel_quote(deal.quote) or deal.quote.revision > 1):
+        links.append([f"Скачать КП №{deal.quote.number}", f"/docs/quote/{deal.quote_id}.pdf"])
+    for old in deal.old_quotes.all():
+        links.append([f"КП №{old.quote.number} (заменено)", admin_link("chat/quote", old.quote_id)])
     if deal.conversation_id:
         links.append(["Диалог в чате", admin_link("chat/conversation", deal.conversation_id)])
     actions = [{
         "label": "Вернуть из архива" if deal.archived_at else "В архив",
         "url": f"/deals/{deal.pk}/archive/", "confirm": "",
     }]
+    stage_url = f"/deals/{deal.pk}/stage/"
+    if deal.quote_id and not deal.archived_at and not services.quote_editable(deal.quote):
+        actions.append({"label": "Править КП", "href": f"/docs/?edit_quote={deal.quote_id}"})
+    if deal.invoice_outdated:
+        actions.insert(0, {"label": "Перевыставить счёт по новому КП", "href": f"/docs/?from_quote={deal.pk}"})
     if deal.quote_id and not deal.order_id and not deal.archived_at:
         actions.insert(0, {"label": "Выставить счёт по КП", "href": f"/docs/?from_quote={deal.pk}"})
+        actions.append({
+            "label": "Отказ клиента", "danger": True, "url": stage_url, "stage": Deal.Stage.LOST,
+            "confirm": "Клиент отказался? КП уйдёт в архив.",
+        })
+    if not deal.is_system and not deal.archived_at:
+        # ручная сделка: этап меняется только этими кнопками
+        if deal.stage in Deal.OPEN_STAGES:
+            actions.insert(0, {
+                "label": "Оплачено", "url": stage_url, "stage": Deal.Stage.WON, "ask_cost": True,
+                "cost": "" if deal.cost is None else str(deal.cost),
+                "confirm": f"«{deal.title}»: во сколько вам обошёлся этот товар?",
+            })
+            actions.append({
+                "label": "Отказ клиента", "danger": True, "url": stage_url, "stage": Deal.Stage.LOST,
+                "confirm": f"Отметить «{deal.title}» отказом?",
+            })
+        else:
+            actions.insert(0, {
+                "label": "Вернуть в работу", "url": stage_url, "stage": Deal.Stage.NEW,
+                "confirm": f"Вернуть «{deal.title}» в работу? Доход по ней уберётся из учёта.",
+            })
     if deal.order_id:
         for target, label, text in ORDER_ACTIONS:
             if target in allowed_transitions(deal.order):
@@ -284,6 +315,7 @@ def deal_json(deal):
     return {
         "locked": list(DealForm.SYSTEM_LOCKED) if deal.is_system else [], "links": links, "actions": actions,
         "origin": deal.origin_label,
+        "warning": "КП изменено после выставления счёта: у клиента счёт на старую сумму" if deal.invoice_outdated else "",
         "title": deal.title, "client": deal.client, "contact": deal.contact, "amount": str(deal.amount),
         "cost": "" if deal.cost is None else str(deal.cost),
         "stage": deal.stage, "source": deal.source, "note": deal.note,
@@ -650,15 +682,25 @@ def documents(request):
     quote_deal = None
     source = request.GET.get("from_quote", "")
     if source.isdigit():
-        quote_deal = Deal.objects.filter(pk=source, quote__isnull=False, order__isnull=True).select_related("quote").first()
+        quote_deal = Deal.objects.filter(pk=source, quote__isnull=False).exclude(order__status=Order.Status.PAID).select_related("quote", "order").first()
         if quote_deal and not form:
             form = services.invoice_form_from_quote(quote_deal)
+    edit_quote = None
+    source = request.GET.get("edit_quote", "")
+    if source:
+        edit_quote = Quote.objects.filter(pk=source).first() if is_uuid(source) else None
+        reason = services.quote_editable(edit_quote) if edit_quote else "КП не найдено"
+        if reason:
+            messages.error(request, reason)
+            return redirect("panel:documents")
+        if not form:
+            form = services.quote_form(edit_quote)
     made = request.GET.get("made", "")
     result = None
     if made.startswith("quote:"):
-        found = next((q for q in quotes if str(q.pk) == made[6:]), None)
+        found = Quote.objects.filter(pk=made[6:]).first() if is_uuid(made[6:]) else None
         if found:
-            result = {"kind": "КП", "done": "КП готово", "number": found.number, "total": found.total, "url": f"/docs/quote/{found.pk}.pdf",
+            result = {"kind": "КП", "done": f"КП обновлено, ред. {found.revision}. Скачайте и отправьте клиенту новый файл" if found.revision > 1 else "КП готово", "number": found.number, "total": found.total, "url": f"/docs/quote/{found.pk}.pdf",
                       "discount": any(i.get("list_price_rub") for i in found.items)}
     elif made.startswith("invoice:"):
         found = next((o for o in invoices if o.number == made[8:]), None)
@@ -674,9 +716,17 @@ def documents(request):
         order.has_pdf = invoice_available(order)
     ctx.update(
         products=products, quotes=quotes, invoices=invoices, result=result, valid_days=14,
-        form=form, from_quote=quote_deal,
+        form=form, from_quote=quote_deal, edit_quote=edit_quote,
     )
     return render(request, "panel/documents.html", ctx)
+
+
+def is_uuid(value):
+    try:
+        uuid.UUID(str(value))
+    except ValueError:
+        return False
+    return True
 
 
 def document_lines(request):
@@ -720,6 +770,30 @@ def quote_create(request):
 
 @panel_required
 @require_POST
+def quote_revise(request, pk):
+    quote = get_object_or_404(Quote, pk=pk)
+    try:
+        lines = document_lines(request)
+        try:
+            days = int(request.POST.get("valid_days") or 14)
+        except ValueError:
+            days = 0
+        if not 1 <= days <= 365:
+            raise services.DocumentError("Срок действия — от 1 до 365 дней")
+        services.revise_quote(
+            quote, client_name=request.POST.get("name", "").strip()[:160],
+            client_phone=request.POST.get("phone", "").strip()[:30], valid_days=days, lines=lines,
+            with_details=request.POST.get("with_details") == "1",
+        )
+    except services.DocumentError as error:
+        remember_form(request)
+        messages.error(request, str(error))
+        return redirect(f"/docs/?edit_quote={quote.pk}")
+    return redirect(f"/docs/?made=quote:{quote.pk}")
+
+
+@panel_required
+@require_POST
 def invoice_create(request):
     try:
         lines = document_lines(request)
@@ -757,7 +831,8 @@ def parse_money(raw):
 @require_GET
 def quote_file(request, pk):
     quote = get_object_or_404(Quote, pk=pk)
-    if not services.is_panel_quote(quote):
+    # КП из чата панель отдаёт только после правки: владелец сам шлёт клиенту новый файл
+    if not services.is_panel_quote(quote) and quote.revision == 1:
         raise Http404
     path = os.path.join(settings.MEDIA_ROOT, quote.pdf_path) if quote.pdf_path else ""
     if not path or not os.path.exists(path):

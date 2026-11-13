@@ -156,6 +156,10 @@ class Quote(models.Model):
     valid_until = models.DateField(verbose_name="Действует до")
     pdf_path = models.CharField(max_length=255, blank=True, default="", verbose_name="Путь к PDF")
     created_at = models.DateTimeField(default=timezone.now, verbose_name="Создано")
+    # Правка готового КП: номер тот же, растёт ревизия; прежние версии остаются в истории
+    revision = models.PositiveIntegerField(default=1, verbose_name="Ревизия")
+    revised_at = models.DateTimeField(null=True, blank=True, verbose_name="Изменено")
+    history = models.JSONField(default=list, blank=True, verbose_name="Прежние ревизии")
 
     class Meta:
         verbose_name = "КП"

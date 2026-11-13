@@ -19,7 +19,7 @@ from apps.leads.models import Lead
 from apps.orders.models import MAX_ITEM_QUANTITY, Order, OrderItem, OrderStatusHistory
 from apps.orders.services import InvoiceError, TransitionError, change_status, valid_inn
 
-from .models import Category, Deal, Entry, Server
+from .models import Category, Deal, DealQuote, Entry, Server
 
 ZERO = Decimal("0")
 PERIODS = {"7": ("Неделя", 7), "30": ("Месяц", 30), "90": ("Квартал", 90), "365": ("Год", 365)}
@@ -400,7 +400,7 @@ def sync_auto_deals() -> None:
     )
     for order in orders:
         _sync_order(order)
-    quotes = Quote.objects.filter(Q(created_at__gte=since) | Q(panel_deal__isnull=False)).select_related("user")
+    quotes = Quote.objects.filter(Q(created_at__gte=since) | Q(panel_deal__isnull=False)).select_related("user").order_by("created_at")
     for quote in quotes:
         _sync_quote(quote)
     _drop_orphans()
@@ -447,7 +447,7 @@ def anonymous_quotes():
     since = timezone.now() - datetime.timedelta(days=AUTO_WINDOW_DAYS)
     taken = set(Deal.objects.exclude(conversation__isnull=True).values_list("conversation_id", flat=True))
     result = []
-    for quote in Quote.objects.filter(created_at__gte=since, panel_deal__isnull=True).select_related("user"):
+    for quote in Quote.objects.filter(created_at__gte=since, panel_deal__isnull=True, superseded_in__isnull=True).select_related("user"):
         # КП, собранные в панели, владелец отправляет сам — это не потерянные контакты из чата
         if is_panel_quote(quote) or quote.conversation_id in taken or phone_key(quote_contact(quote)[1]):
             continue
@@ -495,13 +495,9 @@ def _sync_order(order):
     if deal is None and order.conversation_id:
         # Клиент сначала просил КП в чате, потом оформил заказ — та же карточка, а не вторая
         deal = Deal.objects.filter(conversation_id=order.conversation_id, order__isnull=True).order_by("id").first()
-    if deal is None and phone_key(order.contact_phone):
+    if deal is None:
         # КП в одном чате, заказ из другого или без чата: тот же клиент по телефону
-        key = phone_key(order.contact_phone)
-        for candidate in Deal.objects.filter(origin=Deal.Origin.QUOTE, order__isnull=True).order_by("id"):
-            if phone_key(candidate.contact) == key:
-                deal = candidate
-                break
+        deal = find_open_deal(order.contact_phone, None, without_order=True)
     fields = {
         "origin": Deal.Origin.ORDER, "order": order,
         "conversation_id": order.conversation_id or (deal.conversation_id if deal else None),
@@ -531,17 +527,55 @@ def _sync_order(order):
     sync_deal(deal)
 
 
-def _sync_quote(quote):
-    if Deal.objects.filter(quote=quote).exists():
+def find_open_deal(phone, conversation_id, without_order=False):
+    """Открытая сделка этого клиента: по диалогу, иначе по телефону. Закрытые и архивные не считаются."""
+    live = Deal.objects.filter(stage__in=Deal.OPEN_STAGES, archived_at__isnull=True)
+    if without_order:
+        live = live.filter(order__isnull=True)
+    if conversation_id:
+        deal = live.filter(conversation_id=conversation_id).order_by("id").first()
+        if deal:
+            return deal
+    key = phone_key(phone)
+    if key:
+        for deal in live.order_by("-id"):
+            if phone_key(deal.contact) == key:
+                return deal
+    return None
+
+
+def attach_quote(deal, quote) -> None:
+    """КП клиента ложится в его открытую сделку: новое становится актуальным, прежнее остаётся версией."""
+    current = deal.quote
+    if current is not None and current.pk == quote.pk:
         return
-    # По диалогу уже есть карточка (заказ или другое КП) — новая не нужна, только привязка
-    existing = Deal.objects.filter(conversation_id=quote.conversation_id).order_by("id").first() if quote.conversation_id else None
-    if existing is not None:
-        if existing.quote_id is None:
-            existing.quote = quote
-            existing.save(update_fields=["quote", "updated_at"])
+    if current is not None and current.created_at > quote.created_at:
+        DealQuote.objects.get_or_create(quote=quote, defaults={"deal": deal})  # пришло старое КП — это версия
+        return
+    if current is not None:
+        DealQuote.objects.get_or_create(quote=current, defaults={"deal": deal})
+    deal.quote = quote
+    if deal.conversation_id is None and quote.conversation_id:
+        deal.conversation_id = quote.conversation_id
+    if deal.order_id is None:
+        # счёта ещё нет: сделка следует за актуальным КП; со счётом сумму задаёт он, а КП даёт предупреждение
+        deal.title, deal.amount, deal.expected_date = f"КП №{quote.number}", quote.total, quote.valid_until
+        deal.note = quote_summary(quote)
+        if deal.stage == Deal.Stage.NEW:
+            deal.stage = Deal.Stage.OFFER
+        if deal.origin == Deal.Origin.MANUAL:
+            deal.origin = Deal.Origin.QUOTE
+    deal.save()
+
+
+def _sync_quote(quote):
+    if Deal.objects.filter(quote=quote).exists() or DealQuote.objects.filter(quote=quote).exists():
         return
     name, phone = quote_contact(quote)
+    deal = find_open_deal(phone, quote.conversation_id)
+    if deal is not None:
+        attach_quote(deal, quote)
+        return
     if not phone_key(phone):
         return  # без телефона связаться нечем: карточку не заводим, КП видно в списке «КП без контактов»
     try:
@@ -715,12 +749,8 @@ def product_details(product) -> dict:
     return {"groups": groups} if groups else {}
 
 
-def create_quote(user, *, client_name, client_phone, valid_days, lines, with_details=True) -> Quote:
-    """КП по выбранным товарам со скидкой; PDF строится по снапшоту. С телефоном клиента заводится и карточка сделки."""
-    from apps.chat.quote_pdf import generate_quote_pdf
-
-    quote_id = uuid.uuid4()
-    today = timezone.localdate()
+def quote_items(lines, with_details=True) -> list[dict]:
+    """Снапшот позиций КП: цена до и после скидки, курс, комплектация."""
     items = []
     for line in lines:
         product = line["product"]
@@ -733,6 +763,16 @@ def create_quote(user, *, client_name, client_phone, valid_days, lines, with_det
             "exchange_rate": str(rate_on(product.currency)) if product.currency != "RUB" else None,
             **(product_details(product) if with_details else {}),
         })
+    return items
+
+
+def create_quote(user, *, client_name, client_phone, valid_days, lines, with_details=True) -> Quote:
+    """КП по выбранным товарам со скидкой; PDF строится по снапшоту. С телефоном клиента заводится и карточка сделки."""
+    from apps.chat.quote_pdf import generate_quote_pdf
+
+    quote_id = uuid.uuid4()
+    today = timezone.localdate()
+    items = quote_items(lines, with_details)
     quote = Quote.objects.create(
         id=quote_id, number=f"KP-{today:%Y%m%d}{PANEL_QUOTE_MARK}{quote_id.hex[:5].upper()}",
         user=None, client_name=client_name or None, client_phone=client_phone or None, items=items,
@@ -742,13 +782,71 @@ def create_quote(user, *, client_name, client_phone, valid_days, lines, with_det
     quote.pdf_path = generate_quote_pdf(quote)
     Quote.objects.filter(pk=quote.pk).update(pdf_path=quote.pdf_path)
     if phone_key(client_phone):
-        deal = Deal.objects.create(
-            origin=Deal.Origin.QUOTE, quote=quote, title=f"КП №{quote.number}", client=client_name or "Клиент",
-            contact=client_phone, source=Deal.PANEL_SOURCE, amount=quote.total, stage=Deal.Stage.OFFER,
-            expected_date=quote.valid_until, note=quote_summary(quote),
-        )
-        sync_deal(deal)
+        deal = find_open_deal(client_phone, None)
+        if deal is not None:
+            attach_quote(deal, quote)  # второе КП тому же клиенту — версия в его сделке, а не новая карточка
+        else:
+            deal = Deal.objects.create(
+                origin=Deal.Origin.QUOTE, quote=quote, title=f"КП №{quote.number}", client=client_name or "Клиент",
+                contact=client_phone, source=Deal.PANEL_SOURCE, amount=quote.total, stage=Deal.Stage.OFFER,
+                expected_date=quote.valid_until, note=quote_summary(quote),
+            )
+            sync_deal(deal)
     return quote
+
+
+def quote_editable(quote):
+    """Правка возможна, пока КП актуально и по нему не получены деньги. Иначе — текст причины."""
+    if DealQuote.objects.filter(quote=quote).exists():
+        return "Это КП заменено новым — правьте актуальное"
+    deal = Deal.objects.filter(quote=quote).select_related("order").first()
+    if deal and (deal.stage == Deal.Stage.WON or (deal.order_id and deal.order.status == Order.Status.PAID)):
+        return "По КП уже получена оплата — правка невозможна, сделайте новое КП"
+    return ""
+
+
+def revise_quote(quote, *, client_name, client_phone, valid_days, lines, with_details=True) -> Quote:
+    """Правка готового КП: тот же номер, новая ревизия. Прежняя версия уходит в историю, PDF пересобирается."""
+    from apps.chat.quote_pdf import generate_quote_pdf
+
+    reason = quote_editable(quote)
+    if reason:
+        raise DocumentError(reason)
+    now = timezone.now()
+    today = timezone.localdate()
+    quote.history = [*quote.history, {
+        "revision": quote.revision, "at": (quote.revised_at or quote.created_at).isoformat(),
+        "total": str(quote.total), "valid_until": quote.valid_until.isoformat(), "items": quote.items,
+    }]
+    quote.items = quote_items(lines, with_details)
+    quote.total = sum((Decimal(i["line_total_rub"]) for i in quote.items), ZERO)
+    quote.valid_until = today + datetime.timedelta(days=valid_days)
+    quote.revision += 1
+    quote.revised_at = now
+    if is_panel_quote(quote):
+        quote.client_name, quote.client_phone = client_name or None, client_phone or None
+    quote.pdf_path = generate_quote_pdf(quote)
+    quote.save()
+    deal = Deal.objects.filter(quote=quote).first()
+    if deal is not None and deal.order_id is None:
+        deal.amount, deal.expected_date, deal.note = quote.total, quote.valid_until, quote_summary(quote)
+        deal.archived_at = None if deal.stage == Deal.Stage.OFFER else deal.archived_at  # срок продлён — КП снова живо
+        deal.save()
+    return quote
+
+
+def quote_form(quote) -> dict:
+    """Форма КП, заполненная по готовому КП — для правки."""
+    name, phone = quote_contact(quote)
+    items = [
+        {"id": i["product_id"], "qty": i["quantity"], "discount": i.get("discount_pct") or ""}
+        for i in quote.items if i.get("product_id")
+    ]
+    days = max((quote.valid_until - timezone.localdate()).days, 1)
+    form = {"items": json.dumps(items), "name": name or "", "phone": phone or "", "valid_days": str(days)}
+    if any(i.get("groups") or i.get("specs") or i.get("kit") for i in quote.items):
+        form["with_details"] = "1"
+    return form
 
 
 BUYER_TYPES = {"individual": Order.BuyerType.INDIVIDUAL, "ip": Order.BuyerType.IP, "legal": Order.BuyerType.LEGAL}
@@ -824,11 +922,19 @@ def invoice_form_from_quote(deal) -> dict:
 
 
 def link_invoice_to_quote_deal(deal_id, order) -> None:
-    """Счёт выставлен по конкретному КП: карточка этого КП становится карточкой заказа (а не первая по телефону)."""
-    deal = Deal.objects.filter(pk=deal_id, quote__isnull=False, order__isnull=True).first() if str(deal_id).isdigit() else None
-    if deal is not None and not Deal.objects.filter(order=order).exists():
-        deal.order = order
+    """Счёт выставлен по КП сделки: карточка становится карточкой заказа. Перевыставление заменяет неоплаченный счёт."""
+    deal = Deal.objects.filter(pk=deal_id, quote__isnull=False).select_related("order").first() if str(deal_id).isdigit() else None
+    if deal is None or Deal.objects.filter(order=order).exists():
+        return
+    old = deal.order
+    if old is not None:
+        if old.status == Order.Status.PAID:
+            return
+        deal.order = None
         deal.save(update_fields=["order", "updated_at"])
+        old.delete()
+    deal.order = order
+    deal.save(update_fields=["order", "updated_at"])
 
 
 def recent_documents(limit=15):

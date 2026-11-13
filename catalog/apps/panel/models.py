@@ -30,18 +30,17 @@ class Category(models.Model):
 class Deal(models.Model):
     class Stage(models.TextChoices):
         NEW = "new", "Новая"
-        NEGOTIATION = "negotiation", "Переговоры"
         OFFER = "offer", "КП отправлено"
         PAYMENT = "payment", "Ждём оплату"
-        WON = "won", "Выиграна"
-        LOST = "lost", "Проиграна"
+        WON = "won", "Оплачено"
+        LOST = "lost", "Отказ"
 
     class Origin(models.TextChoices):
         MANUAL = "manual", "Вручную"
         ORDER = "order", "С сайта"
         QUOTE = "quote", "Из чата"
 
-    OPEN_STAGES = (Stage.NEW, Stage.NEGOTIATION, Stage.OFFER, Stage.PAYMENT)
+    OPEN_STAGES = (Stage.NEW, Stage.OFFER, Stage.PAYMENT)
 
     title = models.CharField(max_length=160, verbose_name="Сделка")
     client = models.CharField(max_length=160, blank=True, default="", verbose_name="Клиент")
@@ -85,6 +84,14 @@ class Deal(models.Model):
     PANEL_SOURCE = "Панель"
 
     @property
+    def invoice_outdated(self):
+        """КП обновили после того, как по сделке выставили счёт: у клиента счёт на старую сумму."""
+        order, quote = self.order, self.quote
+        if order is None or quote is None or order.status in ("paid", "cancelled"):
+            return False
+        return (getattr(quote, "revised_at", None) or quote.created_at) > order.created_at
+
+    @property
     def is_system(self):
         return self.origin != self.Origin.MANUAL
 
@@ -96,6 +103,21 @@ class Deal(models.Model):
     @property
     def origin_label(self):
         return "Вручную" if self.origin == self.Origin.MANUAL or self.from_panel else self.get_origin_display()
+
+
+class DealQuote(models.Model):
+    """Прежние версии КП сделки: актуальное лежит в Deal.quote, заменённые остаются здесь и не удаляются."""
+
+    deal = models.ForeignKey(Deal, on_delete=models.CASCADE, related_name="old_quotes", verbose_name="Сделка")
+    quote = models.OneToOneField(
+        "chat.Quote", on_delete=models.CASCADE, related_name="superseded_in", verbose_name="Заменённое КП"
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Заменено")
+
+    class Meta:
+        verbose_name = "Заменённое КП"
+        verbose_name_plural = "Заменённые КП"
+        ordering = ["-created_at"]
 
 
 class Entry(models.Model):

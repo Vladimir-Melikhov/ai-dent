@@ -206,6 +206,10 @@ class Quote(Base):
     valid_until: Mapped[datetime.date]
     pdf_path: Mapped[str] = mapped_column(default="")
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    # правка КП в панели: у новых КП из чата — первая ревизия и пустая история
+    revision: Mapped[int] = mapped_column(default=1)
+    revised_at: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True))
+    history: Mapped[list] = mapped_column(JSONB, default=list)
 
 
 class LLMUsage(Base):

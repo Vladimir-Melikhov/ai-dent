@@ -8,7 +8,7 @@ from django.utils import timezone
 from apps.accounts.models import User
 from apps.orders.models import Order
 
-from . import services
+from . import services, views
 from .access import LOGIN_ATTEMPTS
 from .models import Category, Deal, Entry, Server
 
@@ -178,7 +178,7 @@ def test_winning_deal_creates_income_and_reopening_removes_it(client):
     assert entry.kind == "income" and entry.amount == 50000 and entry.category.name == "Сделки"
     deal.refresh_from_db()
     assert deal.closed_at is not None
-    client.post(f"/deals/{deal.pk}/stage/", {"stage": "negotiation"})
+    client.post(f"/deals/{deal.pk}/stage/", {"stage": "new"})
     assert not Entry.objects.filter(deal=deal).exists()
     deal.refresh_from_db()
     assert deal.closed_at is None
@@ -983,7 +983,7 @@ def test_panel_quote_counts_as_manual(client):
     deal.source = Deal.PANEL_SOURCE
     deal.save()
     assert deal.origin_label == "Вручную"
-    assert "КП-1" in client.get("/deals/?src=manual").content.decode()
+    assert "KP-20260101-PABCDE" in client.get("/deals/?src=manual").content.decode()
     assert "КП-1" not in client.get("/deals/?src=quote").content.decode()
 
 
@@ -1034,3 +1034,142 @@ def test_invoice_from_quote_links_that_quote(client):
     services.link_invoice_to_quote_deal(str(deal.pk), order)
     deal.refresh_from_db()
     assert deal.order_id == order.pk
+
+
+def test_manual_deal_moves_only_by_buttons_not_by_form(client):
+    deal = make_deal()
+    html = client.get("/deals/").content.decode()
+    assert 'draggable' not in html and "negotiation" not in html
+    labels = [a["label"] for a in views.deal_json(deal)["actions"]]
+    assert "Оплачено" in labels and "Отказ клиента" in labels
+    # форма сохранения этап не меняет
+    client.post("/deals/save/", {"id": deal.pk, "title": "Клиника", "amount": "50000", "stage": "won", "cost": "0"})
+    deal.refresh_from_db()
+    assert deal.stage == "new" and not Entry.objects.exists()
+    client.post(f"/deals/{deal.pk}/stage/", {"stage": "lost"})
+    assert [a["label"] for a in views.deal_json(Deal.objects.get(pk=deal.pk))["actions"]][0] == "Вернуть в работу"
+
+
+def panel_quote(client, microscope, discount="0", phone="+7 900 123 45 67"):
+    client.post("/docs/quote/", {
+        "name": "ООО Стом", "phone": phone, "valid_days": "10", "items": items_json(microscope, 1, discount),
+    })
+    return Quote.objects.order_by("-created_at").first()
+
+
+def test_second_quote_for_same_phone_is_version_in_same_deal(client, microscope, settings, tmp_path):
+    settings.MEDIA_ROOT = tmp_path
+    first = panel_quote(client, microscope)
+    second = panel_quote(client, microscope, "10", phone="8 900 123 45 67")  # тот же клиент, другая запись номера
+    deal = Deal.objects.get()
+    assert deal.quote == second and deal.amount == second.total < first.total
+    assert [o.quote for o in deal.old_quotes.all()] == [first] and deal.stage == "offer"
+    assert "версий 2" in client.get("/deals/").content.decode()
+    # синхронизация ничего не дублирует
+    client.get("/deals/")
+    assert Deal.objects.count() == 1 and deal.old_quotes.count() == 1
+
+
+def test_chat_quotes_sync_in_creation_order(client):
+    conv = Conversation.objects.create(session=AnonSession.objects.create())
+    Lead.objects.create(number="L1", phone="+79001112233", conversation=conv, pd_consent_at=timezone.now())
+    old = make_quote(conv, "KP-1")
+    new = make_quote(conv, "KP-2")
+    Quote.objects.filter(pk=old.pk).update(created_at=timezone.now() - datetime.timedelta(hours=2))
+    client.get("/deals/")
+    deal = Deal.objects.get()
+    assert deal.quote == new and [o.quote for o in deal.old_quotes.all()] == [old]
+    assert services.anonymous_quotes() == []
+
+
+def test_new_quote_after_invoice_warns_and_reissue_replaces_unpaid_order(client, microscope, settings, tmp_path):
+    settings.MEDIA_ROOT = tmp_path
+    panel_quote(client, microscope)
+    deal = Deal.objects.get()
+    client.post("/docs/invoice/", {
+        "buyer_type": "legal", "name": "ООО Стом", "inn": "7707083893", "contact_name": "Иван",
+        "phone": "+7 900 123 45 67", "items": items_json(microscope, 1, "0"), "deal_id": deal.pk,
+    })
+    deal.refresh_from_db()
+    old_order = deal.order
+    assert deal.stage == "payment" and not deal.invoice_outdated
+    panel_quote(client, microscope, "10")
+    deal.refresh_from_db()
+    assert deal.stage == "payment" and deal.order == old_order and deal.invoice_outdated  # сумма и этап по счёту
+    assert views.deal_json(deal)["warning"] and views.deal_json(deal)["actions"][0]["label"].startswith("Перевыставить")
+    client.post("/docs/invoice/", {
+        "buyer_type": "legal", "name": "ООО Стом", "inn": "7707083893", "contact_name": "Иван",
+        "phone": "+7 900 123 45 67", "items": items_json(microscope, 1, "10"), "deal_id": deal.pk,
+    })
+    deal.refresh_from_db()
+    assert deal.order != old_order and not deal.invoice_outdated and deal.amount == deal.order.total_amount
+    assert not Order.objects.filter(pk=old_order.pk).exists() and Order.objects.count() == 1
+
+
+def test_paid_order_is_not_replaced_by_reissue(client, microscope, settings, tmp_path):
+    settings.MEDIA_ROOT = tmp_path
+    panel_quote(client, microscope)
+    deal = Deal.objects.get()
+    client.post("/docs/invoice/", {
+        "buyer_type": "legal", "name": "ООО Стом", "inn": "7707083893", "contact_name": "Иван",
+        "phone": "+7 900 123 45 67", "items": items_json(microscope, 1, "0"), "deal_id": deal.pk,
+    })
+    deal.refresh_from_db()
+    Order.objects.filter(pk=deal.order_id).update(status=Order.Status.PAID)
+    panel_quote(client, microscope, "10")
+    deal.refresh_from_db()
+    assert not deal.invoice_outdated
+
+
+def test_revising_quote_keeps_number_and_history_and_updates_deal(client, microscope, settings, tmp_path):
+    settings.MEDIA_ROOT = tmp_path
+    quote = panel_quote(client, microscope)
+    deal = Deal.objects.get()
+    number, old_total = quote.number, quote.total
+    response = client.post(f"/docs/quote/{quote.pk}/revise/", {
+        "name": "ООО Стом", "phone": "+7 900 123 45 67", "valid_days": "20", "items": items_json(microscope, 1, "10"),
+    })
+    quote.refresh_from_db()
+    deal.refresh_from_db()
+    assert response.status_code == 302 and Quote.objects.count() == 1 and Deal.objects.count() == 1
+    assert quote.number == number and quote.revision == 2 and quote.revised_at
+    assert quote.total < old_total and deal.amount == quote.total
+    assert quote.history[0]["revision"] == 1 and Decimal(quote.history[0]["total"]) == old_total
+    from apps.chat.quote_pdf import quote_document
+
+    assert "ред. 2" in quote_document(quote)["dates"]
+    html = client.get("/deals/").content.decode()
+    assert "КП ред. 2" in html
+    pdf = client.get(f"/docs/quote/{quote.pk}.pdf")
+    assert pdf.status_code == 200 and b"".join(pdf.streaming_content).startswith(b"%PDF")
+    page = client.get(f"/docs/?edit_quote={quote.pk}").content.decode()
+    assert "Сохранить как ред. 3" in page
+
+
+def test_revising_after_invoice_warns_and_paid_quote_is_locked(client, microscope, settings, tmp_path):
+    settings.MEDIA_ROOT = tmp_path
+    quote = panel_quote(client, microscope)
+    deal = Deal.objects.get()
+    client.post("/docs/invoice/", {
+        "buyer_type": "legal", "name": "ООО Стом", "inn": "7707083893", "contact_name": "Иван",
+        "phone": "+7 900 123 45 67", "items": items_json(microscope, 1, "0"), "deal_id": deal.pk,
+    })
+    post = lambda: client.post(f"/docs/quote/{quote.pk}/revise/", {
+        "name": "ООО Стом", "phone": "+7 900 123 45 67", "valid_days": "10", "items": items_json(microscope, 1, "5"),
+    })
+    post()
+    deal.refresh_from_db()
+    assert deal.invoice_outdated  # у клиента счёт на старую сумму
+    Order.objects.filter(pk=deal.order_id).update(status=Order.Status.PAID)
+    response = post()
+    quote.refresh_from_db()
+    assert quote.revision == 2  # вторая правка после оплаты не прошла
+    assert "оплата" in client.get(response["Location"], follow=True).content.decode()
+    assert client.get(f"/docs/?edit_quote={quote.pk}", follow=True).redirect_chain
+
+
+def test_superseded_quote_cannot_be_edited(client, microscope, settings, tmp_path):
+    settings.MEDIA_ROOT = tmp_path
+    first = panel_quote(client, microscope)
+    panel_quote(client, microscope, "10")
+    assert "заменено" in services.quote_editable(first)

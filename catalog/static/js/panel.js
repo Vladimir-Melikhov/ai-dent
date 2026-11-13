@@ -105,6 +105,7 @@
         button.textContent = action.label;
         button.dataset.action = action.url;
         button.dataset.confirm = action.confirm;
+        if (action.stage) button.dataset.stage = action.stage;
         if (action.ask_cost) { button.dataset.askCost = '1'; button.dataset.value = action.cost || ''; }
         bar.append(button);
       }
@@ -135,6 +136,7 @@
     if (!target) return;
     if (target.matches('[data-ask-cost]')) payWithCost(target.dataset.url, target.dataset.text, target.dataset.value || '');
     else if (target.matches('[data-action]')) {
+      if (target.dataset.stage) { moveDeal(target); return; }
       if (target.dataset.askCost) { payWithCost(target.dataset.action, target.dataset.confirm, target.dataset.value || ''); return; }
       if (target.dataset.confirm && !confirm(target.dataset.confirm)) return;
       const form = $('#del-form');
@@ -209,6 +211,26 @@
     form.submit();
   }
 
+  // --- воронка: этап меняют кнопки в карточке, а не перетаскивание
+  async function moveDeal(button) {
+    const body = new FormData();
+    body.set('stage', button.dataset.stage);
+    if (button.dataset.askCost) {
+      const cost = await askCost(button.dataset.confirm, button.dataset.value || '');
+      if (cost === null) return;
+      body.set('cost', cost);
+    } else if (button.dataset.confirm && !confirm(button.dataset.confirm)) return;
+    try {
+      const response = await fetch(button.dataset.action, {
+        method: 'POST', body, headers: { 'X-CSRFToken': csrf(), 'X-Requested-With': 'fetch' },
+      });
+      if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || '');
+    } catch (error) {
+      alert(error.message || 'Не удалось изменить этап');
+    }
+    location.reload();
+  }
+
   // --- проверка сервера
   async function checkServer(button) {
     const label = $('span', button);
@@ -228,54 +250,5 @@
     } finally {
       button.classList.remove('busy');
     }
-  }
-
-  // --- воронка: перетаскивание карточек
-  const board = $('.board');
-  if (board) {
-    let dragged = null;
-    board.addEventListener('dragstart', (event) => {
-      dragged = event.target.closest('.deal');
-      if (!dragged) return;
-      dragged.classList.add('drag');
-      event.dataTransfer.effectAllowed = 'move';
-      event.dataTransfer.setData('text/plain', dragged.dataset.id);
-    });
-    board.addEventListener('dragend', () => {
-      dragged?.classList.remove('drag');
-      $$('.col.over').forEach((col) => col.classList.remove('over'));
-    });
-    board.addEventListener('dragover', (event) => {
-      const col = event.target.closest('.col');
-      if (!col || !dragged) return;
-      event.preventDefault();
-      $$('.col.over').forEach((other) => other !== col && other.classList.remove('over'));
-      col.classList.add('over');
-    });
-    board.addEventListener('drop', async (event) => {
-      const col = event.target.closest('.col');
-      if (!col || !dragged) return;
-      event.preventDefault();
-      const body = new FormData();
-      body.set('stage', col.dataset.stage);
-      const title = dragged.querySelector('b').textContent;
-      if (dragged.classList.contains('system') && col.dataset.stage === 'lost' && dragged.closest('.col') !== col
-          && !confirm(`«${title}»: отметить проигранной? Заказ будет отменён, КП уйдёт в архив.`)) return;
-      if (col.dataset.stage === 'won') {
-        // выигранная сделка — сначала закупка, иначе прибыль не посчитать
-        const cost = await askCost(`«${title}»: во сколько вам обошёлся этот товар?`, '');
-        if (cost === null) return;
-        body.set('cost', cost);
-      }
-      try {
-        const response = await fetch(board.dataset.stageUrl.replace('/0/', `/${dragged.dataset.id}/`), {
-          method: 'POST', body, headers: { 'X-CSRFToken': csrf(), 'X-Requested-With': 'fetch' },
-        });
-        if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || '');
-      } catch (error) {
-        alert(error.message || 'Не удалось перенести сделку');
-      }
-      location.reload();
-    });
   }
 })();

@@ -239,11 +239,10 @@ textarea { resize: vertical; }
 .count { padding: 1px 8px; border-radius: 999px; background: var(--glass-strong); font-size: 12px; font-weight: 700; }
 .sum { margin-left: auto; font-size: 12px; }
 .stage-dot { width: 9px; height: 9px; border-radius: 50%; }
-.s-new { background: var(--c1); } .s-negotiation { background: var(--c7); } .s-offer { background: var(--c4); } .s-payment { background: var(--c2); } .s-won { background: var(--good); } .s-lost { background: var(--c0); }
+.s-new { background: var(--c1); } .s-offer { background: var(--c4); } .s-payment { background: var(--c2); } .s-won { background: var(--good); } .s-lost { background: var(--c0); }
 .col-body { display: grid; gap: 10px; }
-.deal { display: grid; gap: 4px; padding: 13px 14px; border-radius: 16px; background: rgba(255,255,255,.06); border: 1px solid var(--line); cursor: grab; transition: transform .15s, border-color .15s; }
+.deal { display: grid; gap: 4px; padding: 13px 14px; border-radius: 16px; background: rgba(255,255,255,.06); border: 1px solid var(--line); cursor: pointer; transition: transform .15s, border-color .15s; }
 .deal:hover { transform: translateY(-2px); border-color: rgba(255,255,255,.2); }
-.deal.drag { opacity: .4; }
 .deal-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; font-size: 12px; }
 .amt-pill { font-weight: 800; }
 .hint { margin: 14px 4px 0; color: var(--text-3); font-size: 12.5px; }
