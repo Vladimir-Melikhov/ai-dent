@@ -633,7 +633,7 @@ def remember_form(request):
     """Введённое не пропадает, если документ не получился."""
     request.session["doc_form"] = {k: v for k, v in request.POST.items() if k in {
         "phone", "buyer_type", "name", "inn", "contact_name", "email", "delivery", "comment",
-        "valid_days", "items",
+        "valid_days", "items", "with_details",
     }}
 
 
@@ -651,6 +651,7 @@ def quote_create(request):
         quote = services.create_quote(
             request.user, client_name=request.POST.get("name", "").strip()[:160],
             client_phone=request.POST.get("phone", "").strip()[:30], valid_days=days, lines=lines,
+            with_details=request.POST.get("with_details") == "1",
         )
     except services.DocumentError as error:
         remember_form(request)

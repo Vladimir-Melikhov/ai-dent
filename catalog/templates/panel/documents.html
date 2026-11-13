@@ -43,6 +43,7 @@
       <label class="fld"><span>Email (необязательно)</span><input name="email" type="email" maxlength="254"></label>
       <label class="fld"><span>Доставка, ₽ (необязательно)</span><input name="delivery" id="delivery" inputmode="decimal" placeholder="0"></label>
       <label class="fld"><span>КП действует, дней</span><input name="valid_days" inputmode="numeric" value="{{ valid_days }}"></label>
+      <label class="check wide"><input type="checkbox" name="with_details" value="1" checked><span>В КП добавить комплектацию и характеристики товаров (если они есть в каталоге)</span></label>
       <label class="fld wide"><span>Комментарий к счёту</span><input name="comment" maxlength="1000"></label>
     </div>
   </article>

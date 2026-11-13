@@ -366,3 +366,5 @@ a.ai-line { color: inherit; }
   .inline-fld { margin-left: 0; }
 }
 [hidden] { display: none !important; }
+.check { display: flex; align-items: center; gap: 10px; grid-column: 1 / -1; color: var(--text-2); font-size: 13px; }
+.check input { width: 18px; height: 18px; flex: none; }

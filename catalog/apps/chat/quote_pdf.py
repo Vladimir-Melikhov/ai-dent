@@ -63,6 +63,11 @@ def quote_document(quote) -> dict:
         "dates": f"от {quote.created_at:%d.%m.%Y} · действует до {quote.valid_until:%d.%m.%Y}",
         "client": quote.client_name or "",
         "lines": lines,
+        # комплектация и характеристики из снапшота КП; пусто — блока нет
+        "details": [
+            {"name": item["name"], "kit": item.get("kit") or [], "specs": item.get("specs") or []}
+            for item in quote.items if item.get("kit") or item.get("specs")
+        ],
         "rows": [(l["name"], l["quantity"], l["price"], l["total"]) for l in lines],
         "total": rub(quote.total),
         "discount": None,
@@ -73,6 +78,69 @@ def quote_document(quote) -> dict:
         doc["discount"] = {"full": rub(full), "saved": "−" + rub(saved), "percent": percent_text(pct)}
         doc["notes"].insert(0, DISCOUNT_NOTE)
     return doc
+
+
+def draw_details(c, fonts, details, y, new_page):
+    """Комплектация и характеристики по товарам: светлые карточки в две колонки."""
+    reg, bold = fonts
+    line_h, gap_h = 4.2 * mm, 1.2 * mm
+    pad, col_gap, key_w = 6 * mm, 8 * mm, 34 * mm
+    col_w = (RIGHT - LEFT - 2 * pad - col_gap) / 2
+    col_x = [LEFT + pad, LEFT + pad + col_w + col_gap]
+    if y < 70 * mm:
+        y = new_page()
+    spaced(c, LEFT, y, "Комплектация и характеристики", bold, 8, INK)
+    y -= 6 * mm
+
+    for item in details:
+        # каждая строка — (подпись или None, строки значения); колонка слева — характеристики, справа — комплектация
+        specs = [(k, wrap_text(c, v, reg, 8.5, col_w - key_w, 2)) for k, v in item["specs"]]
+        kit = [(None, wrap_text(c, t, reg, 8.5, col_w - 4 * mm, 3)) for t in item["kit"]]
+        if specs and kit:
+            columns = [specs, kit]
+        else:
+            rows = specs or kit
+            heights = [len(v) * line_h + gap_h for _, v in rows]
+            run, cut = 0, len(rows)
+            for i, h in enumerate(heights):
+                run += h
+                if run >= sum(heights) / 2:
+                    cut = i + 1
+                    break
+            columns = [rows[:cut], rows[cut:]]
+        body_h = max(sum(len(v) * line_h + gap_h for _, v in col) for col in columns)
+        card_h = 12 * mm + body_h + 4 * mm
+        if y - card_h < 32 * mm:
+            y = new_page()
+        glass(c, LEFT, y - card_h, RIGHT - LEFT, card_h)
+        c.setFont(bold, 9.5)
+        c.setFillColor(INK)
+        c.drawString(LEFT + pad, y - 8 * mm, wrap_text(c, item["name"], bold, 9.5, RIGHT - LEFT - 2 * pad, 1)[0])
+
+        for x, col in zip(col_x, columns):
+            ty = y - 13.5 * mm
+            for key, value_lines in col:
+                if key is not None:
+                    c.setFont(reg, 8)
+                    c.setFillColor(MUTED)
+                    shown = key
+                    while c.stringWidth(shown, reg, 8) > key_w - 2 * mm:
+                        shown = shown[:-2] + "…" if shown.endswith("…") is False else shown[:-2] + "…"
+                    c.drawString(x, ty, shown)
+                    text_x = x + key_w
+                else:
+                    c.setFillColor(FAINT)
+                    c.setFont(reg, 8.5)
+                    c.drawString(x, ty, "—")
+                    text_x = x + 4 * mm
+                c.setFont(reg, 8.5)
+                c.setFillColor(INK)
+                for line in value_lines:
+                    c.drawString(text_x, ty, line)
+                    ty -= line_h
+                ty -= gap_h
+        y -= card_h + 4 * mm
+    return y
 
 
 def generate_quote_pdf(quote) -> str:
@@ -117,7 +185,9 @@ def generate_quote_pdf(quote) -> str:
         y = new_page()
     y = totals_block(c, fonts, y + 2 * mm, doc["total"], doc["discount"])
 
-    y -= 10 * mm
+    y -= 12 * mm
+    if doc["details"]:
+        y = draw_details(c, fonts, doc["details"], y, new_page) - 3 * mm
     c.setFont(reg, 8.5)
     c.setFillColor(MUTED)
     for note in doc["notes"]:

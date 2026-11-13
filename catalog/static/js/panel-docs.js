@@ -110,7 +110,8 @@
   for (const [name, value] of Object.entries(restore)) {
     if (name === 'items') continue;
     const field = form.elements[name];
-    if (field) field.value = value;
+    if (!field) continue;
+    if (field.type === 'checkbox') field.checked = value === field.value; else field.value = value;
   }
   syncBuyer();
   let saved = [];

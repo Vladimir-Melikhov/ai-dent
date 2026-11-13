@@ -375,30 +375,30 @@ def totals_block_height(discount) -> float:
 
 
 def totals_block(c, fonts, y, total_text, discount=None):
-    """Чёрная карточка с итогом справа; со скидкой — сумма по прайсу и размер скидки."""
+    """Светлая карточка с итогом справа; со скидкой — сумма по прайсу и размер скидки."""
     reg, bold = fonts
     w = 84 * mm
     h = totals_block_height(discount)
     x = RIGHT - w
-    glass(c, x, y - h, w, h, dark=True)
+    glass(c, x, y - h, w, h)
     pad = 6 * mm
     ty = y - 8 * mm
     if discount:
         c.setFont(reg, 9)
-        c.setFillColor(colors.Color(1, 1, 1, alpha=0.62))
+        c.setFillColor(MUTED)
         c.drawString(x + pad, ty, "Сумма по прайсу")
         c.drawRightString(RIGHT - pad, ty, discount["full"])
         ty -= 6 * mm
-        c.setFillColor(colors.white)
+        c.setFillColor(INK)
         c.drawString(x + pad, ty, f"Скидка {discount['percent']}")
         c.drawRightString(RIGHT - pad, ty, discount["saved"])
         ty -= 3.5 * mm
-        c.setStrokeColor(colors.Color(1, 1, 1, alpha=0.25))
+        c.setStrokeColor(LINE)
         c.setLineWidth(0.5)
         c.line(x + pad, ty, RIGHT - pad, ty)
         ty -= 7 * mm
-    spaced(c, x + pad, ty + 0.5 * mm, "Итого", reg, 8, colors.Color(1, 1, 1, alpha=0.7))
+    spaced(c, x + pad, ty + 0.5 * mm, "Итого", reg, 8, MUTED)
     c.setFont(bold, 15)
-    c.setFillColor(colors.white)
+    c.setFillColor(INK)
     c.drawRightString(RIGHT - pad, ty, total_text)
     return y - h

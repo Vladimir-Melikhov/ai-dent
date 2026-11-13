@@ -1,5 +1,6 @@
 """Цифры панели. Продажи сайта берутся из оплаченных заказов, всё остальное — из операций панели."""
 import datetime
+import re
 import uuid
 from collections import defaultdict
 from dataclasses import dataclass
@@ -660,7 +661,36 @@ def parse_lines(raw) -> list[dict]:
     return lines
 
 
-def create_quote(user, *, client_name, client_phone, valid_days, lines) -> Quote:
+def product_details(product) -> dict:
+    """Комплектация и характеристики товара для КП. Пустое — блока у этого товара не будет.
+
+    Комплектация — характеристика, в названии которой есть «комплект»; остальные идут в характеристики."""
+    chars = product.characteristics if isinstance(product.characteristics, dict) else {}
+    kit, specs = [], []
+
+    def text(value):
+        if isinstance(value, (list, tuple)):
+            return ", ".join(str(v).strip() for v in value if str(v).strip())
+        return str(value).strip()
+
+    for key, value in chars.items():
+        key = str(key).strip()
+        if not key or not text(value):
+            continue
+        if "комплект" in key.lower():
+            parts = value if isinstance(value, (list, tuple)) else re.split(r"[;\n]+", str(value))
+            kit += [str(p).strip()[:140] for p in parts if str(p).strip()]
+        else:
+            specs.append([key[:60], text(value)[:140]])
+    details = {}
+    if kit:
+        details["kit"] = kit[:24]
+    if specs:
+        details["specs"] = specs[:16]
+    return details
+
+
+def create_quote(user, *, client_name, client_phone, valid_days, lines, with_details=True) -> Quote:
     """КП по выбранным товарам со скидкой; PDF строится по снапшоту. С телефоном клиента заводится и карточка сделки."""
     from apps.chat.quote_pdf import generate_quote_pdf
 
@@ -676,6 +706,7 @@ def create_quote(user, *, client_name, client_phone, valid_days, lines) -> Quote
             "discount_pct": str(line["discount"]) if line["discount"] else None,
             "source_price": str(product.price), "source_currency": product.currency,
             "exchange_rate": str(rate_on(product.currency)) if product.currency != "RUB" else None,
+            **(product_details(product) if with_details else {}),
         })
     quote = Quote.objects.create(
         id=quote_id, number=f"KP-{today:%Y%m%d}{PANEL_QUOTE_MARK}{quote_id.hex[:5].upper()}",

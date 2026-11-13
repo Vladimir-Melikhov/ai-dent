@@ -923,3 +923,24 @@ def test_manager_price_cut_in_admin_remembers_list_price(microscope):
     edit_order_items(order, [{"action": "price", "item_id": item.pk, "value": "1000"}])
     item.refresh_from_db()
     assert item.list_unit_price is None
+
+
+def test_quote_adds_kit_and_specs_from_catalog(client, microscope, settings, tmp_path):
+    settings.MEDIA_ROOT = tmp_path
+    microscope.characteristics = {"Питание": "220 В", "Комплектация": "Штатив; Блок освещения\nКамера", "Пусто": ""}
+    microscope.save()
+    client.post("/docs/quote/", {"name": "К", "items": items_json(microscope), "with_details": "1"})
+    from apps.chat.models import Quote
+    from apps.chat.quote_pdf import quote_document
+
+    quote = Quote.objects.get()
+    assert quote.items[0]["kit"] == ["Штатив", "Блок освещения", "Камера"] and quote.items[0]["specs"] == [["Питание", "220 В"]]
+    assert quote_document(quote)["details"][0]["name"] == "Микроскоп EXTARO"
+    assert (tmp_path / quote.pdf_path).exists()
+    # без галочки и без характеристик блока нет
+    client.post("/docs/quote/", {"name": "К", "items": items_json(microscope)})
+    assert "kit" not in Quote.objects.exclude(pk=quote.pk).get().items[0]
+    microscope.characteristics = {}
+    microscope.save()
+    client.post("/docs/quote/", {"name": "К", "items": items_json(microscope), "with_details": "1"})
+    assert quote_document(Quote.objects.order_by("-created_at").first())["details"] == []
