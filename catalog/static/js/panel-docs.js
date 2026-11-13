@@ -46,8 +46,8 @@
       const info = $('.l-info', row);
       if (info) {
         const d = product?.details || {};
-        info.textContent = !product ? '' : (d.specs || d.kit)
-          ? `В КП: характеристик ${d.specs || 0}, комплектация ${d.kit || 0} пунктов`
+        info.textContent = !product ? '' : d.groups
+          ? `В КП: «Главное о товаре» — ${d.groups} групп, ${d.items} пунктов`
           : 'У товара нет характеристик — блока в КП не будет';
       }
       if (!product) { price.textContent = '—'; price.classList.remove('was'); sum.textContent = '—'; continue; }

@@ -925,44 +925,47 @@ def test_manager_price_cut_in_admin_remembers_list_price(microscope):
     assert item.list_unit_price is None
 
 
-def test_quote_adds_kit_and_specs_from_catalog(client, microscope, settings, tmp_path):
+def test_quote_adds_whole_main_block_from_catalog(client, microscope, settings, tmp_path):
     settings.MEDIA_ROOT = tmp_path
-    microscope.characteristics = {"Питание": "220 В", "Комплектация": "Штатив; Блок освещения\nКамера", "Пусто": ""}
+    microscope.characteristics = {"Комплектация": ["Штатив", "Камера"], "Питание": "220 В", "Пусто": ""}
     microscope.save()
     client.post("/docs/quote/", {"name": "К", "items": items_json(microscope), "with_details": "1"})
     from apps.chat.models import Quote
     from apps.chat.quote_pdf import quote_document
 
     quote = Quote.objects.get()
-    assert quote.items[0]["kit"] == ["Штатив", "Блок освещения", "Камера"] and quote.items[0]["specs"] == [["Питание", "220 В"]]
+    assert sorted(quote.items[0]["groups"]) == [["Комплектация", ["Штатив", "Камера"]], ["Питание", ["220 В"]]]
     assert quote_document(quote)["details"][0]["name"] == "Микроскоп EXTARO"
     assert (tmp_path / quote.pdf_path).exists()
     # без галочки и без характеристик блока нет
     client.post("/docs/quote/", {"name": "К", "items": items_json(microscope)})
-    assert "kit" not in Quote.objects.exclude(pk=quote.pk).get().items[0]
+    assert "groups" not in Quote.objects.exclude(pk=quote.pk).get().items[0]
     microscope.characteristics = {}
     microscope.save()
     client.post("/docs/quote/", {"name": "К", "items": items_json(microscope), "with_details": "1"})
     assert quote_document(Quote.objects.order_by("-created_at").first())["details"] == []
 
 
-def test_product_details_are_short_and_cover_site_formats():
+def test_product_details_keep_site_block_whole():
     from types import SimpleNamespace as NS
 
     def details(chars):
         return services.product_details(NS(characteristics=chars, content_blocks=NS(all=lambda: [])))
 
-    # группы «название → список»: комплектация — пунктами, длинный список — одной строкой
-    got = details({
-        "Комплектация": [f"Пункт {i}" for i in range(12)],
-        "Особенности": ["Одно", "Два", "Три", "Четыре"],
-        "Питание": "220 В",
-        **{f"Параметр {i}": str(i) for i in range(12)},
-    })
-    assert len(got["kit"]) == 9 and got["kit"][-1] == "и ещё 4"
-    assert got["specs"][0] == ["Особенности", "Одно · Два · Три …"] and len(got["specs"]) == 8
-    # вложенные словари и список пар
-    assert details({"Основное": {"Вес": "5 кг"}})["specs"] == [["Вес", "5 кг"]]
-    assert details([{"label": "Мощность", "value": "1 кВт"}])["specs"] == [["Мощность", "1 кВт"]]
+    big = {f"Группа {i}": [f"Пункт {j}" for j in range(6)] for i in range(5)}
+    got = details(big)["groups"]
+    assert len(got) == 5 and all(len(items) == 6 for _, items in got)
+    assert details({"Основное": {"Вес": "5 кг"}})["groups"] == [["Вес", ["5 кг"]]]
+    assert details([{"label": "Мощность", "value": "1 кВт"}])["groups"] == [["Мощность", ["1 кВт"]]]
     assert details({}) == {} and details(None) == {}
-    assert len(details({"A": "x" * 300})["specs"][0][1]) <= 70
+
+
+def test_long_main_block_flows_to_next_page(client, microscope, settings, tmp_path):
+    settings.MEDIA_ROOT = tmp_path
+    microscope.characteristics = {f"Группа {i}": [f"Длинный пункт номер {j} с пояснением " * 3 for j in range(8)] for i in range(14)}
+    microscope.save()
+    client.post("/docs/quote/", {"name": "К", "items": items_json(microscope), "with_details": "1"})
+    from apps.chat.models import Quote
+
+    pdf = (tmp_path / Quote.objects.get().pdf_path).read_bytes()
+    assert pdf.startswith(b"%PDF") and pdf.count(b"/Type /Page\n") >= 2

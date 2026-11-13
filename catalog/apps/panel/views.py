@@ -587,13 +587,18 @@ def margin(request):
 
 # --- КП и счета
 
+def details_count(product):
+    groups = services.product_details(product).get("groups", [])
+    return {"groups": len(groups), "items": sum(len(items) or 1 for _, items in groups)}
+
+
 @panel_required
 def documents(request):
     ctx = page_context(request, "documents")
     quotes, invoices = services.recent_documents()
     products = [
         {"id": p.pk, "name": p.name, "sku": p.sku or "", "price": float(p.price_rub),
-         "details": {k: len(v) for k, v in services.product_details(p).items()}}
+         "details": details_count(p)}
         for p in Product.objects.filter(is_active=True, price_rub__isnull=False)
         .prefetch_related("content_blocks").order_by("name")[:3000]
     ]

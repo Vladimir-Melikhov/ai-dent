@@ -38,6 +38,18 @@ def item_list_price(item):
     return listed if Decimal(str(listed)) > Decimal(str(item["unit_price_rub"])) else None
 
 
+def item_groups(item):
+    """Группы «Главного о товаре» из снапшота; у КП, собранных раньше, — из прежних полей комплектации и характеристик."""
+    if item.get("groups"):
+        return item["groups"]
+    groups = []
+    if item.get("specs"):
+        groups.append(["Характеристики", [f"{k}: {v}" for k, v in item["specs"]]])
+    if item.get("kit"):
+        groups.append(["Комплектация", item["kit"]])
+    return groups
+
+
 def quote_document(quote) -> dict:
     """Содержимое PDF отдельно от отрисовки — его проверяют тесты."""
     notes = list(TERMS)
@@ -65,8 +77,8 @@ def quote_document(quote) -> dict:
         "lines": lines,
         # комплектация и характеристики из снапшота КП; пусто — блока нет
         "details": [
-            {"name": item["name"], "kit": item.get("kit") or [], "specs": item.get("specs") or []}
-            for item in quote.items if item.get("kit") or item.get("specs")
+            {"name": item["name"], "groups": item_groups(item)}
+            for item in quote.items if item_groups(item)
         ],
         "rows": [(l["name"], l["quantity"], l["price"], l["total"]) for l in lines],
         "total": rub(quote.total),
@@ -81,65 +93,75 @@ def quote_document(quote) -> dict:
 
 
 def draw_details(c, fonts, details, y, new_page):
-    """Комплектация и характеристики по товарам: светлые карточки в две колонки."""
+    """«Главное о товаре» целиком: по карточке на товар, группы с пунктами в две колонки, переносится на следующую страницу."""
     reg, bold = fonts
-    line_h, gap_h = 4.2 * mm, 1.2 * mm
-    pad, col_gap, key_w = 6 * mm, 8 * mm, 34 * mm
+    line_h, item_gap, group_gap = 4.2 * mm, 1 * mm, 4.5 * mm
+    pad, col_gap = 6 * mm, 8 * mm
     col_w = (RIGHT - LEFT - 2 * pad - col_gap) / 2
     col_x = [LEFT + pad, LEFT + pad + col_w + col_gap]
-    if y < 70 * mm:
+    bottom = 30 * mm
+    if y < 80 * mm:
         y = new_page()
-    spaced(c, LEFT, y, "Комплектация и характеристики", bold, 8, INK)
+    spaced(c, LEFT, y, "Главное о товаре", bold, 8, INK)
     y -= 6 * mm
 
-    for item in details:
-        # каждая строка — (подпись или None, строки значения); колонка слева — характеристики, справа — комплектация
-        specs = [(k, wrap_text(c, v, reg, 8.5, col_w - key_w, 2)) for k, v in item["specs"]]
-        kit = [(None, wrap_text(c, t, reg, 8.5, col_w - 4 * mm, 3)) for t in item["kit"]]
-        if specs and kit:
-            columns = [specs, kit]
-        else:
-            rows = specs or kit
-            heights = [len(v) * line_h + gap_h for _, v in rows]
-            run, cut = 0, len(rows)
-            for i, h in enumerate(heights):
-                run += h
-                if run >= sum(heights) / 2:
-                    cut = i + 1
-                    break
-            columns = [rows[:cut], rows[cut:]]
-        body_h = max(sum(len(v) * line_h + gap_h for _, v in col) for col in columns)
-        card_h = 12 * mm + body_h + 4 * mm
-        if y - card_h < 32 * mm:
-            y = new_page()
-        glass(c, LEFT, y - card_h, RIGHT - LEFT, card_h)
-        c.setFont(bold, 9.5)
-        c.setFillColor(INK)
-        c.drawString(LEFT + pad, y - 8 * mm, wrap_text(c, item["name"], bold, 9.5, RIGHT - LEFT - 2 * pad, 1)[0])
+    def block(group):
+        title, items = group
+        wrapped = [wrap_text(c, text, reg, 8.5, col_w - 4 * mm) for text in items]
+        height = (5 * mm if title else 0) + sum(len(w) * line_h + item_gap for w in wrapped) + group_gap
+        return {"title": title, "items": wrapped, "h": height}
 
-        for x, col in zip(col_x, columns):
-            ty = y - 13.5 * mm
-            for key, value_lines in col:
-                if key is not None:
-                    c.setFont(reg, 8)
-                    c.setFillColor(MUTED)
-                    shown = key
-                    while c.stringWidth(shown, reg, 8) > key_w - 2 * mm:
-                        shown = shown[:-2] + "…" if shown.endswith("…") is False else shown[:-2] + "…"
-                    c.drawString(x, ty, shown)
-                    text_x = x + key_w
-                else:
-                    c.setFillColor(FAINT)
-                    c.setFont(reg, 8.5)
-                    c.drawString(x, ty, "—")
-                    text_x = x + 4 * mm
-                c.setFont(reg, 8.5)
-                c.setFillColor(INK)
-                for line in value_lines:
-                    c.drawString(text_x, ty, line)
-                    ty -= line_h
-                ty -= gap_h
-        y -= card_h + 4 * mm
+    for item in details:
+        blocks = [block(g) for g in item["groups"]]
+        first = True
+        while blocks:
+            head_h = 12 * mm
+            room = y - bottom - head_h - 4 * mm
+            if room < 25 * mm:
+                y = new_page()
+                room = y - bottom - head_h - 4 * mm
+            heights, columns = [0, 0], [[], []]
+            # группы раскладываются по двум колонкам: каждая — в более короткую; что не влезло — на следующую страницу
+            while blocks:
+                col = 0 if heights[0] <= heights[1] else 1
+                if heights[col] + blocks[0]["h"] > room and (columns[0] or columns[1]):
+                    other = 1 - col
+                    if heights[other] + blocks[0]["h"] <= room:
+                        col = other
+                    else:
+                        break
+                heights[col] += blocks[0]["h"]
+                columns[col].append(blocks.pop(0))
+            card_h = head_h + max(heights) + 1 * mm
+            glass(c, LEFT, y - card_h, RIGHT - LEFT, card_h)
+            c.setFont(bold, 9.5)
+            c.setFillColor(INK)
+            name = item["name"] if first else f"{item['name']} (продолжение)"
+            c.drawString(LEFT + pad, y - 8 * mm, wrap_text(c, name, bold, 9.5, RIGHT - LEFT - 2 * pad, 1)[0])
+            for x, col_blocks in zip(col_x, columns):
+                ty = y - 14 * mm
+                for b in col_blocks:
+                    if b["title"]:
+                        c.setFont(bold, 8.5)
+                        c.setFillColor(INK)
+                        c.drawString(x, ty, b["title"] if c.stringWidth(b["title"], bold, 8.5) <= col_w else b["title"][:40] + "…")
+                        ty -= 5 * mm
+                    for lines in b["items"]:
+                        for n, line in enumerate(lines):
+                            if n == 0:
+                                c.setFont(reg, 8.5)
+                                c.setFillColor(FAINT)
+                                c.drawString(x, ty, "—")
+                            c.setFont(reg, 8.5)
+                            c.setFillColor(MUTED if False else INK)
+                            c.drawString(x + 4 * mm, ty, line)
+                            ty -= line_h
+                        ty -= item_gap
+                    ty -= group_gap
+            y -= card_h + 4 * mm
+            first = False
+            if blocks:
+                y = new_page()
     return y
 
 
