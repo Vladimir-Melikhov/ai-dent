@@ -524,6 +524,19 @@ def find_open_deal(phone, conversation_id, without_order=False):
     return None
 
 
+def quote_in_deal(quote) -> bool:
+    return Deal.objects.filter(quote=quote).exists() or DealQuote.objects.filter(quote=quote).exists()
+
+
+def _follow_quote_client(deal, quote) -> None:
+    """Имя и телефон в сделке следуют за актуальным КП: поправили имя в КП — оно и в карточке."""
+    name, phone = quote_contact(quote)
+    if name:
+        deal.client = name
+    if phone and phone_key(phone):
+        deal.contact = phone
+
+
 def attach_quote(deal, quote) -> None:
     """КП клиента ложится в его открытую сделку: новое становится актуальным, прежнее остаётся версией."""
     current = deal.quote
@@ -541,6 +554,7 @@ def attach_quote(deal, quote) -> None:
         # счёта ещё нет: сделка следует за актуальным КП; со счётом сумму задаёт он, а КП даёт предупреждение
         deal.title, deal.amount, deal.expected_date = f"КП №{quote.number}", quote.total, quote.valid_until
         deal.note = quote_summary(quote)
+        _follow_quote_client(deal, quote)
         if deal.stage == Deal.Stage.NEW:
             deal.stage = Deal.Stage.OFFER
         if deal.origin == Deal.Origin.MANUAL:
@@ -810,6 +824,7 @@ def revise_quote(quote, *, client_name, client_phone, valid_days, lines, with_de
     deal = Deal.objects.filter(quote=quote).first()
     if deal is not None and deal.order_id is None:
         deal.amount, deal.expected_date, deal.note = quote.total, quote.valid_until, quote_summary(quote)
+        _follow_quote_client(deal, quote)
         deal.archived_at = None if deal.stage == Deal.Stage.OFFER else deal.archived_at  # срок продлён — КП снова живо
         deal.save()
     return quote

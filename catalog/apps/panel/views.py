@@ -258,11 +258,13 @@ def deal_json(deal):
     if deal.order_id:
         links.append(["Заказ в админке", admin_link("orders/order", deal.order_id)])
     if deal.quote_id:
-        links.append([f"КП №{deal.quote.number}", admin_link("chat/quote", deal.quote_id)])
-    if deal.quote_id and (services.is_panel_quote(deal.quote) or deal.quote.revision > 1):
-        links.append([f"Скачать КП №{deal.quote.number}", f"/docs/quote/{deal.quote_id}.pdf"])
+        links.append([f"КП №{deal.quote.number} — актуальное, PDF", f"/docs/quote/{deal.quote_id}.pdf"])
+    seen = {deal.quote_id}
     for old in deal.old_quotes.all():
-        links.append([f"КП №{old.quote.number} (заменено)", admin_link("chat/quote", old.quote_id)])
+        if old.quote_id in seen:
+            continue
+        seen.add(old.quote_id)
+        links.append([f"КП №{old.quote.number} — прежнее, PDF", f"/docs/quote/{old.quote_id}.pdf"])
     if deal.conversation_id:
         links.append(["Диалог в чате", admin_link("chat/conversation", deal.conversation_id)])
     actions = [{
@@ -832,7 +834,7 @@ def parse_money(raw):
 def quote_file(request, pk):
     quote = get_object_or_404(Quote, pk=pk)
     # КП из чата панель отдаёт только после правки: владелец сам шлёт клиенту новый файл
-    if not services.is_panel_quote(quote) and quote.revision == 1:
+    if not services.is_panel_quote(quote) and quote.revision == 1 and not services.quote_in_deal(quote):
         raise Http404
     path = os.path.join(settings.MEDIA_ROOT, quote.pdf_path) if quote.pdf_path else ""
     if not path or not os.path.exists(path):

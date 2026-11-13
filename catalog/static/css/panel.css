@@ -348,6 +348,7 @@ a.ai-line { color: inherit; }
 .result > div:first-child { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .result-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 .doc-builder { align-items: start; }
+.doc-builder > .hint.wide { grid-column: 1 / -1; margin: 0; padding: 12px 16px; border-radius: 14px; background: var(--glass); border: 1px solid var(--line-soft); }
 .doc-summary { position: sticky; top: 16px; }
 .doc-summary .calc-list .disc dd, .doc-summary .calc-list .disc dt { color: #ffb08f; }
 .doc-buttons { display: grid; gap: 10px; }

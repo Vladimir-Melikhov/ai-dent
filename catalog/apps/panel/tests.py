@@ -1169,3 +1169,20 @@ def test_superseded_quote_cannot_be_edited(client, microscope, settings, tmp_pat
     first = panel_quote(client, microscope)
     panel_quote(client, microscope, "10")
     assert "заменено" in services.quote_editable(first)
+
+
+def test_three_chat_quotes_then_partial_invoice_one_card_with_history(client):
+    conv = Conversation.objects.create(session=AnonSession.objects.create())
+    Lead.objects.create(number="L9", phone="+79001112233", conversation=conv, pd_consent_at=timezone.now())
+    quotes = [make_quote(conv, f"KP-{i}") for i in (1, 2, 3)]
+    for i, q in enumerate(quotes):
+        Quote.objects.filter(pk=q.pk).update(created_at=timezone.now() - datetime.timedelta(hours=10 - i))
+    client.get("/deals/")
+    order = make_order(conversation=conv, total_amount=Decimal("30000"), status=Order.Status.CONFIRMED)
+    client.get("/deals/")
+    deal = Deal.objects.get()  # одна карточка
+    assert deal.order == order and deal.stage == "payment" and deal.amount == 30000
+    assert deal.quote == quotes[2] and {o.quote for o in deal.old_quotes.all()} == {quotes[0], quotes[1]}
+    assert not deal.invoice_outdated  # счёт позже КП — предупреждения нет
+    labels = [label for label, _ in views.deal_json(deal)["links"]]
+    assert sum("КП №" in label for label in labels) == 3
