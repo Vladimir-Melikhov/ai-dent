@@ -132,6 +132,7 @@
           <button class="drawer__tab" data-tab="fav" id="tab-fav">Избранное</button>
           {% if request.user.is_authenticated %}
           <button class="drawer__tab" data-tab="orders" id="tab-orders">Мои заказы</button>
+          <button class="drawer__tab" data-tab="quotes" id="tab-quotes">КП</button>
           {% endif %}
         </div>
         <button class="drawer__x" id="drawer-x" aria-label="Закрыть">✕</button>
@@ -141,6 +142,7 @@
         <div class="drawer__pane" id="pane-fav" hidden></div>
         {% if request.user.is_authenticated %}
         <div class="drawer__pane" id="pane-orders" hidden></div>
+        <div class="drawer__pane" id="pane-quotes" hidden></div>
         {% endif %}
       </div>
       <div class="drawer__foot" id="drawer-foot" hidden>

@@ -10,5 +10,6 @@ urlpatterns = [
     path("ticket/", views.ticket, name="ticket"),
     path("lead/", create_lead, name="lead"),
     path("order/", chat_order, name="order"),
+    path("quotes/", views.quotes_list, name="quotes_list"),
     path("quote/<uuid:quote_id>/", views.quote_pdf, name="quote_pdf"),
 ]

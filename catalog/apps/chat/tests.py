@@ -289,6 +289,30 @@ def test_quote_pdf_for_owner_only(client, quote, settings, tmp_path):
     assert Client().get(f"/chat/quote/{quote.pk}/").status_code == 404
 
 
+def test_quotes_history_in_profile(client):
+    import datetime
+    from decimal import Decimal
+
+    from apps.accounts.models import User
+
+    from .models import Quote
+
+    assert client.get("/chat/quotes/").json() == {"items": []}
+    user = User.objects.create_user("+79001234567", "pass-12345")
+    other = User.objects.create_user("+79001234568", "pass-12345")
+    today = datetime.date.today()
+    mine = Quote.objects.create(number="KP-1", user=user, total=Decimal("1000"), valid_until=today + datetime.timedelta(days=5),
+                                items=[{"name": "Лупа", "quantity": 1}])
+    Quote.objects.create(number="KP-2", user=user, total=Decimal("2000"), valid_until=today - datetime.timedelta(days=1))
+    Quote.objects.create(number="KP-3", user=other, total=Decimal("3000"), valid_until=today)
+    client.force_login(user)
+    items = client.get("/chat/quotes/").json()["items"]
+    assert sorted(i["number"] for i in items) == ["KP-1", "KP-2"]
+    by_number = {i["number"]: i for i in items}
+    assert by_number["KP-2"]["status"] == "Срок истёк" and by_number["KP-1"]["status"].startswith("Действует до")
+    assert by_number["KP-1"]["url"] == f"/chat/quote/{mine.pk}/"
+
+
 def test_quote_document_has_no_requisites_or_client_data(quote):
     from apps.orders.pdf import SELLER
     from .quote_pdf import CURRENCY_NOTE, quote_document

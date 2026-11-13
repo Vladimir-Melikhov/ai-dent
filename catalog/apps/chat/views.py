@@ -1,6 +1,7 @@
 import os
 
 from django.conf import settings
+from django.utils import timezone
 from django.http import FileResponse, Http404, JsonResponse
 from django.views.decorators.http import require_GET, require_POST
 
@@ -30,6 +31,30 @@ def _is_quote_owner(request, quote) -> bool:
         return True
     session = getattr(request, "anon_session", None)
     return session is not None and quote.session_id == session.pk
+
+
+@require_GET
+def quotes_list(request):
+    """История КП клиента — для вкладки «КП» в профиле: и подготовленные в чате, и выставленные менеджером."""
+    if not request.user.is_authenticated:
+        return JsonResponse({"items": []})
+    today = timezone.localdate()
+    quotes = Quote.objects.filter(user=request.user).select_related("superseded_in").order_by("-created_at")
+    items = []
+    for q in quotes:
+        replaced = hasattr(q, "superseded_in")
+        if replaced:
+            status = "Заменено новым"
+        elif q.valid_until < today:
+            status = "Срок истёк"
+        else:
+            status = f"Действует до {q.valid_until:%d.%m.%Y}"
+        items.append({
+            "number": q.number, "created_at": q.created_at.astimezone().strftime("%d.%m.%Y"),
+            "status": status, "total": float(q.total), "items_count": len(q.items),
+            "url": f"/chat/quote/{q.id}/",
+        })
+    return JsonResponse({"items": items})
 
 
 @require_GET

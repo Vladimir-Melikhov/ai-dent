@@ -31,6 +31,8 @@ function getCookie(name) {
   const paneFav = document.getElementById("pane-fav");
   const paneOrders = document.getElementById("pane-orders");
   const foot = document.getElementById("drawer-foot");
+  const paneQuotes = document.getElementById("pane-quotes");
+  const tabQuotes = document.getElementById("tab-quotes");
   const tabOrders = document.getElementById("tab-orders");
   const accountDelete = document.getElementById("account-delete");
 
@@ -44,15 +46,18 @@ function getCookie(name) {
   document.getElementById("tab-cart").addEventListener("click", () => switchTab("cart"));
   document.getElementById("tab-fav").addEventListener("click", () => switchTab("fav"));
   if (tabOrders) tabOrders.addEventListener("click", () => switchTab("orders"));
+  if (tabQuotes) tabQuotes.addEventListener("click", () => switchTab("quotes"));
   
   function switchTab(tab) {
     document.querySelectorAll(".drawer__tab").forEach(t => t.classList.toggle("is-active", t.dataset.tab === tab));
     paneCart.hidden = tab !== "cart";
     paneFav.hidden = tab !== "fav";
     if (paneOrders) paneOrders.hidden = tab !== "orders";
+    if (paneQuotes) paneQuotes.hidden = tab !== "quotes";
     foot.hidden = tab !== "cart";
     if (tab === "cart") loadCart();
     else if (tab === "orders") loadOrders();
+    else if (tab === "quotes") loadQuotes();
     else loadFav();
   }
   
@@ -164,6 +169,31 @@ function getCookie(name) {
         <div class="drawer-order__row drawer-order__meta">
           <span>${o.items_count} товар(ов)</span>
           ${o.invoice_url ? `<a class="drawer-order__invoice" href="${o.invoice_url}" target="_blank" rel="noopener">Скачать счёт</a>` : ""}
+        </div>
+      </div>`).join("");
+  }
+
+  async function loadQuotes() {
+    if (!paneQuotes) return;
+    const res = await fetch("/chat/quotes/");
+    const data = await res.json();
+    if (!data.items.length) {
+      paneQuotes.innerHTML = '<p class="drawer__empty">Коммерческих предложений пока нет</p>';
+      return;
+    }
+    paneQuotes.innerHTML = data.items.map(q => `
+      <div class="drawer-order">
+        <div class="drawer-order__row">
+          <span class="drawer-order__number">${escapeHTML(q.number)}</span>
+          <span class="drawer-order__date">${q.created_at}</span>
+        </div>
+        <div class="drawer-order__row">
+          <span class="drawer-order__status">${escapeHTML(q.status)}</span>
+          <span class="drawer-order__total">${fmt(q.total)}</span>
+        </div>
+        <div class="drawer-order__row drawer-order__meta">
+          <span>${q.items_count} товар(ов)</span>
+          <a class="drawer-order__invoice" href="${q.url}" target="_blank" rel="noopener">Скачать PDF</a>
         </div>
       </div>`).join("");
   }
