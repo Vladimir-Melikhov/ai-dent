@@ -207,9 +207,9 @@ def paint_page(c):
     c.rect(0, 0, PAGE_W, PAGE_H, stroke=0, fill=1)
     if os.path.exists(TEETH):
         c.saveState()
-        c.setFillAlpha(0.07)
-        size = 150 * mm
-        c.translate(PAGE_W - 48 * mm, 70 * mm)
+        c.setFillAlpha(0.12)
+        size = 190 * mm
+        c.translate(PAGE_W - 52 * mm, 78 * mm)
         c.rotate(-8)
         c.drawImage(TEETH, -size / 2, -size / 2, width=size, height=size * 1024 / 1051, mask="auto")
         c.restoreState()
