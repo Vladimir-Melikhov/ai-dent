@@ -19,9 +19,10 @@
     <div class="col-head"><span class="stage-dot s-{{ stage.value }}"></span><b>{{ stage.label }}</b><span class="count">{{ stage.items|length }}</span><span class="muted sum">{{ stage.amount|rub }}</span></div>
     <div class="col-body">
       {% for d in stage.items %}
-      <article class="deal{% if d.is_system %} system{% endif %}" {% if not d.is_system %}draggable="true"{% endif %} data-id="{{ d.pk }}" tabindex="0" data-edit="dlg">
-        <div class="deal-top"><b>{{ d.title }}</b><span class="origin o-{{ d.origin }}">{{ d.get_origin_display }}</span></div>
+      <article class="deal{% if d.is_system %} system{% endif %}" draggable="true" data-id="{{ d.pk }}" tabindex="0" data-edit="dlg">
+        <div class="deal-top"><b>{{ d.title }}</b><span class="origin o-{{ d.origin }}">{{ d.origin_label }}</span></div>
         {% if d.client %}<span class="muted">{{ d.client }}</span>{% endif %}
+        {% if d.quote_id and d.order_id %}<span class="muted from-quote">по КП №{{ d.quote.number }}</span>{% endif %}
         {% if d.contact %}<a class="phone" href="tel:{{ d.contact }}">{{ d.contact }}</a>{% endif %}
         {% if d.stage == "won" and d.cost is None %}<span class="nocost">нет закупки — прибыль не посчитана</span>{% endif %}
         <div class="deal-foot"><span class="amt-pill">{{ d.amount|rub }}</span>{% if d.wait_days is not None %}<span class="wait{% if d.stale %} stale{% endif %}">ждёт {{ d.wait_days }} дн.</span>{% elif d.expected_date %}<span class="muted">до {{ d.expected_date|date:"j b" }}</span>{% endif %}</div>

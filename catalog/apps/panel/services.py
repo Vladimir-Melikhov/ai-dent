@@ -1,5 +1,6 @@
 """Цифры панели. Продажи сайта берутся из оплаченных заказов, всё остальное — из операций панели."""
 import datetime
+import json
 import re
 import uuid
 from collections import defaultdict
@@ -479,6 +480,13 @@ def ensure_order_deal(order) -> Deal:
     return Deal.objects.get(order_id=order.pk)
 
 
+def order_from_panel(order) -> bool:
+    """Счёт выставлен владельцем в панели (не клиентом на сайте)."""
+    return order.status_history.filter(
+        from_status=Order.Status.DRAFT, actor=OrderStatusHistory.Actor.DIRECTOR
+    ).exists()
+
+
 def _sync_order(order):
     stage = ORDER_STAGE.get(order.status)
     if stage is None:
@@ -499,7 +507,8 @@ def _sync_order(order):
         "conversation_id": order.conversation_id or (deal.conversation_id if deal else None),
         "title": f"Заказ №{order.number}", "amount": order.total_amount or ZERO, "stage": stage,
         "client": order.company_name or order.buyer_name or order.contact_name or "",
-        "contact": order.contact_phone or "", "source": "Сайт",
+        "contact": order.contact_phone or "",
+        "source": Deal.PANEL_SOURCE if order_from_panel(order) else "Сайт",
     }
     if deal is None:
         try:
@@ -735,7 +744,7 @@ def create_quote(user, *, client_name, client_phone, valid_days, lines, with_det
     if phone_key(client_phone):
         deal = Deal.objects.create(
             origin=Deal.Origin.QUOTE, quote=quote, title=f"КП №{quote.number}", client=client_name or "Клиент",
-            contact=client_phone, source="Панель", amount=quote.total, stage=Deal.Stage.OFFER,
+            contact=client_phone, source=Deal.PANEL_SOURCE, amount=quote.total, stage=Deal.Stage.OFFER,
             expected_date=quote.valid_until, note=quote_summary(quote),
         )
         sync_deal(deal)
@@ -803,6 +812,23 @@ def create_invoice(user, *, buyer_type, name, inn, contact_name, phone, email, d
     except (InvoiceError, TransitionError):
         order.delete()
         raise
+
+
+def invoice_form_from_quote(deal) -> dict:
+    """Форма счёта, заполненная по КП: те же товары, количество и скидки, клиент из карточки."""
+    items = [
+        {"id": i["product_id"], "qty": i["quantity"], "discount": i.get("discount_pct") or ""}
+        for i in deal.quote.items if i.get("product_id")
+    ]
+    return {"items": json.dumps(items), "deal_id": str(deal.pk), "name": deal.client, "phone": deal.contact}
+
+
+def link_invoice_to_quote_deal(deal_id, order) -> None:
+    """Счёт выставлен по конкретному КП: карточка этого КП становится карточкой заказа (а не первая по телефону)."""
+    deal = Deal.objects.filter(pk=deal_id, quote__isnull=False, order__isnull=True).first() if str(deal_id).isdigit() else None
+    if deal is not None and not Deal.objects.filter(order=order).exists():
+        deal.order = order
+        deal.save(update_fields=["order", "updated_at"])
 
 
 def recent_documents(limit=15):

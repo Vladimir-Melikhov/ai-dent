@@ -60,6 +60,8 @@
     form.elements.id.value = id || '';
     $('h2', dialog).textContent = id ? dialog.dataset.titleEdit : dialog.dataset.titleNew;
     $$('.dlg-delete', dialog).forEach((node) => node.remove());
+    const bar = $('.dlg-actions', dialog) || $('.dlg-foot', dialog);
+    if (bar.matches('.dlg-actions')) bar.hidden = true;
     $$('[name]', form).forEach((field) => { field.disabled = false; });
     const links = $('.dlg-links', dialog);
     if (links) { links.hidden = true; links.replaceChildren(); }
@@ -89,6 +91,14 @@
         links.hidden = false;
       }
       for (const action of info.actions || []) {
+        if (action.href) {
+          const link = document.createElement('a');
+          link.className = 'btn primary dlg-delete';
+          link.href = action.href;
+          link.textContent = action.label;
+          bar.append(link);
+          continue;
+        }
         const button = document.createElement('button');
         button.type = 'button';
         button.className = `btn dlg-delete ${action.danger ? 'danger' : 'ghost'}`;
@@ -96,15 +106,16 @@
         button.dataset.action = action.url;
         button.dataset.confirm = action.confirm;
         if (action.ask_cost) { button.dataset.askCost = '1'; button.dataset.value = action.cost || ''; }
-        $('.dlg-foot', dialog).prepend(button);
+        bar.append(button);
       }
       const extra = $('#dlg-extra');
       if (extra && !(info.locked || []).length) {
         const button = extra.content.firstElementChild.cloneNode(true);
         button.dataset.delete = button.dataset.delete.replace('{id}', id);
         button.classList.add('dlg-delete');
-        $('.dlg-foot', dialog).prepend(button);
+        bar.append(button);
       }
+      if (bar.matches('.dlg-actions')) bar.hidden = !bar.children.length;
     }
     filterCategories(form);
     dialog.showModal();
@@ -247,9 +258,12 @@
       event.preventDefault();
       const body = new FormData();
       body.set('stage', col.dataset.stage);
+      const title = dragged.querySelector('b').textContent;
+      if (dragged.classList.contains('system') && col.dataset.stage === 'lost' && dragged.closest('.col') !== col
+          && !confirm(`«${title}»: отметить проигранной? Заказ будет отменён, КП уйдёт в архив.`)) return;
       if (col.dataset.stage === 'won') {
         // выигранная сделка — сначала закупка, иначе прибыль не посчитать
-        const cost = await askCost(`«${dragged.querySelector('b').textContent}»: во сколько вам обошёлся этот товар?`, '');
+        const cost = await askCost(`«${title}»: во сколько вам обошёлся этот товар?`, '');
         if (cost === null) return;
         body.set('cost', cost);
       }
@@ -257,9 +271,9 @@
         const response = await fetch(board.dataset.stageUrl.replace('/0/', `/${dragged.dataset.id}/`), {
           method: 'POST', body, headers: { 'X-CSRFToken': csrf(), 'X-Requested-With': 'fetch' },
         });
-        if (!response.ok) throw new Error();
-      } catch {
-        alert('Не удалось перенести сделку');
+        if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || '');
+      } catch (error) {
+        alert(error.message || 'Не удалось перенести сделку');
       }
       location.reload();
     });

@@ -202,9 +202,13 @@ def deals(request):
     services.sync_auto_deals()
     origin = request.GET.get("src", "")
     archive = request.GET.get("archive") == "1"
-    qs = Deal.objects.select_related("order", "conversation").filter(archived_at__isnull=not archive)
-    if origin in Deal.Origin.values:
-        qs = qs.filter(origin=origin)
+    qs = Deal.objects.select_related("order", "conversation", "quote").filter(archived_at__isnull=not archive)
+    # КП и счета, собранные в панели, — «Вручную»; «Из чата» и «С сайта» — только то, что пришло от клиентов
+    made_here = Q(origin=Deal.Origin.MANUAL) | Q(source=Deal.PANEL_SOURCE)
+    if origin == Deal.Origin.MANUAL:
+        qs = qs.filter(made_here)
+    elif origin in Deal.Origin.values:
+        qs = qs.filter(origin=origin).exclude(made_here)
     stages = []
     all_deals = list(qs)
     now = timezone.now()
@@ -252,12 +256,16 @@ def deal_json(deal):
     links = []
     if deal.order_id:
         links.append(["Заказ в админке", admin_link("orders/order", deal.order_id)])
+    if deal.quote_id:
+        links.append([f"КП №{deal.quote.number}", admin_link("chat/quote", deal.quote_id)])
     if deal.conversation_id:
         links.append(["Диалог в чате", admin_link("chat/conversation", deal.conversation_id)])
     actions = [{
         "label": "Вернуть из архива" if deal.archived_at else "В архив",
         "url": f"/deals/{deal.pk}/archive/", "confirm": "",
     }]
+    if deal.quote_id and not deal.order_id and not deal.archived_at:
+        actions.insert(0, {"label": "Выставить счёт по КП", "href": f"/docs/?from_quote={deal.pk}"})
     if deal.order_id:
         for target, label, text in ORDER_ACTIONS:
             if target in allowed_transitions(deal.order):
@@ -275,7 +283,7 @@ def deal_json(deal):
         })
     return {
         "locked": list(DealForm.SYSTEM_LOCKED) if deal.is_system else [], "links": links, "actions": actions,
-        "origin": deal.get_origin_display(),
+        "origin": deal.origin_label,
         "title": deal.title, "client": deal.client, "contact": deal.contact, "amount": str(deal.amount),
         "cost": "" if deal.cost is None else str(deal.cost),
         "stage": deal.stage, "source": deal.source, "note": deal.note,
@@ -295,10 +303,10 @@ def deal_stage(request, pk):
     """Перенос карточки по воронке (перетаскивание)."""
     deal = get_object_or_404(Deal, pk=pk)
     stage = request.POST.get("stage")
-    if deal.is_system:
-        return JsonResponse({"error": "Этап этой карточки следует за заказом"}, status=400)
     if stage not in Deal.Stage.values:
         return JsonResponse({"error": "Неизвестный этап"}, status=400)
+    if deal.is_system:
+        return system_deal_stage(request, deal, stage)
     if stage == Deal.Stage.WON:
         cost = CostForm(request.POST)
         if not cost.is_valid():
@@ -308,6 +316,42 @@ def deal_stage(request, pk):
         deal.stage = stage
         deal.save(update_fields=["stage", "cost", "updated_at"])
         services.sync_deal(deal)
+    return JsonResponse({"ok": True})
+
+
+def system_deal_stage(request, deal, stage):
+    """Перетаскивание карточки заказа или КП: двигаются только настоящие действия — оплата и отмена."""
+    if stage == deal.stage:
+        return JsonResponse({"ok": True})
+    order = deal.order
+    if order is None:
+        if stage == Deal.Stage.LOST:
+            deal.archived_at = timezone.now()
+            deal.save(update_fields=["archived_at"])
+            return JsonResponse({"ok": True})
+        return JsonResponse({
+            "error": "КП само перейдёт в «Ждём оплату», когда по нему выставят счёт. Отказ клиента — перетащите в «Проиграна»",
+        }, status=400)
+    target = {Deal.Stage.WON: Order.Status.PAID, Deal.Stage.LOST: Order.Status.CANCELLED}.get(stage)
+    if target is None:
+        return JsonResponse({"error": "Этап карточки следует за заказом: перетащите в «Выиграна» (оплата) или «Проиграна» (отмена)"}, status=400)
+    if target not in allowed_transitions(order):
+        return JsonResponse({"error": f"Заказ №{order.number} сейчас нельзя перевести в этот этап"}, status=400)
+    cost = None
+    if target == Order.Status.PAID:
+        form = CostForm(request.POST)
+        if not form.is_valid():
+            return JsonResponse({"error": "Укажите закупку (0, если её не было)", "need": "cost"}, status=400)
+        cost = form.cleaned_data["cost"]
+    try:
+        change_status(order, target, actor=OrderStatusHistory.Actor.DIRECTOR, actor_user=request.user)
+    except (TransitionError, InvoiceError) as error:
+        return JsonResponse({"error": str(error)}, status=400)
+    if cost is not None:
+        paid = services.ensure_order_deal(order)
+        paid.cost = cost
+        paid.save(update_fields=["cost", "updated_at"])
+    services.sync_auto_deals()
     return JsonResponse({"ok": True})
 
 
@@ -602,6 +646,13 @@ def documents(request):
         for p in Product.objects.filter(is_active=True, price_rub__isnull=False)
         .prefetch_related("content_blocks").order_by("name")[:3000]
     ]
+    form = request.session.pop("doc_form", {})
+    quote_deal = None
+    source = request.GET.get("from_quote", "")
+    if source.isdigit():
+        quote_deal = Deal.objects.filter(pk=source, quote__isnull=False, order__isnull=True).select_related("quote").first()
+        if quote_deal and not form:
+            form = services.invoice_form_from_quote(quote_deal)
     made = request.GET.get("made", "")
     result = None
     if made.startswith("quote:"):
@@ -623,7 +674,7 @@ def documents(request):
         order.has_pdf = invoice_available(order)
     ctx.update(
         products=products, quotes=quotes, invoices=invoices, result=result, valid_days=14,
-        form=request.session.pop("doc_form", {}),
+        form=form, from_quote=quote_deal,
     )
     return render(request, "panel/documents.html", ctx)
 
@@ -640,7 +691,7 @@ def remember_form(request):
     """Введённое не пропадает, если документ не получился."""
     request.session["doc_form"] = {k: v for k, v in request.POST.items() if k in {
         "phone", "buyer_type", "name", "inn", "contact_name", "email", "delivery", "comment",
-        "valid_days", "items", "with_details",
+        "valid_days", "items", "with_details", "deal_id",
     }}
 
 
@@ -684,6 +735,7 @@ def invoice_create(request):
         remember_form(request)
         messages.error(request, str(error))
         return redirect("panel:documents")
+    services.link_invoice_to_quote_deal(request.POST.get("deal_id", ""), order)
     services.sync_auto_deals()
     return redirect(f"/docs/?made=invoice:{order.number}")
 

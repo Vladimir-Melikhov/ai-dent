@@ -969,3 +969,68 @@ def test_long_main_block_flows_to_next_page(client, microscope, settings, tmp_pa
 
     pdf = (tmp_path / Quote.objects.get().pdf_path).read_bytes()
     assert pdf.startswith(b"%PDF") and pdf.count(b"/Type /Page\n") >= 2
+
+
+# --- КП и счета из панели, перетаскивание карточек заказов
+
+def test_panel_quote_counts_as_manual(client):
+    quote = make_quote(number="KP-20260101-PABCDE")
+    quote.client_phone = "+79001112233"
+    quote.save()
+    client.get("/deals/")
+    deal = Deal.objects.get(quote=quote)
+    assert deal.origin == "quote" and deal.origin_label == "Из чата"  # чатовое КП
+    deal.source = Deal.PANEL_SOURCE
+    deal.save()
+    assert deal.origin_label == "Вручную"
+    assert "КП-1" in client.get("/deals/?src=manual").content.decode()
+    assert "КП-1" not in client.get("/deals/?src=quote").content.decode()
+
+
+def test_drag_order_to_won_pays_it(client):
+    order = make_order(status=Order.Status.CONFIRMED)
+    client.get("/deals/")
+    deal = Deal.objects.get(order=order)
+    assert client.post(f"/deals/{deal.pk}/stage/", {"stage": "won"}).status_code == 400  # без закупки
+    assert client.post(f"/deals/{deal.pk}/stage/", {"stage": "won", "cost": "5000"}).status_code == 200
+    order.refresh_from_db()
+    deal.refresh_from_db()
+    assert order.status == Order.Status.PAID and deal.stage == "won" and deal.cost == 5000
+
+
+def test_drag_system_card_to_open_stage_rejected(client):
+    order = make_order()
+    client.get("/deals/")
+    deal = Deal.objects.get(order=order)
+    assert client.post(f"/deals/{deal.pk}/stage/", {"stage": "new"}).status_code == 400
+    order.refresh_from_db()
+    assert order.status == Order.Status.PENDING_CONFIRMATION
+
+
+def test_drag_quote_card_to_lost_archives_it(client):
+    quote = make_quote()
+    quote.client_phone = "+79001112233"
+    quote.save()
+    client.get("/deals/")
+    deal = Deal.objects.get(quote=quote)
+    assert client.post(f"/deals/{deal.pk}/stage/", {"stage": "payment"}).status_code == 400
+    assert client.post(f"/deals/{deal.pk}/stage/", {"stage": "lost"}).status_code == 200
+    deal.refresh_from_db()
+    assert deal.archived_at is not None
+
+
+def test_invoice_from_quote_links_that_quote(client):
+    from apps.catalog.models import Product  # noqa: F401
+    first = make_quote(number="KP-1")
+    second = make_quote(number="KP-2")
+    for q in (first, second):
+        q.client_phone = "+79001112233"
+        q.save()
+    client.get("/deals/")
+    deal = Deal.objects.get(quote=second)
+    page = client.get(f"/docs/?from_quote={deal.pk}").content.decode()
+    assert "KP-2" in page and f'"deal_id": "{deal.pk}"' in page
+    order = make_order(number="S9")
+    services.link_invoice_to_quote_deal(str(deal.pk), order)
+    deal.refresh_from_db()
+    assert deal.order_id == order.pk

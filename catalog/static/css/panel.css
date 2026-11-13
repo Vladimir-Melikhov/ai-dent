@@ -76,7 +76,7 @@ svg { width: 18px; height: 18px; flex: none; }
 .top-right { margin-left: 0; }
 .round { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--line); background: var(--glass); transition: .18s; }
 .round:hover { background: var(--glass-strong); }
-.round.sm { width: 32px; height: 32px; }
+.round.sm { width: 32px; height: 32px; border-radius: 8px; }
 
 .page { position: relative; z-index: 1; max-width: 1360px; margin: 0 auto; padding: 14px 24px 64px; }
 .head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 22px; }
@@ -89,7 +89,7 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 .seg a { padding: 7px 14px; border-radius: 999px; color: var(--text-2); font-weight: 600; font-size: 13px; }
 .seg a.on { background: var(--text); color: #0b0d13; }
 
-.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 16px; border-radius: 999px; border: 1px solid var(--line);
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 16px; border-radius: 8px; border: 1px solid var(--line);
   background: var(--glass); font-weight: 700; font-size: 13px; transition: .18s; }
 .btn:hover { background: var(--glass-strong); }
 .btn.primary { background: var(--text); color: #0b0d13; border-color: transparent; }
@@ -128,7 +128,7 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 .panel { padding: 22px; min-width: 0; }
 .panel-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 16px; }
 .panel-head p { margin: 2px 0 0; font-size: 12.5px; }
-.more { font-size: 12.5px; font-weight: 700; color: var(--text-2); padding: 5px 11px; border-radius: 999px; border: 1px solid var(--line); }
+.more { font-size: 12.5px; font-weight: 700; color: var(--text-2); padding: 5px 11px; border-radius: 8px; border: 1px solid var(--line); }
 .more:hover { color: var(--text); background: var(--glass); }
 .legend { display: flex; gap: 14px; font-size: 12.5px; color: var(--text-2); }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
@@ -297,7 +297,11 @@ body.auth { display: grid; place-items: center; padding: 24px; }
 .deal-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
 .origin { flex: none; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; background: var(--glass-strong); color: var(--text-2); }
 .origin.o-order { color: var(--accent); background: rgba(110,168,255,.14); } .origin.o-quote { color: #b9a9ff; background: rgba(144,133,233,.16); }
-.deal.system { cursor: pointer; border-style: dashed; }
+.deal.system { border-style: dashed; }
+.from-quote { font-size: 12px; }
+.dlg-actions { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 14px; border-top: 1px solid var(--line-soft); }
+.dlg-actions[hidden] { display: none; }
+.dlg-actions .btn { padding: 8px 14px; }
 .phone { font-size: 12.5px; color: var(--text-2); width: max-content; } .phone:hover { color: var(--accent); }
 .dlg-links { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .dlg-links[hidden] { display: none; }

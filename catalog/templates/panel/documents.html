@@ -21,6 +21,7 @@
 <form id="doc-form" method="post" class="row main-row doc-builder" autocomplete="off">
   {% csrf_token %}
   <input type="hidden" name="items" id="doc-items">
+  <input type="hidden" name="deal_id" value="">
   <article class="glass panel">
     <div class="panel-head"><div><h2>Товары</h2><p class="muted">Начните вводить название или артикул — цена подставится из каталога</p></div></div>
     <div class="lines-head"><span>Товар</span><span>Кол-во</span><span class="r">Цена</span><span>Скидка, %</span><span class="r">Сумма</span><span></span></div>
@@ -31,6 +32,7 @@
       <button type="button" class="btn ghost sm" id="apply-all">Применить ко всем</button>
     </div>
 
+    {% if from_quote %}<p class="hint">Счёт по КП №{{ from_quote.quote.number }}: товары и скидки взяты из КП. Проверьте их и укажите данные покупателя. После оплаты карточка КП станет карточкой этого заказа.</p>{% endif %}
     <div class="panel-head spaced"><div><h2>Кому</h2><p class="muted">Для КП достаточно имени. Для счёта нужны данные покупателя</p></div></div>
     <div class="grid2">
       <label class="fld"><span>Покупатель</span>

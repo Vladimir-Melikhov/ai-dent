@@ -82,9 +82,20 @@ class Deal(models.Model):
     def __str__(self):
         return self.title
 
+    PANEL_SOURCE = "Панель"
+
     @property
     def is_system(self):
         return self.origin != self.Origin.MANUAL
+
+    @property
+    def from_panel(self):
+        """КП или счёт, собранные владельцем в панели, — для него это «вручную», а не «из чата» или «с сайта»."""
+        return self.is_system and self.source == self.PANEL_SOURCE
+
+    @property
+    def origin_label(self):
+        return "Вручную" if self.origin == self.Origin.MANUAL or self.from_panel else self.get_origin_display()
 
 
 class Entry(models.Model):
