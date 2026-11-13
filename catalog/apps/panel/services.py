@@ -422,6 +422,7 @@ def _drop_orphans():
         if deal.quote_id:
             if deal.origin != Deal.Origin.QUOTE or deal.stage != Deal.Stage.OFFER:
                 deal.origin, deal.stage, deal.closed_at = Deal.Origin.QUOTE, Deal.Stage.OFFER, None
+                deal.archived_at = None  # заказ удалён — КП снова живо; истёкшее вернёт в архив _archive_expired_quotes
                 deal.title, deal.amount = f"КП №{deal.quote.number}", deal.quote.total
                 deal.save()
         else:

@@ -968,6 +968,21 @@ def test_invoice_for_unknown_client_stays_with_owner(client, microscope, setting
     assert order.user_id is None and order.conversation_id is None
 
 
+def test_deleting_order_returns_live_quote_from_archive(client, microscope, settings, tmp_path):
+    settings.MEDIA_ROOT = tmp_path
+    phone = "+7 900 123 45 67"
+    client.post("/docs/quote/", {"name": "Иван", "phone": phone, "valid_days": "7", "items": items_json(microscope, 1, "0")})
+    client.post("/docs/invoice/", {
+        "buyer_type": "legal", "name": "ООО Стом", "inn": "7707083893", "contact_name": "Иван",
+        "phone": phone, "deal_id": str(Deal.objects.get().pk), "items": items_json(microscope, 1, "0"),
+    })
+    deal = Deal.objects.get()
+    Deal.objects.filter(pk=deal.pk).update(archived_at=timezone.now())
+    client.post(f"/deals/{deal.pk}/delete-order/")
+    deal.refresh_from_db()
+    assert deal.order_id is None and deal.stage == Deal.Stage.OFFER and deal.archived_at is None
+
+
 def test_sales_number_links_to_invoice(client, microscope, settings, tmp_path):
     settings.MEDIA_ROOT = tmp_path
     client.post("/docs/invoice/", {
