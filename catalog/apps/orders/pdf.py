@@ -233,16 +233,17 @@ def glass(c, x, y, w, h, radius=4 * mm, dark=False):
 
 
 def spaced(c, x, y, text, font, size, color, right=False, space=0.6):
-    """Подпись капсом с лёгким разрядом."""
-    c.setFont(font, size)
-    c.setFillColor(color)
+    """Подпись капсом с лёгким разрядом. Разряд не должен «протекать» на следующий текст — отсюда save/restore."""
     text = text.upper()
     width = c.stringWidth(text, font, size) + space * (len(text) - 1)
+    c.saveState()
+    c.setFillColor(color)
     t = c.beginText(x - (width if right else 0), y)
     t.setFont(font, size)
     t.setCharSpace(space)
     t.textOut(text)
     c.drawText(t)
+    c.restoreState()
 
 
 def page_header(c, fonts, kind, number, sub=None):
@@ -276,15 +277,26 @@ def page_footer(c, fonts, left_text):
 
 
 def wrap_text(c, text, font, size, width, max_lines=None):
+    """Перенос по словам; слово длиннее строки режется, чтобы не вылезать за рамку."""
+    def pieces(word):
+        while c.stringWidth(word, font, size) > width and len(word) > 1:
+            cut = len(word) - 1
+            while cut > 1 and c.stringWidth(word[:cut], font, size) > width:
+                cut -= 1
+            yield word[:cut]
+            word = word[cut:]
+        yield word
+
     lines, current = [], ""
     for word in str(text).split():
-        test = f"{current} {word}".strip()
-        if c.stringWidth(test, font, size) <= width:
-            current = test
-        else:
-            if current:
-                lines.append(current)
-            current = word
+        for part in pieces(word):
+            test = f"{current} {part}".strip()
+            if c.stringWidth(test, font, size) <= width:
+                current = test
+            else:
+                if current:
+                    lines.append(current)
+                current = part
     if current:
         lines.append(current)
     if max_lines and len(lines) > max_lines:
@@ -366,12 +378,12 @@ def items_table(c, fonts, lines, y, bottom, new_page):
         c.setStrokeColor(LINE)
         c.setLineWidth(0.5)
         c.line(LEFT, y, RIGHT, y)
-        y -= 6 * mm
+        y -= 5 * mm
     return y
 
 
 def totals_block_height(discount) -> float:
-    return (34 if discount else 22) * mm
+    return (31 if discount else 20) * mm
 
 
 def totals_block(c, fonts, y, total_text, discount=None):
@@ -382,7 +394,7 @@ def totals_block(c, fonts, y, total_text, discount=None):
     x = RIGHT - w
     glass(c, x, y - h, w, h)
     pad = 6 * mm
-    ty = y - 8 * mm
+    ty = y - 7.5 * mm
     if discount:
         c.setFont(reg, 9)
         c.setFillColor(MUTED)
