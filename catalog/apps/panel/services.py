@@ -404,7 +404,6 @@ def sync_auto_deals() -> None:
     for quote in quotes:
         _sync_quote(quote)
     _drop_orphans()
-    _archive_superseded()
     _archive_expired_quotes()
 
 
@@ -453,25 +452,6 @@ def anonymous_quotes():
             continue
         result.append(quote)
     return result
-
-
-def _archive_superseded():
-    """Клиент вернулся с новым заказом, а старый неоплаченный висит больше недели — старый уходит в архив."""
-    now = timezone.now()
-    groups = defaultdict(list)
-    for deal in Deal.objects.filter(
-        archived_at__isnull=True, stage__in=(Deal.Stage.PAYMENT, Deal.Stage.OFFER)
-    ).exclude(origin=Deal.Origin.MANUAL):
-        key = phone_key(deal.contact)
-        if key:
-            groups[key].append(deal)
-    for deals in groups.values():
-        if len(deals) < 2:
-            continue
-        newest = max(deals, key=lambda d: d.created_at)
-        for deal in deals:
-            if deal is not newest and now - deal.created_at >= datetime.timedelta(days=STALE_DAYS):
-                Deal.objects.filter(pk=deal.pk).update(archived_at=now)
 
 
 def ensure_order_deal(order) -> Deal:

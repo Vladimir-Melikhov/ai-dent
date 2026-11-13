@@ -541,14 +541,14 @@ def test_quote_card_merges_into_order_by_phone(client):
     assert deal.origin == "order" and deal.stage == "payment" and deal.quote_id and deal.order_id
 
 
-def test_stale_unpaid_card_archived_when_client_orders_again(client):
+def test_old_unpaid_card_is_not_hidden_when_client_orders_again(client):
     old = make_order(number="OLD")
     client.get("/deals/")
     age(Deal.objects.get(order=old), 10)
     make_order(number="NEW")
     client.get("/deals/")
-    assert Deal.objects.get(order=old).archived_at is not None
-    assert Deal.objects.get(title="Заказ №NEW").archived_at is None
+    # неоплаченный заказ сам в архив не уходит: решает владелец («Отменить заказ» или «В архив»)
+    assert Deal.objects.filter(archived_at__isnull=True).count() == 2
 
 
 def test_fresh_parallel_orders_both_stay(client):
@@ -648,10 +648,6 @@ def test_card_age_is_order_age_not_sync_time(client):
     Order.objects.filter(pk=order.pk).update(created_at=timezone.now() - datetime.timedelta(days=10))
     body = client.get("/deals/").content.decode()
     assert "ждёт 10 дн." in body
-    # старый неоплаченный + новый заказ того же клиента: старый уходит в архив сразу
-    make_order(number="NEW")
-    client.get("/deals/")
-    assert Deal.objects.get(order=order).archived_at is not None
 
 
 # --- закупка: спрашиваем при оплате; калькулятор маржи
