@@ -588,6 +588,7 @@ def sales(request):
         if order.status == Order.Status.PAID:
             cost = services.order_cost(order)
             order.cost, order.profit = (cost, (order.total_amount or ZERO) - cost) if cost else (None, None)
+        order.has_pdf = invoice_available(order)
         order.can_confirm = Order.Status.CONFIRMED in allowed_transitions(order)
         order.can_pay = Order.Status.PAID in allowed_transitions(order)
     tiles = []

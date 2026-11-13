@@ -97,7 +97,7 @@ async def cart_summary(session: AsyncSession, owner: Owner) -> dict:
 
 async def allowed_product(session: AsyncSession, product_id: int) -> tuple[Product | None, str | None]:
     """То же правило допуска, что в Django: активен и есть цена в рублях; остаток не важен."""
-    product = await session.get(Product, product_id)
+    product = await session.get(Product, product_id, options=[selectinload(Product.content_blocks)])
     if product is None or not product.is_active:
         return None, "товара нет в каталоге"
     if product.price_rub is None:
@@ -130,6 +130,49 @@ async def set_quantity(session: AsyncSession, owner: Owner, product_id: int, qua
     return None
 
 
+def _flatten(characteristics) -> list[list]:
+    """«Главное о товаре» как на сайте и в КП из панели: группы «название → список пунктов».
+
+    Копия panel.services._flatten: api и Django — отдельные сервисы, общего кода у них нет."""
+    pairs = []
+    if isinstance(characteristics, dict):
+        for key, value in characteristics.items():
+            if isinstance(value, dict):
+                pairs += [(k, v) for k, v in value.items()]
+            else:
+                pairs.append((key, value))
+    elif isinstance(characteristics, list):
+        for item in characteristics:
+            if isinstance(item, dict):
+                label = item.get("label") or item.get("title") or item.get("name") or item.get("key") or ""
+                pairs.append((label, item.get("value", item.get("values", item.get("items")))))
+            elif item:
+                pairs.append(("", item))
+    result = []
+    for key, value in pairs:
+        items = value if isinstance(value, (list, tuple)) else [value]
+        items = [" ".join(str(v).split()) for v in items if v is not None and str(v).strip()]
+        if items:
+            result.append([str(key).strip(), items])
+    return result
+
+
+def product_details(product: Product) -> dict:
+    """Группы описания для КП; нет характеристик — строки блоков «Характеристики» и «Ряд фич»."""
+    groups = _flatten(product.characteristics)
+    if not groups:
+        for block in product.content_blocks:
+            if block.block_type not in ("specs", "features"):
+                continue
+            for item in block.data if isinstance(block.data, list) else []:
+                if isinstance(item, dict):
+                    label = str(item.get("label") or item.get("title") or item.get("name") or "").strip()
+                    value = str(item.get("value") or "").strip()
+                    if label or value:
+                        groups.append([label, [value]] if label and value else [label or value, []])
+    return {"groups": groups} if groups else {}
+
+
 async def quote_lines(session: AsyncSession, positions: list[tuple[int, int]]) -> list[dict]:
     """Снапшот позиций КП в рублях; у валютных — исходная цена и курс на дату КП."""
     lines = []
@@ -143,6 +186,7 @@ async def quote_lines(session: AsyncSession, positions: list[tuple[int, int]]) -
             "unit_price_rub": str(unit), "line_total_rub": str(unit * quantity),
             "source_price": str(product.price), "source_currency": product.currency,
             "exchange_rate": str(await rate_on(session, product.currency)) if product.currency != "RUB" else None,
+            **product_details(product),
         })
     return lines
 

@@ -109,6 +109,8 @@ def test_quote_from_cart_and_from_items(owner, conversation, catalog):
     assert quote["conversation_id"] == conversation["id"] and quote["pdf_path"] == ""
     items = json.loads(quote["items"])
     assert items[0]["unit_price_rub"] == "48500.00" and items[0]["source_currency"] == "RUB"
+    # описание как в КП из панели: «Главное о товаре» группами
+    assert items[0]["groups"] == [["Увеличение", ["3,0×"]]]
 
     usd = run_tool(owner, "create_quote", {"source": "items", "items": [{"product_id": catalog["usd"], "quantity": 1}]})
     assert usd.result["total_rub"] == 95000.0

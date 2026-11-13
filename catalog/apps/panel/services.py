@@ -467,6 +467,16 @@ def order_from_panel(order) -> bool:
     ).exists()
 
 
+def _note_is_auto(deal) -> bool:
+    """Заметка пуста или это авто-текст по КП сделки (не правка владельца) — её можно заменить составом заказа."""
+    note = deal.note.strip()
+    if not note:
+        return True
+    quotes = [deal.quote] if deal.quote_id else []
+    quotes += [d.quote for d in deal.old_quotes.select_related("quote")]
+    return any(note == quote_summary(q).strip() for q in quotes)
+
+
 def _sync_order(order):
     stage = ORDER_STAGE.get(order.status)
     if stage is None:
@@ -496,8 +506,10 @@ def _sync_order(order):
             return
     else:
         changed = {k: v for k, v in fields.items() if getattr(deal, k) != v}
-        if not deal.note.strip():
-            changed["note"] = order_summary(order)
+        if _note_is_auto(deal):
+            summary = order_summary(order)
+            if summary != deal.note:
+                changed["note"] = summary
         if deal.archived_at and stage == Deal.Stage.WON:
             changed["archived_at"] = None  # деньги пришли — карточка возвращается из архива
         if changed:

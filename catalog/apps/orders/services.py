@@ -251,7 +251,8 @@ def issue_invoice(order, issued_at) -> Invoice:
 
 
 def invoice_url(order) -> str:
-    return reverse("orders:invoice_download", args=[order.number])
+    # urlconf сайта явно: из панели (свой хост и urlconf) ссылка на счёт всё равно ведёт на сайт
+    return reverse("orders:invoice_download", args=[order.number], urlconf=settings.ROOT_URLCONF)
 
 
 EVENT_TEXT = {

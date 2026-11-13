@@ -604,6 +604,22 @@ def test_unknown_status_rejected(client):
     assert order.status == "pending_confirmation"
 
 
+def test_confirm_from_panel_host_builds_site_invoice_link(client, settings, tmp_path, microscope):
+    """Подтверждение из панели: у хоста панели свой urlconf, ссылка на счёт всё равно строится."""
+    from apps.chat.models import Message
+    from apps.orders.models import OrderItem
+
+    settings.MEDIA_ROOT = tmp_path
+    conversation = Conversation.objects.create(session=AnonSession.objects.create())
+    order = make_order(conversation=conversation)
+    OrderItem.objects.create(order=order, product=microscope, product_name="Лупа", unit_price=500, line_total=500)
+    response = client.post(f"/orders/{order.pk}/to/confirmed/")
+    order.refresh_from_db()
+    assert response.status_code == 302 and order.status == "confirmed"
+    event = Message.objects.filter(conversation=conversation).latest("id")
+    assert order.number in event.event_payload["invoice_url"]
+
+
 def test_order_status_requires_login():
     order = make_order(status=Order.Status.CONFIRMED)
     response = Client(HTTP_HOST=PANEL).post(f"/orders/{order.pk}/to/paid/")
@@ -889,6 +905,36 @@ def test_invoice_with_discount_creates_confirmed_order(client, microscope, setti
     # заказ пошёл обычным путём: виден в сделках и продажах
     assert Deal.objects.get(order=order).stage == Deal.Stage.PAYMENT
     assert order.number in client.get("/sales/").content.decode()
+
+
+def test_invoice_replaces_quote_text_in_deal_note(client, microscope, settings, tmp_path):
+    """Счёт собран иначе, чем КП: в заметке сделки — состав счёта, а не последнего КП; правка владельца не трогается."""
+    settings.MEDIA_ROOT = tmp_path
+    phone = "+7 900 123 45 67"
+    client.post("/docs/quote/", {"name": "Иван", "phone": phone, "valid_days": "7", "items": items_json(microscope, 1, "0")})
+    deal = Deal.objects.get()
+    assert "× 1" in deal.note
+    client.post("/docs/invoice/", {
+        "buyer_type": "legal", "name": "ООО Стом", "inn": "7707083893", "contact_name": "Иван",
+        "phone": phone, "items": items_json(microscope, 3, "0"),
+    })
+    deal = Deal.objects.get()
+    assert deal.order_id and "× 3" in deal.note and "× 1" not in deal.note
+    deal.note = "Звонить после обеда"
+    deal.save()
+    client.get("/deals/")
+    deal.refresh_from_db()
+    assert deal.note == "Звонить после обеда"
+
+
+def test_sales_number_links_to_invoice(client, microscope, settings, tmp_path):
+    settings.MEDIA_ROOT = tmp_path
+    client.post("/docs/invoice/", {
+        "buyer_type": "legal", "name": "ООО Стом", "inn": "7707083893", "contact_name": "Иван",
+        "phone": "+7 900 123 45 67", "items": items_json(microscope, 1, "0"),
+    })
+    order = Order.objects.get()
+    assert f'href="/docs/invoice/{order.number}.pdf"' in client.get("/sales/").content.decode()
 
 
 def test_invoice_bad_inn_creates_nothing(client, microscope):

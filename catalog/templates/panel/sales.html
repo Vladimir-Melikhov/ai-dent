@@ -26,7 +26,7 @@
     <tbody>
       {% for o in page %}
       <tr>
-        <td class="nowrap"><b>№{{ o.number }}</b></td>
+        <td class="nowrap">{% if o.has_pdf %}<a href="/docs/invoice/{{ o.number }}.pdf" target="_blank" rel="noopener" title="Открыть счёт (PDF)"><b>№{{ o.number }}</b></a>{% else %}<b>№{{ o.number }}</b>{% endif %}</td>
         <td class="nowrap">{{ o.created_at|date:"d.m.Y H:i" }}</td>
         <td>{{ o.company_name|default:o.buyer_name|default:o.contact_name|default:"—" }}{% if o.contact_phone %}<br><a class="phone" href="tel:{{ o.contact_phone }}">{{ o.contact_phone }}</a>{% endif %}</td>
         <td class="nowrap"><span class="pill st-{{ o.status }}">{{ o.get_status_display }}</span>{% if o.wait_days is not None %} <span class="wait{% if o.wait_days >= 7 %} stale{% endif %}">{{ o.wait_days }} дн.</span>{% endif %}</td>
