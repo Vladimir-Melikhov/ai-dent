@@ -32,6 +32,7 @@
         <td class="nowrap"><span class="pill st-{{ o.status }}">{{ o.get_status_display }}</span>{% if o.wait_days is not None %} <span class="wait{% if o.wait_days >= 7 %} stale{% endif %}">{{ o.wait_days }} дн.</span>{% endif %}</td>
         <td class="r nowrap amt">{{ o.total_amount|default_if_none:0|rub }}{% if o.profit is not None %}<br><span class="wait">прибыль {{ o.profit|rub }}</span>{% endif %}</td>
         <td class="r nowrap">
+          {% if o.has_pdf %}<a class="btn sm ghost" href="/docs/invoice/{{ o.number }}.pdf" target="_blank" rel="noopener">Счёт PDF</a>{% endif %}
           {% if o.can_pay %}
           <button type="button" class="btn sm primary" data-ask-cost data-url="/orders/{{ o.pk }}/to/paid/" data-text="Заказ №{{ o.number }} на {{ o.total_amount|rub }}: во сколько вам обошёлся этот товар? Клиент увидит оплату в чате.">Оплата пришла</button>
           {% elif o.can_confirm %}

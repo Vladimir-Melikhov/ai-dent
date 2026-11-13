@@ -272,6 +272,9 @@ def _status_event(order, to_status) -> None:
     payload = {"number": order.number, "total": float(order.total_amount or 0)}
     if to_status == S.CONFIRMED:
         payload["invoice_url"] = invoice_url(order)
+        # счёт выставил владелец в панели, а не клиент оформил заказ на сайте — в чате текст другой
+        if order.status_history.filter(from_status=S.DRAFT, actor=OrderStatusHistory.Actor.DIRECTOR).exists():
+            payload["issued"] = True
         if settings.PAYMENT_LINK_ENABLED:
             from .payment import create_payment_stub
             payload["pay_url"] = create_payment_stub(order)["pay_url"]

@@ -22,6 +22,7 @@ def event_line(event_type: str, payload: dict | None) -> str:
         "order_confirmed": f"Менеджер подтвердил заказ № {number}{amount}; счёт доступен клиенту.",
         "order_paid": f"Заказ № {number} оплачен.",
         "order_cancelled": f"Заказ № {number} отменён.",
+        "quote_issued": f"Менеджер подготовил для клиента КП № {number}{amount}; оно доступно клиенту.",
         "lead_created": f"Клиент оставил заявку № {number}; менеджер перезвонит.",
     }
     return lines.get(event_type, f"Событие {event_type}.")

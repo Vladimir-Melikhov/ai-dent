@@ -343,7 +343,13 @@ if (root) {
         const total = typeof p.total === "number" ? ` Сумма — ${formatPrice(p.total)}.` : "";
         const invoice = p.invoice_url ? ` <a href="${escapeHTML(safeHref(p.invoice_url) || "#")}">Скачать счёт</a>` : "";
         const pay = p.pay_url && safeHref(p.pay_url) ? ` · <a href="${escapeHTML(safeHref(p.pay_url))}">Оплатить</a>` : "";
+        if (p.issued) return `<strong>Вам выставлен счёт по заказу № ${number}.</strong>${total}${invoice}${pay}`;
         return `<strong>Заказ № ${number} подтверждён.</strong>${total}${invoice}${pay}`;
+      }
+      case "quote_issued": {
+        const total = typeof p.total === "number" ? ` Сумма — ${formatPrice(p.total)}.` : "";
+        const link = p.url ? ` <a href="${escapeHTML(safeHref(p.url) || "#")}">Скачать PDF</a>` : "";
+        return `<strong>${p.updated ? "Мы обновили" : "Вам подготовили"} коммерческое предложение № ${number}.</strong>${total}${link}`;
       }
       case "order_paid": return `<strong>Заказ № ${number} оплачен.</strong>`;
       case "order_cancelled": return `<strong>Заказ № ${number} отменён.</strong>`;

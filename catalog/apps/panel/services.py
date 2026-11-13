@@ -772,6 +772,40 @@ def quote_items(lines, with_details=True) -> list[dict]:
     return items
 
 
+def client_channel(phone, deal=None):
+    """Как достучаться до клиента на сайте: (аккаунт, диалог). Аккаунт — по телефону, диалог — его открытый чат,
+    а без аккаунта — чат из карточки сделки. Ничего не нашли — (None, None): документ просто остаётся у владельца."""
+    from apps.accounts.models import User
+    from apps.accounts.utils import normalize_phone as site_phone
+
+    user = None
+    number = site_phone(phone or "")
+    if number:
+        user = User.objects.filter(phone=number).first()
+    conversation = None
+    if user is not None:
+        conversation = Conversation.objects.filter(
+            user=user, status=Conversation.Status.ACTIVE).order_by("-last_message_at").first()
+    if conversation is None and deal is not None and deal.conversation_id:
+        conversation = deal.conversation
+        if user is None:
+            user = conversation.user
+    return user, conversation
+
+
+def notify_quote(quote, conversation) -> None:
+    """В чат клиента: владелец подготовил КП (или обновил его)."""
+    from apps.chat.services import add_event
+
+    if conversation is None:
+        return
+    updated = quote.revision > 1
+    add_event(conversation, Message.EventType.QUOTE_ISSUED, {
+        "number": quote.number, "total": float(quote.total), "url": f"/chat/quote/{quote.id}/",
+        "valid_until": quote.valid_until.isoformat(), "updated": updated,
+    }, content=f"{'Обновлено' if updated else 'Подготовлено'} КП № {quote.number}")
+
+
 def create_quote(user, *, client_name, client_phone, valid_days, lines, with_details=True) -> Quote:
     """КП по выбранным товарам со скидкой; PDF строится по снапшоту. С телефоном клиента заводится и карточка сделки."""
     from apps.chat.quote_pdf import generate_quote_pdf
@@ -787,6 +821,13 @@ def create_quote(user, *, client_name, client_phone, valid_days, lines, with_det
     )
     quote.pdf_path = generate_quote_pdf(quote)
     Quote.objects.filter(pk=quote.pk).update(pdf_path=quote.pdf_path)
+    owner, conversation = client_channel(client_phone, find_open_deal(client_phone, None) if phone_key(client_phone) else None)
+    if owner is not None or conversation is not None:
+        # КП видно клиенту на сайте: скачивание проверяет владельца по аккаунту или гостевой сессии
+        quote.user = owner
+        quote.session = conversation.session if owner is None and conversation is not None else None
+        Quote.objects.filter(pk=quote.pk).update(user=quote.user, session=quote.session)
+        transaction.on_commit(lambda: notify_quote(quote, conversation))
     if phone_key(client_phone):
         deal = find_open_deal(client_phone, None)
         if deal is not None:
@@ -832,8 +873,14 @@ def revise_quote(quote, *, client_name, client_phone, valid_days, lines, with_de
     if is_panel_quote(quote):
         quote.client_name, quote.client_phone = client_name or None, client_phone or None
     quote.pdf_path = generate_quote_pdf(quote)
-    quote.save()
     deal = Deal.objects.filter(quote=quote).first()
+    if is_panel_quote(quote):
+        owner, conversation = client_channel(quote.client_phone, deal)
+        if owner is not None or conversation is not None:
+            quote.user = owner
+            quote.session = conversation.session if owner is None and conversation is not None else None
+            transaction.on_commit(lambda: notify_quote(quote, conversation))
+    quote.save()
     if deal is not None and deal.order_id is None:
         deal.amount, deal.expected_date, deal.note = quote.total, quote.valid_until, quote_summary(quote)
         _follow_quote_client(deal, quote)
@@ -859,7 +906,7 @@ def quote_form(quote) -> dict:
 BUYER_TYPES = {"individual": Order.BuyerType.INDIVIDUAL, "ip": Order.BuyerType.IP, "legal": Order.BuyerType.LEGAL}
 
 
-def create_invoice(user, *, buyer_type, name, inn, contact_name, phone, email, delivery, comment, lines) -> Order:
+def create_invoice(user, *, buyer_type, name, inn, contact_name, phone, email, delivery, comment, lines, deal=None) -> Order:
     """Заказ от имени владельца и счёт по нему: цены со скидкой, в счёте видна цена по прайсу.
 
     Заказ идёт обычным путём: подтверждён, счёт выставлен, дальше «Оплата пришла» в продажах."""
@@ -879,6 +926,11 @@ def create_invoice(user, *, buyer_type, name, inn, contact_name, phone, email, d
     else:
         fields.update(buyer_name=name.strip(), contact_name=name.strip())
     today = timezone.localdate()
+    # Клиент есть на сайте — заказ попадёт в его «Мои заказы», а в чат придёт счёт
+    owner, conversation = client_channel(phone, deal)
+    if owner is not None or conversation is not None:
+        fields.update(user=owner, conversation=conversation,
+                      session=conversation.session if owner is None and conversation is not None else None)
     with transaction.atomic():
         order = Order.objects.create(
             status=Order.Status.PENDING_CONFIRMATION, payment_status=Order.PaymentStatus.NONE, currency="RUB",

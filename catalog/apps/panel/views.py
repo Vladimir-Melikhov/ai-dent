@@ -798,6 +798,7 @@ def quote_revise(request, pk):
 @panel_required
 @require_POST
 def invoice_create(request):
+    deal_id = request.POST.get("deal_id", "")
     try:
         lines = document_lines(request)
         delivery = parse_money(request.POST.get("delivery", ""))
@@ -807,6 +808,7 @@ def invoice_create(request):
             contact_name=request.POST.get("contact_name", "")[:255], phone=request.POST.get("phone", "").strip()[:30],
             email=request.POST.get("email", "").strip()[:254], delivery=delivery,
             comment=request.POST.get("comment", "")[:1000], lines=lines,
+            deal=Deal.objects.filter(pk=deal_id).first() if deal_id.isdigit() else None,
         )
     except (services.DocumentError, InvoiceError, TransitionError) as error:
         remember_form(request)

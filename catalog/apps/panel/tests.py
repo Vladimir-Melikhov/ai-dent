@@ -927,6 +927,47 @@ def test_invoice_replaces_quote_text_in_deal_note(client, microscope, settings, 
     assert deal.note == "Звонить после обеда"
 
 
+def test_invoice_for_site_client_goes_to_account_and_chat(client, microscope, settings, tmp_path):
+    """Аккаунт с таким телефоном и открытый чат: заказ в «Моих заказах», в чат — «вам выставили счёт» со ссылкой."""
+    from apps.chat.models import Message
+
+    settings.MEDIA_ROOT = tmp_path
+    customer = User.objects.create_user("+79001234567", "pass-12345")
+    conversation = Conversation.objects.create(user=customer)
+    client.post("/docs/invoice/", {
+        "buyer_type": "legal", "name": "ООО Стом", "inn": "7707083893", "contact_name": "Иван",
+        "phone": "8 900 123 45 67", "items": items_json(microscope, 1, "0"),
+    })
+    order = Order.objects.get()
+    assert order.user_id == customer.pk and order.conversation_id == conversation.pk
+    event = Message.objects.get(conversation=conversation, event_type="order_confirmed")
+    assert event.event_payload.get("issued") is True and order.number in event.event_payload["invoice_url"]
+
+
+def test_quote_for_site_client_notifies_chat(client, microscope, django_capture_on_commit_callbacks):
+    from apps.chat.models import Message
+
+    customer = User.objects.create_user("+79001234567", "pass-12345")
+    conversation = Conversation.objects.create(user=customer)
+    with django_capture_on_commit_callbacks(execute=True):
+        client.post("/docs/quote/", {"name": "Иван", "phone": "+7 900 123 45 67", "valid_days": "7",
+                                     "items": items_json(microscope, 1, "0")})
+    quote = Quote.objects.get()
+    assert quote.user_id == customer.pk
+    event = Message.objects.get(conversation=conversation, event_type="quote_issued")
+    assert event.event_payload["url"] == f"/chat/quote/{quote.id}/"
+
+
+def test_invoice_for_unknown_client_stays_with_owner(client, microscope, settings, tmp_path):
+    settings.MEDIA_ROOT = tmp_path
+    client.post("/docs/invoice/", {
+        "buyer_type": "legal", "name": "ООО Стом", "inn": "7707083893", "contact_name": "Иван",
+        "phone": "+7 900 555 55 55", "items": items_json(microscope, 1, "0"),
+    })
+    order = Order.objects.get()
+    assert order.user_id is None and order.conversation_id is None
+
+
 def test_sales_number_links_to_invoice(client, microscope, settings, tmp_path):
     settings.MEDIA_ROOT = tmp_path
     client.post("/docs/invoice/", {
@@ -934,7 +975,8 @@ def test_sales_number_links_to_invoice(client, microscope, settings, tmp_path):
         "phone": "+7 900 123 45 67", "items": items_json(microscope, 1, "0"),
     })
     order = Order.objects.get()
-    assert f'href="/docs/invoice/{order.number}.pdf"' in client.get("/sales/").content.decode()
+    html = client.get("/sales/").content.decode()
+    assert f'href="/docs/invoice/{order.number}.pdf"' in html and "Счёт PDF" in html
 
 
 def test_invoice_bad_inn_creates_nothing(client, microscope):

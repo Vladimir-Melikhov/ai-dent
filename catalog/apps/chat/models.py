@@ -68,6 +68,7 @@ class Message(models.Model):
         ORDER_PAID = "order_paid", "Заказ оплачен"
         ORDER_CANCELLED = "order_cancelled", "Заказ отменён"
         LEAD_CREATED = "lead_created", "Заявка создана"
+        QUOTE_ISSUED = "quote_issued", "КП выставлено менеджером"
 
     conversation = models.ForeignKey(Conversation, on_delete=models.CASCADE, related_name="messages")
     role = models.CharField(max_length=20, choices=Role.choices, verbose_name="Роль")
