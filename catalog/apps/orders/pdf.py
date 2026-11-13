@@ -22,11 +22,18 @@ SELLER = {
 }
 
 
-INK = colors.HexColor("#17222c")
-MUTED = colors.HexColor("#8c98a3")
-LINE = colors.HexColor("#e4e9ee")
+INK = colors.HexColor("#0f1419")
+SOFT = colors.HexColor("#2c323b")
+MUTED = colors.HexColor("#525c6d")
+FAINT = colors.HexColor("#8a94a6")
+BG = colors.HexColor("#f4f3f2")
+LINE = colors.HexColor("#d6d4d2")
 CARD = colors.HexColor("#f5f8fa")
 CARD_DARK = colors.HexColor("#e9eef2")
+
+
+FONT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "static", "fonts", "pdf")
+TEETH = os.path.join(os.path.dirname(FONT_DIR), "..", "img", "teeth.png")
 
 
 def _fonts():
@@ -43,6 +50,12 @@ def _fonts():
     ]
 
     reg, bold = "Helvetica", "Helvetica-Bold"
+
+    # Шрифт сайта лежит в репозитории: цифры и ₽ одинаковые на любом сервере
+    if os.path.exists(os.path.join(FONT_DIR, "Manrope-Regular.ttf")):
+        pdfmetrics.registerFont(TTFont("Manrope", os.path.join(FONT_DIR, "Manrope-Regular.ttf")))
+        pdfmetrics.registerFont(TTFont("Manrope-Bold", os.path.join(FONT_DIR, "Manrope-Bold.ttf")))
+        return "Manrope", "Manrope-Bold"
 
     for p in candidates_reg:
         if os.path.exists(p):
@@ -154,8 +167,6 @@ def _draw_wrapped_text(
 
 # ─── Скидка ───
 
-ACCENT = colors.HexColor("#1f6f8b")
-DISCOUNT = colors.HexColor("#b4472d")
 
 
 def discount_percent(list_price, price):
@@ -182,3 +193,212 @@ def discount_summary(rows):
     if full <= paid:
         return None
     return full, full - paid, ((full - paid) / full * 100)
+
+
+# ─── Общий вид документов: серо-бежевый фон сайта, стекло, чёрные акценты ───
+
+PAGE_W, PAGE_H = 210 * mm, 297 * mm
+LEFT, RIGHT = 20 * mm, 190 * mm
+
+
+def paint_page(c):
+    """Фон страницы и еле заметный зуб, как на сайте."""
+    c.setFillColor(BG)
+    c.rect(0, 0, PAGE_W, PAGE_H, stroke=0, fill=1)
+    if os.path.exists(TEETH):
+        c.saveState()
+        c.setFillAlpha(0.07)
+        size = 150 * mm
+        c.translate(PAGE_W - 48 * mm, 70 * mm)
+        c.rotate(-8)
+        c.drawImage(TEETH, -size / 2, -size / 2, width=size, height=size * 1024 / 1051, mask="auto")
+        c.restoreState()
+
+
+def glass(c, x, y, w, h, radius=4 * mm, dark=False):
+    """Матовая карточка: светлая полупрозрачная или чёрная."""
+    c.saveState()
+    if dark:
+        c.setFillColor(INK)
+        c.roundRect(x, y, w, h, radius, stroke=0, fill=1)
+    else:
+        c.setFillColor(colors.white)
+        c.setFillAlpha(0.72)
+        c.roundRect(x, y, w, h, radius, stroke=0, fill=1)
+        c.setStrokeColor(INK)
+        c.setStrokeAlpha(0.09)
+        c.setLineWidth(0.6)
+        c.roundRect(x, y, w, h, radius, stroke=1, fill=0)
+    c.restoreState()
+
+
+def spaced(c, x, y, text, font, size, color, right=False, space=0.6):
+    """Подпись капсом с лёгким разрядом."""
+    c.setFont(font, size)
+    c.setFillColor(color)
+    text = text.upper()
+    width = c.stringWidth(text, font, size) + space * (len(text) - 1)
+    t = c.beginText(x - (width if right else 0), y)
+    t.setFont(font, size)
+    t.setCharSpace(space)
+    t.textOut(text)
+    c.drawText(t)
+
+
+def page_header(c, fonts, kind, number, sub=None):
+    reg, bold = fonts
+    c.setFillColor(INK)
+    c.setFont(bold, 22)
+    c.drawString(LEFT, PAGE_H - 27 * mm, SELLER["brand"])
+    spaced(c, LEFT, PAGE_H - 33 * mm, SELLER["tagline"], reg, 7.5, MUTED)
+    spaced(c, RIGHT, PAGE_H - 22 * mm, kind, reg, 7.5, MUTED, right=True)
+    c.setFont(bold, 15)
+    c.setFillColor(INK)
+    c.drawRightString(RIGHT, PAGE_H - 29.5 * mm, number)
+    if sub:
+        c.setFont(reg, 8.5)
+        c.setFillColor(MUTED)
+        c.drawRightString(RIGHT, PAGE_H - 35 * mm, sub)
+    c.setStrokeColor(INK)
+    c.setLineWidth(0.8)
+    c.line(LEFT, PAGE_H - 40 * mm, RIGHT, PAGE_H - 40 * mm)
+
+
+def page_footer(c, fonts, left_text):
+    reg, _ = fonts
+    c.setStrokeColor(LINE)
+    c.setLineWidth(0.6)
+    c.line(LEFT, 24 * mm, RIGHT, 24 * mm)
+    c.setFont(reg, 7.5)
+    c.setFillColor(FAINT)
+    c.drawString(LEFT, 18.5 * mm, left_text)
+    c.drawRightString(RIGHT, 18.5 * mm, f"{SELLER['brand']} · {SELLER['tagline']}")
+
+
+def wrap_text(c, text, font, size, width, max_lines=None):
+    lines, current = [], ""
+    for word in str(text).split():
+        test = f"{current} {word}".strip()
+        if c.stringWidth(test, font, size) <= width:
+            current = test
+        else:
+            if current:
+                lines.append(current)
+            current = word
+    if current:
+        lines.append(current)
+    if max_lines and len(lines) > max_lines:
+        lines = lines[:max_lines]
+        while lines[-1] and c.stringWidth(lines[-1] + "…", font, size) > width:
+            lines[-1] = lines[-1][:-1]
+        lines[-1] += "…"
+    return lines or [""]
+
+
+def items_table(c, fonts, lines, y, bottom, new_page):
+    """Позиции: числовые колонки по ширине самых длинных значений — цифры не наезжают друг на друга.
+
+    lines: name, quantity, price, total, list_price (до скидки или None), discount ("−15%" или None).
+    new_page() закрывает страницу и возвращает y на новой."""
+    reg, bold = fonts
+    size, gap = 9.5, 7 * mm
+    width = lambda text, font=reg, pt=size: c.stringWidth(text, font, pt)  # noqa: E731
+    has_discount = any(l["discount"] for l in lines)
+
+    total_w = max([width(l["total"], bold) for l in lines] + [width("СУММА", reg, 7)])
+    price_w = max([width(l["price"], bold) for l in lines] + [width(l["list_price"], reg, 7.5) for l in lines if l["list_price"]]
+                  + [width("ЦЕНА", reg, 7)])
+    pill_w = max([width(l["discount"], bold, 8) for l in lines if l["discount"]] + [0]) + 5 * mm
+    qty_w = max([width(l["quantity"]) for l in lines] + [width("КОЛ-ВО", reg, 7)])
+
+    sum_r = RIGHT - 2 * mm
+    price_r = sum_r - total_w - gap
+    disc_r = price_r - price_w - gap
+    qty_r = (disc_r - pill_w if has_discount else price_r - price_w) - gap
+    name_w = qty_r - qty_w - gap - LEFT
+
+    def head(at):
+        spaced(c, LEFT, at, "Наименование", reg, 7, MUTED)
+        spaced(c, qty_r, at, "Кол-во", reg, 7, MUTED, right=True)
+        spaced(c, price_r, at, "Цена", reg, 7, MUTED, right=True)
+        if has_discount:
+            spaced(c, disc_r, at, "Скидка", reg, 7, MUTED, right=True)
+        spaced(c, sum_r, at, "Сумма", reg, 7, MUTED, right=True)
+        c.setStrokeColor(INK)
+        c.setLineWidth(0.5)
+        c.line(LEFT, at - 3 * mm, RIGHT, at - 3 * mm)
+
+    head(y)
+    y -= 10 * mm
+    for line in lines:
+        name_lines = wrap_text(c, line["name"], reg, size, name_w, 3)
+        height = max(len(name_lines) * 4.8 * mm, 4.8 * mm + (4.4 * mm if line["list_price"] else 0))
+        if y - height < bottom:
+            y = new_page()
+            head(y)
+            y -= 10 * mm
+        top = y
+        c.setFont(reg, size)
+        c.setFillColor(INK)
+        for text in name_lines:
+            c.drawString(LEFT, y, text)
+            y -= 4.8 * mm
+        c.drawRightString(qty_r, top, line["quantity"])
+        c.setFont(bold, size)
+        c.drawRightString(price_r, top, line["price"])
+        c.drawRightString(sum_r, top, line["total"])
+        if line["list_price"]:
+            c.setFont(reg, 7.5)
+            c.setFillColor(FAINT)
+            c.drawRightString(price_r, top - 4.3 * mm, line["list_price"])
+            lw = c.stringWidth(line["list_price"], reg, 7.5)
+            c.setStrokeColor(FAINT)
+            c.setLineWidth(0.5)
+            c.line(price_r - lw, top - 3.3 * mm, price_r, top - 3.3 * mm)
+            # скидка — чёрная «таблетка», как кнопки на сайте
+            c.setFillColor(INK)
+            c.roundRect(disc_r - pill_w, top - 1.4 * mm, pill_w, 5.2 * mm, 2.6 * mm, stroke=0, fill=1)
+            c.setFillColor(colors.white)
+            c.setFont(bold, 8)
+            c.drawCentredString(disc_r - pill_w / 2, top + 0.1 * mm, line["discount"])
+            y = min(y, top - 4.3 * mm - 3.6 * mm)
+        y -= 1.8 * mm
+        c.setStrokeColor(LINE)
+        c.setLineWidth(0.5)
+        c.line(LEFT, y, RIGHT, y)
+        y -= 6 * mm
+    return y
+
+
+def totals_block_height(discount) -> float:
+    return (34 if discount else 22) * mm
+
+
+def totals_block(c, fonts, y, total_text, discount=None):
+    """Чёрная карточка с итогом справа; со скидкой — сумма по прайсу и размер скидки."""
+    reg, bold = fonts
+    w = 84 * mm
+    h = totals_block_height(discount)
+    x = RIGHT - w
+    glass(c, x, y - h, w, h, dark=True)
+    pad = 6 * mm
+    ty = y - 8 * mm
+    if discount:
+        c.setFont(reg, 9)
+        c.setFillColor(colors.Color(1, 1, 1, alpha=0.62))
+        c.drawString(x + pad, ty, "Сумма по прайсу")
+        c.drawRightString(RIGHT - pad, ty, discount["full"])
+        ty -= 6 * mm
+        c.setFillColor(colors.white)
+        c.drawString(x + pad, ty, f"Скидка {discount['percent']}")
+        c.drawRightString(RIGHT - pad, ty, discount["saved"])
+        ty -= 3.5 * mm
+        c.setStrokeColor(colors.Color(1, 1, 1, alpha=0.25))
+        c.setLineWidth(0.5)
+        c.line(x + pad, ty, RIGHT - pad, ty)
+        ty -= 7 * mm
+    spaced(c, x + pad, ty + 0.5 * mm, "Итого", reg, 8, colors.Color(1, 1, 1, alpha=0.7))
+    c.setFont(bold, 15)
+    c.setFillColor(colors.white)
+    c.drawRightString(RIGHT - pad, ty, total_text)
+    return y - h

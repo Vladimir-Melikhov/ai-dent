@@ -11,8 +11,8 @@ from reportlab.pdfgen import canvas
 
 from .models import Order, OrderItem
 from .pdf import (
-    DISCOUNT, INK, LINE, MUTED, SELLER, _draw_gradient_box, _draw_wrapped_text, _fonts, discount_percent,
-    discount_summary, percent_text,
+    INK, LEFT, MUTED, PAGE_H, RIGHT, SELLER, _fonts, discount_percent, discount_summary, glass, items_table,
+    page_footer, page_header, paint_page, percent_text, spaced, totals_block, totals_block_height, wrap_text,
 )
 from .services import rub_text
 
@@ -20,8 +20,6 @@ INVOICES_DIR = "invoices"
 CONFIRMED_TEXT = "Заказ подтверждён. Оплатите счёт по реквизитам выше."
 FOOTER_TEXT = "Счёт выставлен после подтверждения заказа менеджером."
 CURRENCY_NOTE = "Цены товаров в иностранной валюте пересчитаны в рубли по курсу ЦБ РФ на дату счёта."
-# Правый край колонки «Цена»: суммы с копейками до миллионов не наезжают на «Кол-во» и «Сумму»
-PRICE_RIGHT = 158 * mm
 
 
 def invoice_items(order) -> list[OrderItem]:
@@ -52,470 +50,122 @@ def invoice_notes(order) -> list[str]:
     return [CURRENCY_NOTE] if foreign else []
 
 
+def invoice_lines(order) -> list[dict]:
+    lines = []
+    for item in invoice_items(order):
+        pct = discount_percent(item.list_unit_price, item.unit_price) if item.kind == OrderItem.Kind.PRODUCT else None
+        lines.append({
+            "name": item.product_name, "quantity": str(item.quantity), "price": rub_text(item.unit_price),
+            "total": rub_text(item.line_total),
+            "list_price": rub_text(item.list_unit_price) if pct is not None else None,
+            "discount": f"−{percent_text(pct)}" if pct is not None else None,
+        })
+    return lines
+
+
 def generate_invoice_pdf(order, issued_at) -> str:
     """Рисует счёт и сохраняет в media/invoices/; запись Invoice создаёт сервис подтверждения."""
-    reg, bold = _fonts()
-
+    fonts = _fonts()
+    reg, bold = fonts
     buf = io.BytesIO()
     c = canvas.Canvas(buf, pagesize=A4)
 
-    w, h = A4
+    def new_page():
+        page_footer(c, fonts, FOOTER_TEXT)
+        c.showPage()
+        paint_page(c)
+        return PAGE_H - 26 * mm
 
-    left = 22 * mm
-    right = w - 22 * mm
-    content_width = right - left
+    paint_page(c)
+    page_header(c, fonts, "Счёт на оплату", f"№ {order.number}", f"от {timezone.localtime(issued_at):%d.%m.%Y}")
 
-    # ─── Шапка ───
-
-    c.setFillColor(INK)
-    c.setFont(bold, 24)
-    c.drawString(
-        left,
-        h - 28 * mm,
-        SELLER["brand"],
-    )
-
-    c.setFont(reg, 9)
-    c.setFillColor(MUTED)
-    c.drawString(
-        left,
-        h - 34 * mm,
-        SELLER["tagline"].upper(),
-    )
-
-    c.setFont(bold, 11)
-    c.setFillColor(INK)
-    c.drawRightString(
-        right,
-        h - 26 * mm,
-        f"СЧЁТ № {order.number}",
-    )
-
-    c.setFont(reg, 9)
-    c.setFillColor(MUTED)
-    c.drawRightString(
-        right,
-        h - 32 * mm,
-        f"от {timezone.localtime(issued_at):%d.%m.%Y}",
-    )
-
-    # линия под шапкой
-
-    c.setStrokeColor(INK)
-    c.setLineWidth(1.5)
-    c.line(
-        left,
-        h - 40 * mm,
-        right,
-        h - 40 * mm,
-    )
-
-    # ─── Продавец ───
-
-    y = h - 52 * mm
-
-    c.setFont(reg, 8)
-    c.setFillColor(MUTED)
-    c.drawString(
-        left,
-        y,
-        "ПОСТАВЩИК",
-    )
-
-    y -= 6 * mm
-
-    y = _draw_wrapped_text(
-        c,
-        SELLER["name"],
-        left,
-        y,
-        content_width,
-        bold,
-        10,
-        INK,
-        4.5 * mm,
-    )
-
-    y -= 1 * mm
-
-    c.setFont(reg, 9)
-    c.setFillColor(INK)
-    c.drawString(
-        left,
-        y,
-        f"ИНН: {SELLER['inn']}",
-    )
-
-    y -= 5 * mm
-
-    c.drawString(
-        left,
-        y,
-        f"Расчётный счёт: {SELLER['account']}",
-    )
-
-    # ─── Покупатель ───
-
-    y -= 10 * mm
-
-    c.setFont(reg, 8)
-    c.setFillColor(MUTED)
-    c.drawString(
-        left,
-        y,
-        "ПОКУПАТЕЛЬ",
-    )
-
-    y -= 6 * mm
-
-    for line in buyer_lines(order):
-        y = _draw_wrapped_text(
-            c,
-            line,
-            left,
-            y,
-            content_width,
-            reg,
-            10,
-            INK,
-            5.5 * mm,
-        )
-
+    # ─── Поставщик и покупатель ───
+    top = PAGE_H - 50 * mm
+    gap = 6 * mm
+    col_w = (RIGHT - LEFT - gap) / 2
+    inner = col_w - 12 * mm
+    blocks = [
+        ("Поставщик", [(SELLER["name"], bold, 9.5), (f"ИНН: {SELLER['inn']}", reg, 9)]),
+        ("Покупатель", [(line, bold if i == 0 else reg, 9.5 if i == 0 else 9) for i, line in enumerate(buyer_lines(order))]),
+    ]
     if order.requisites and not order.buyer_type:
-        y = _draw_wrapped_text(
-            c,
-            order.requisites[:150],
-            left,
-            y,
-            content_width,
-            reg,
-            9,
-            MUTED,
-            4.5 * mm,
-        )
-
-    # ─── Таблица позиций ───
-
-    y -= 7 * mm
-
-    c.setFillColor(MUTED)
-    c.setFont(reg, 8)
-
-    c.drawString(
-        left,
-        y,
-        "НАИМЕНОВАНИЕ",
-    )
-
-    c.drawString(
-        120 * mm,
-        y,
-        "КОЛ-ВО",
-    )
-
-    c.drawRightString(
-        PRICE_RIGHT,
-        y,
-        "ЦЕНА",
-    )
-
-    c.drawRightString(
-        right,
-        y,
-        "СУММА",
-    )
-
-    y -= 3 * mm
-
-    c.setStrokeColor(LINE)
-    c.setLineWidth(1)
-
-    c.line(
-        left,
-        y,
-        right,
-        y,
-    )
-
-    y -= 7 * mm
-
-    c.setFont(reg, 9.5)
-
-    for item in invoice_items(order):
-
-        c.setFillColor(INK)
-
-        name = (
-            item.product_name
-            if len(item.product_name) <= 52
-            else item.product_name[:49] + "…"
-        )
-
-        c.drawString(
-            left,
-            y,
-            name,
-        )
-
-        c.drawString(
-            122 * mm,
-            y,
-            str(item.quantity),
-        )
-
-        c.drawRightString(
-            PRICE_RIGHT,
-            y,
-            rub_text(item.unit_price),
-        )
-
-        c.drawRightString(
-            right,
-            y,
-            rub_text(item.line_total),
-        )
-
-        pct = discount_percent(item.list_unit_price, item.unit_price)
-        if pct is not None:
-            # Скидка видна в строке: цена по прайсу и процент
-            y -= 4.6 * mm
-            c.setFont(reg, 8)
-            c.setFillColor(DISCOUNT)
-            c.drawString(left, y, f"Скидка {percent_text(pct)} · цена по прайсу {rub_text(item.list_unit_price)}")
-            c.setFont(reg, 9.5)
-
-        y -= 5.5 * mm
-
-        c.setStrokeColor(LINE)
-
-        c.line(
-            left,
-            y,
-            right,
-            y,
-        )
-
-        y -= 5 * mm
-
-        # Таблица закончилась слишком низко — продолжаем на новой странице
-
-        if y < 70 * mm:
-            c.showPage()
-
-            y = h - 28 * mm
-
-            c.setFont(bold, 13)
+        blocks[1][1].append((str(order.requisites)[:150], reg, 8.5))
+    laid = []
+    for caption, rows in blocks:
+        out = []
+        for text, font, size in rows:
+            for line in wrap_text(c, text, font, size, inner):
+                out.append((line, font, size))
+        laid.append((caption, out))
+    box_h = 14 * mm + max(len(rows) for _, rows in laid) * 4.8 * mm
+    for n, (caption, rows) in enumerate(laid):
+        x = LEFT + n * (col_w + gap)
+        glass(c, x, top - box_h, col_w, box_h)
+        spaced(c, x + 6 * mm, top - 7 * mm, caption, reg, 7, MUTED)
+        ty = top - 13.5 * mm
+        for line, font, size in rows:
+            c.setFont(font, size)
             c.setFillColor(INK)
-            c.drawString(
-                left,
-                y,
-                f"Счёт № {order.number}",
-            )
+            c.drawString(x + 6 * mm, ty, line)
+            ty -= 4.8 * mm
 
-            y -= 9 * mm
+    # ─── Позиции ───
+    y = items_table(c, fonts, invoice_lines(order), top - box_h - 12 * mm, 40 * mm, new_page)
 
-            c.setFont(reg, 8)
-            c.setFillColor(MUTED)
-            c.drawString(
-                left,
-                y,
-                "ПРОДОЛЖЕНИЕ ПОЗИЦИЙ",
-            )
-
-            y -= 8 * mm
-
-            c.setFont(reg, 9.5)
-
-    # ─── Итого ───
-
-    y -= 2 * mm
-
+    # ─── Итого со скидкой ───
     summary = discount_summary(
         [(i.list_unit_price, i.unit_price, i.quantity) for i in invoice_items(order) if i.kind == OrderItem.Kind.PRODUCT]
     )
+    discount = None
     if summary:
-        full, saved, saved_pct = summary
-        c.setFont(reg, 9.5)
-        c.setFillColor(MUTED)
-        c.drawString(120 * mm, y, "Сумма по прайсу:")
-        c.drawRightString(right, y, rub_text(full))
-        y -= 6 * mm
-        c.setFillColor(DISCOUNT)
-        c.drawString(120 * mm, y, f"Скидка {percent_text(saved_pct)}:")
-        c.drawRightString(right, y, "−" + rub_text(saved))
-        y -= 8 * mm
-
-    c.setFont(bold, 14)
-    c.setFillColor(INK)
-
-    c.drawString(
-        120 * mm,
-        y,
-        "Итого:",
-    )
-
-    c.drawRightString(
-        right,
-        y,
-        rub_text(order.total_amount),
-    )
-
-    # ─── Пересчёт валюты ───
-
-    for note in invoice_notes(order):
-        y -= 7 * mm
-        y = _draw_wrapped_text(
-            c,
-            note,
-            left,
-            y,
-            content_width,
-            reg,
-            8.5,
-            MUTED,
-            4.5 * mm,
-        )
-
-    # ─── Реквизиты для оплаты ───
-
-    y -= 11 * mm
-
-    payment_height = 44 * mm
-    payment_y = y - payment_height + 5 * mm
-
-    # Если до футера не хватает места — переносим блок.
-
-    if payment_y < 42 * mm:
-        c.showPage()
-        y = h - 35 * mm
-        payment_y = y - payment_height
-
-    _draw_gradient_box(
-        c,
-        left,
-        payment_y,
-        content_width,
-        payment_height,
-    )
-
-    text_x = left + 7 * mm
-    text_y = payment_y + payment_height - 8 * mm
-
-    c.setFont(bold, 9)
-    c.setFillColor(INK)
-    c.drawString(
-        text_x,
-        text_y,
-        "РЕКВИЗИТЫ ДЛЯ ОПЛАТЫ",
-    )
-
-    text_y -= 6 * mm
-
-    c.setFont(reg, 8)
-    c.setFillColor(MUTED)
-
-    c.drawString(
-        text_x,
-        text_y,
-        f"ИП: {SELLER['name']}",
-    )
-
-    text_y -= 4.5 * mm
-
-    c.drawString(
-        text_x,
-        text_y,
-        f"ИНН: {SELLER['inn']}",
-    )
-
-    text_y -= 4.5 * mm
-
-    c.drawString(
-        text_x,
-        text_y,
-        f"Расчётный счёт: {SELLER['account']}",
-    )
-
-    for line in (f"Банк: {SELLER['bank']}", f"БИК: {SELLER['bik']}", f"Корр. счёт: {SELLER['corr_account']}"):
-        text_y -= 4.5 * mm
-        c.drawString(text_x, text_y, line)
-
-    # ─── Спасибо за заказ ───
-
-    thanks_y = payment_y - 24 * mm
-
-    c.setFont(bold, 15)
-    c.setFillColor(INK)
-
-    c.drawString(
-        left,
-        thanks_y,
-        "Спасибо за заказ.",
-    )
+        full, saved, pct = summary
+        discount = {"full": rub_text(full), "saved": "−" + rub_text(saved), "percent": percent_text(pct)}
+    if y - totals_block_height(discount) < 40 * mm:
+        y = new_page()
+    y = totals_block(c, fonts, y + 2 * mm, rub_text(order.total_amount), discount)
 
     c.setFont(reg, 8.5)
     c.setFillColor(MUTED)
+    for note in invoice_notes(order):
+        y -= 7 * mm
+        for line in wrap_text(c, note, reg, 8.5, RIGHT - LEFT):
+            c.drawString(LEFT, y, line)
+            y -= 4.6 * mm
 
-    c.drawString(
-        left,
-        thanks_y - 5.5 * mm,
-        CONFIRMED_TEXT,
-    )
-
-    # ─── Футер ───
-
-    c.setStrokeColor(LINE)
-    c.setLineWidth(0.7)
-
-    c.line(
-        left,
-        27 * mm,
-        right,
-        27 * mm,
-    )
-
-    c.setFont(reg, 7.5)
+    # ─── Реквизиты для оплаты ───
+    pay_h = 42 * mm
+    y -= 10 * mm
+    if y - pay_h < 28 * mm:
+        y = new_page()
+    glass(c, LEFT, y - pay_h, RIGHT - LEFT, pay_h)
+    spaced(c, LEFT + 7 * mm, y - 8 * mm, "Реквизиты для оплаты", bold, 8, INK)
+    ty = y - 15 * mm
+    c.setFont(reg, 8.5)
     c.setFillColor(MUTED)
+    for text in (
+        f"Получатель: {SELLER['name']}", f"ИНН: {SELLER['inn']} · Расчётный счёт: {SELLER['account']}",
+        f"Банк: {SELLER['bank']} · БИК: {SELLER['bik']}", f"Корр. счёт: {SELLER['corr_account']}",
+    ):
+        c.drawString(LEFT + 7 * mm, ty, text)
+        ty -= 5 * mm
+    y -= pay_h + 12 * mm
 
-    c.drawString(
-        left,
-        21 * mm,
-        FOOTER_TEXT,
-    )
+    if y > 36 * mm:
+        c.setFont(bold, 14)
+        c.setFillColor(INK)
+        c.drawString(LEFT, y, "Спасибо за заказ.")
+        c.setFont(reg, 8.5)
+        c.setFillColor(MUTED)
+        c.drawString(LEFT, y - 5.5 * mm, CONFIRMED_TEXT)
 
-    c.drawRightString(
-        right,
-        21 * mm,
-        f"{SELLER['brand']} · {SELLER['tagline']}",
-    )
-
-    # ─── Сохранение ───
-
+    page_footer(c, fonts, FOOTER_TEXT)
     c.showPage()
     c.save()
 
     buf.seek(0)
-
-    rel_dir = INVOICES_DIR
-
-    abs_dir = os.path.join(
-        settings.MEDIA_ROOT,
-        rel_dir,
-    )
-
-    os.makedirs(
-        abs_dir,
-        exist_ok=True,
-    )
-
+    abs_dir = os.path.join(settings.MEDIA_ROOT, INVOICES_DIR)
+    os.makedirs(abs_dir, exist_ok=True)
     filename = f"invoice-{order.number}.pdf"
-
-    abs_path = os.path.join(
-        abs_dir,
-        filename,
-    )
-
-    with open(abs_path, "wb") as f:
+    with open(os.path.join(abs_dir, filename), "wb") as f:
         f.write(buf.read())
-
-    return f"{rel_dir}/{filename}"
+    return f"{INVOICES_DIR}/{filename}"

@@ -10,8 +10,8 @@ from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas
 
 from apps.orders.pdf import (
-    ACCENT, CARD, DISCOUNT, INK, LINE, MUTED, SELLER, _draw_gradient_box, _draw_wrapped_text, _fonts,
-    discount_percent, discount_summary, percent_text,
+    FAINT, INK, LEFT, MUTED, PAGE_H, RIGHT, SELLER, _fonts, discount_percent, discount_summary, glass, page_footer,
+    page_header, paint_page, percent_text, spaced, totals_block, totals_block_height, items_table, wrap_text,
 )
 from apps.orders.services import rub_text
 
@@ -75,177 +75,62 @@ def quote_document(quote) -> dict:
     return doc
 
 
-def _wrap(c, text, font, size, width, max_lines=2):
-    """Название в одну-две строки по ширине колонки."""
-    lines, current = [], ""
-    for word in str(text).split():
-        test = f"{current} {word}".strip()
-        if c.stringWidth(test, font, size) <= width:
-            current = test
-        else:
-            if current:
-                lines.append(current)
-            current = word
-    if current:
-        lines.append(current)
-    if len(lines) > max_lines:
-        lines = lines[:max_lines]
-        while lines[-1] and c.stringWidth(lines[-1] + "…", font, size) > width:
-            lines[-1] = lines[-1][:-1]
-        lines[-1] += "…"
-    return lines or [""]
-
-
 def generate_quote_pdf(quote) -> str:
     """Рисует PDF и сохраняет в media/quotes/; Caddy этот каталог напрямую не отдаёт."""
     doc = quote_document(quote)
-    has_discount = any(l["discount"] for l in doc["lines"])
-    reg, bold = _fonts()
+    fonts = _fonts()
+    reg, bold = fonts
     buf = io.BytesIO()
     c = canvas.Canvas(buf, pagesize=A4)
-    w, h = A4
-    left, right = 22 * mm, w - 22 * mm
-    # колонки таблицы: у позиций со скидкой появляется своя колонка
-    qty_x = 116 * mm
-    price_r = 146 * mm if has_discount else 158 * mm
-    disc_r = 164 * mm
-    name_w = (qty_x - left) - 6 * mm
+    footer_text = f"Действует до {quote.valid_until:%d.%m.%Y}"
 
-    def footer():
-        c.setStrokeColor(LINE)
-        c.setLineWidth(0.7)
-        c.line(left, 27 * mm, right, 27 * mm)
-        c.setFont(reg, 7.5)
-        c.setFillColor(MUTED)
-        c.drawString(left, 21 * mm, f"Действует до {quote.valid_until:%d.%m.%Y}")
-        c.drawRightString(right, 21 * mm, f"{SELLER['brand']} · {SELLER['tagline']}")
+    def new_page():
+        page_footer(c, fonts, footer_text)
+        c.showPage()
+        paint_page(c)
+        return PAGE_H - 26 * mm
 
-    # ─── Шапка ───
-    c.setFillColor(ACCENT)
-    c.rect(0, h - 6 * mm, w, 6 * mm, stroke=0, fill=1)
-    c.setFillColor(INK)
-    c.setFont(bold, 24)
-    c.drawString(left, h - 26 * mm, doc["brand"])
-    c.setFont(reg, 9)
-    c.setFillColor(MUTED)
-    c.drawString(left, h - 32 * mm, doc["tagline"].upper())
-    c.setFont(reg, 8)
-    c.drawRightString(right, h - 22 * mm, "КОММЕРЧЕСКОЕ ПРЕДЛОЖЕНИЕ")
-    c.setFont(bold, 15)
-    c.setFillColor(INK)
-    c.drawRightString(right, h - 29 * mm, f"№ {quote.number}")
-    c.setStrokeColor(INK)
-    c.setLineWidth(1.5)
-    c.line(left, h - 38 * mm, right, h - 38 * mm)
+    paint_page(c)
+    page_header(c, fonts, "Коммерческое предложение", f"№ {quote.number}")
 
-    # ─── Для кого и сроки ───
-    y = h - 48 * mm
-    box_h = 18 * mm
-    _draw_gradient_box(c, left, y - box_h + 4 * mm, right - left, box_h)
-    cells = [("ДАТА", f"{quote.created_at:%d.%m.%Y}"), ("ДЕЙСТВУЕТ ДО", f"{quote.valid_until:%d.%m.%Y}")]
+    # ─── Даты и для кого ───
+    y = PAGE_H - 50 * mm
+    box_h = 19 * mm
+    glass(c, LEFT, y - box_h, RIGHT - LEFT, box_h)
+    cells = [("Дата", f"{quote.created_at:%d.%m.%Y}"), ("Действует до", f"{quote.valid_until:%d.%m.%Y}")]
     if doc["client"]:
-        cells.append(("ДЛЯ", doc["client"]))
-    x = left + 6 * mm
+        cells.append(("Для", doc["client"]))
+    x = LEFT + 7 * mm
     for i, (caption, value) in enumerate(cells):
-        c.setFont(reg, 7.5)
-        c.setFillColor(MUTED)
-        c.drawString(x, y - 2 * mm, caption)
+        spaced(c, x, y - 6.5 * mm, caption, reg, 7, MUTED)
         c.setFont(bold, 11)
         c.setFillColor(INK)
-        shown = value if i < 2 else _wrap(c, value, bold, 11, right - x - 6 * mm, 1)[0]
-        c.drawString(x, y - 8.5 * mm, shown)
-        x += 38 * mm
+        room = RIGHT - x - 7 * mm
+        c.drawString(x, y - 13 * mm, wrap_text(c, value, bold, 11, room if i == 2 else 60 * mm, 1)[0])
+        x += 42 * mm
 
-    # ─── Таблица ───
-    y -= box_h + 8 * mm
-    c.setFillColor(CARD)
-    c.roundRect(left, y - 3 * mm, right - left, 9 * mm, 2 * mm, stroke=0, fill=1)
-
-    def table_head(at):
-        c.setFont(reg, 7.5)
-        c.setFillColor(MUTED)
-        c.drawString(left + 3 * mm, at, "НАИМЕНОВАНИЕ")
-        c.drawString(qty_x, at, "КОЛ-ВО")
-        c.drawRightString(price_r, at, "ЦЕНА")
-        if has_discount:
-            c.drawRightString(disc_r, at, "СКИДКА")
-        c.drawRightString(right - 3 * mm, at, "СУММА")
-
-    table_head(y)
-    y -= 11 * mm
-    for line in doc["lines"]:
-        name_lines = _wrap(c, line["name"], reg, 9.5, name_w - 3 * mm)
-        height = max(len(name_lines) * 4.6 * mm, 4.6 * mm) + (4 * mm if line["list_price"] else 0)
-        if y - height < 58 * mm:
-            footer()
-            c.showPage()
-            c.setFillColor(ACCENT)
-            c.rect(0, h - 6 * mm, w, 6 * mm, stroke=0, fill=1)
-            y = h - 24 * mm
-            table_head(y)
-            y -= 10 * mm
-        top = y
-        c.setFont(reg, 9.5)
-        c.setFillColor(INK)
-        for text in name_lines:
-            c.drawString(left + 3 * mm, y, text)
-            y -= 4.6 * mm
-        c.drawString(qty_x, top, line["quantity"])
-        c.setFont(bold if line["discount"] else reg, 9.5)
-        c.drawRightString(price_r, top, line["price"])
-        c.setFont(bold, 9.5)
-        c.drawRightString(right - 3 * mm, top, line["total"])
-        if line["list_price"]:
-            # цена по прайсу под ценой, зачёркнутая
-            c.setFont(reg, 8)
-            c.setFillColor(MUTED)
-            c.drawRightString(price_r, top - 4.4 * mm, line["list_price"])
-            width = c.stringWidth(line["list_price"], reg, 8)
-            c.setStrokeColor(MUTED)
-            c.setLineWidth(0.5)
-            c.line(price_r - width, top - 3.4 * mm, price_r, top - 3.4 * mm)
-            c.setFont(bold, 9.5)
-            c.setFillColor(DISCOUNT)
-            c.drawRightString(disc_r, top, line["discount"])
-            y = min(y, top - 4.4 * mm - 3 * mm)
-        y -= 1.6 * mm
-        c.setStrokeColor(LINE)
-        c.setLineWidth(0.6)
-        c.line(left, y, right, y)
-        y -= 5.5 * mm
+    # ─── Позиции ───
+    y = items_table(c, fonts, doc["lines"], y - box_h - 12 * mm, 50 * mm + totals_block_height(doc["discount"]) * 0, new_page)
 
     # ─── Итого ───
-    need = 34 * mm if doc["discount"] else 20 * mm
-    if y - need < 58 * mm:
-        footer()
-        c.showPage()
-        c.setFillColor(ACCENT)
-        c.rect(0, h - 6 * mm, w, 6 * mm, stroke=0, fill=1)
-        y = h - 24 * mm
-    y -= 1 * mm
-    if doc["discount"]:
-        c.setFont(reg, 9.5)
-        c.setFillColor(MUTED)
-        c.drawString(qty_x, y, "Сумма по прайсу")
-        c.drawRightString(right - 3 * mm, y, doc["discount"]["full"])
-        y -= 6 * mm
-        c.setFillColor(DISCOUNT)
-        c.drawString(qty_x, y, f"Скидка {doc['discount']['percent']}")
-        c.drawRightString(right - 3 * mm, y, doc["discount"]["saved"])
-        y -= 3 * mm
-        c.setStrokeColor(LINE)
-        c.line(qty_x, y, right, y)
-        y -= 7 * mm
-    c.setFont(bold, 14)
-    c.setFillColor(INK)
-    c.drawString(qty_x, y, "Итого:")
-    c.drawRightString(right - 3 * mm, y, doc["total"])
+    if y - totals_block_height(doc["discount"]) < 40 * mm:
+        y = new_page()
+    y = totals_block(c, fonts, y + 2 * mm, doc["total"], doc["discount"])
 
-    y -= 14 * mm
+    y -= 10 * mm
+    c.setFont(reg, 8.5)
+    c.setFillColor(MUTED)
     for note in doc["notes"]:
-        y = _draw_wrapped_text(c, note, left, y, right - left, reg, 8.5, MUTED, 4.5 * mm) - 1 * mm
+        for line in wrap_text(c, note, reg, 8.5, RIGHT - LEFT):
+            if y < 30 * mm:
+                y = new_page()
+                c.setFont(reg, 8.5)
+                c.setFillColor(MUTED)
+            c.drawString(LEFT, y, line)
+            y -= 4.6 * mm
+        y -= 0.8 * mm
 
-    footer()
+    page_footer(c, fonts, footer_text)
     c.showPage()
     c.save()
 
