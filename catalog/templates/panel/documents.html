@@ -92,7 +92,8 @@
 
 <template id="line-tpl">
   <div class="line">
-    <input class="l-product" list="products" required placeholder="Название или артикул" aria-label="Товар">
+    <div class="l-name"><input class="l-product" list="products" required placeholder="Название или артикул" aria-label="Товар">
+      <small class="l-info muted"></small></div>
     <input class="l-qty" inputmode="numeric" value="1" aria-label="Количество">
     <span class="l-price r">—</span>
     <input class="l-disc" inputmode="decimal" placeholder="0" aria-label="Скидка, %">

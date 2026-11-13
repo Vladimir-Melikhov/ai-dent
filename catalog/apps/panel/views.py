@@ -592,8 +592,10 @@ def documents(request):
     ctx = page_context(request, "documents")
     quotes, invoices = services.recent_documents()
     products = [
-        {"id": p.pk, "name": p.name, "sku": p.sku or "", "price": float(p.price_rub)}
-        for p in Product.objects.filter(is_active=True, price_rub__isnull=False).order_by("name")[:3000]
+        {"id": p.pk, "name": p.name, "sku": p.sku or "", "price": float(p.price_rub),
+         "details": {k: len(v) for k, v in services.product_details(p).items()}}
+        for p in Product.objects.filter(is_active=True, price_rub__isnull=False)
+        .prefetch_related("content_blocks").order_by("name")[:3000]
     ]
     made = request.GET.get("made", "")
     result = None

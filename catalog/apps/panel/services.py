@@ -661,32 +661,77 @@ def parse_lines(raw) -> list[dict]:
     return lines
 
 
+MAX_SPECS, MAX_KIT = 8, 8
+
+
+def _clip(value, limit):
+    value = " ".join(str(value).split())
+    return value if len(value) <= limit else value[: limit - 1].rstrip() + "…"
+
+
+def _flatten(characteristics):
+    """«Главное о товаре» в любом виде, в каком его хранит каталог: словарь «название → значение или список»,
+    вложенные словари и списки пар. Возвращает [(название, [значения])]."""
+    pairs = []
+    if isinstance(characteristics, dict):
+        for key, value in characteristics.items():
+            if isinstance(value, dict):
+                pairs += [(f"{k}", v) for k, v in value.items()]
+            else:
+                pairs.append((key, value))
+    elif isinstance(characteristics, list):
+        for item in characteristics:
+            if isinstance(item, dict):
+                label = item.get("label") or item.get("title") or item.get("name") or item.get("key") or ""
+                pairs.append((label, item.get("value", item.get("values", item.get("items")))))
+            elif item:
+                pairs.append(("", item))
+    result = []
+    for key, value in pairs:
+        items = value if isinstance(value, (list, tuple)) else re.split(r"[;\n]+", str(value)) if value is not None else []
+        items = [" ".join(str(v).split()) for v in items if v is not None and str(v).strip()]
+        if items:
+            result.append((str(key).strip(), items))
+    return result
+
+
 def product_details(product) -> dict:
-    """Комплектация и характеристики товара для КП. Пустое — блока у этого товара не будет.
+    """Ключевое о товаре для КП — как «Главное о товаре» на сайте, но коротко: до 8 характеристик и до 8 пунктов комплектации.
 
-    Комплектация — характеристика, в названии которой есть «комплект»; остальные идут в характеристики."""
-    chars = product.characteristics if isinstance(product.characteristics, dict) else {}
+    Комплектация — группа, в названии которой есть «комплект». Длинные списки в остальных группах сворачиваются в одну строку.
+    Пусто — блока у этого товара не будет."""
+    groups = _flatten(product.characteristics)
+    if not groups:
+        # нет характеристик — берём строки из блоков контента «Характеристики» и «Ряд фич»
+        rows = []
+        for block in getattr(product, "content_blocks").all():
+            if block.block_type not in ("specs", "features"):
+                continue
+            for item in block.data if isinstance(block.data, list) else []:
+                if isinstance(item, dict):
+                    label = item.get("label") or item.get("title") or item.get("name") or ""
+                    rows.append((str(label), [str(item["value"])] if item.get("value") else []))
+        groups = [(k, v) for k, v in rows if k or v]
     kit, specs = [], []
-
-    def text(value):
-        if isinstance(value, (list, tuple)):
-            return ", ".join(str(v).strip() for v in value if str(v).strip())
-        return str(value).strip()
-
-    for key, value in chars.items():
-        key = str(key).strip()
-        if not key or not text(value):
-            continue
+    for key, items in groups:
         if "комплект" in key.lower():
-            parts = value if isinstance(value, (list, tuple)) else re.split(r"[;\n]+", str(value))
-            kit += [str(p).strip()[:140] for p in parts if str(p).strip()]
+            kit += items
+        elif not key:
+            specs.append(["", _clip(" · ".join(items), 90)])
+        elif len(items) == 1:
+            specs.append([_clip(key, 40), _clip(items[0], 70)])
         else:
-            specs.append([key[:60], text(value)[:140]])
+            specs.append([_clip(key, 40), _clip(" · ".join(items[:3]) + (" …" if len(items) > 3 else ""), 90)])
+    # строки без названия — это пункты списка: идут в комплектацию, если названий вообще нет
+    named = [s for s in specs if s[0]]
+    unnamed = [s[1] for s in specs if not s[0]]
     details = {}
+    kit = [_clip(k, 70) for k in kit] + [_clip(u, 70) for u in unnamed]
     if kit:
-        details["kit"] = kit[:24]
-    if specs:
-        details["specs"] = specs[:16]
+        more = len(kit) - MAX_KIT
+        details["kit"] = kit[:MAX_KIT] + ([f"и ещё {more}"] if more > 0 else [])
+    if named:
+        details["specs"] = named[:MAX_SPECS]
     return details
 
 

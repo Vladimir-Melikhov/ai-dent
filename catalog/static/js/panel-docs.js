@@ -43,6 +43,13 @@
     for (const row of linesBox.children) {
       const { product, qty, discount } = rowState(row);
       const price = $('.l-price', row), sum = $('.l-sum', row);
+      const info = $('.l-info', row);
+      if (info) {
+        const d = product?.details || {};
+        info.textContent = !product ? '' : (d.specs || d.kit)
+          ? `В КП: характеристик ${d.specs || 0}, комплектация ${d.kit || 0} пунктов`
+          : 'У товара нет характеристик — блока в КП не будет';
+      }
       if (!product) { price.textContent = '—'; price.classList.remove('was'); sum.textContent = '—'; continue; }
       count += 1;
       const unit = unitPrice(product.price, discount);

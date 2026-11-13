@@ -368,3 +368,4 @@ a.ai-line { color: inherit; }
 [hidden] { display: none !important; }
 .check { display: flex; align-items: center; gap: 10px; grid-column: 1 / -1; color: var(--text-2); font-size: 13px; }
 .check input { width: 18px; height: 18px; flex: none; }
+.l-name { display: grid; gap: 3px; min-width: 0; } .l-info { font-size: 11.5px; padding-left: 4px; }

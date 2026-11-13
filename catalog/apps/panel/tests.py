@@ -944,3 +944,25 @@ def test_quote_adds_kit_and_specs_from_catalog(client, microscope, settings, tmp
     microscope.save()
     client.post("/docs/quote/", {"name": "К", "items": items_json(microscope), "with_details": "1"})
     assert quote_document(Quote.objects.order_by("-created_at").first())["details"] == []
+
+
+def test_product_details_are_short_and_cover_site_formats():
+    from types import SimpleNamespace as NS
+
+    def details(chars):
+        return services.product_details(NS(characteristics=chars, content_blocks=NS(all=lambda: [])))
+
+    # группы «название → список»: комплектация — пунктами, длинный список — одной строкой
+    got = details({
+        "Комплектация": [f"Пункт {i}" for i in range(12)],
+        "Особенности": ["Одно", "Два", "Три", "Четыре"],
+        "Питание": "220 В",
+        **{f"Параметр {i}": str(i) for i in range(12)},
+    })
+    assert len(got["kit"]) == 9 and got["kit"][-1] == "и ещё 4"
+    assert got["specs"][0] == ["Особенности", "Одно · Два · Три …"] and len(got["specs"]) == 8
+    # вложенные словари и список пар
+    assert details({"Основное": {"Вес": "5 кг"}})["specs"] == [["Вес", "5 кг"]]
+    assert details([{"label": "Мощность", "value": "1 кВт"}])["specs"] == [["Мощность", "1 кВт"]]
+    assert details({}) == {} and details(None) == {}
+    assert len(details({"A": "x" * 300})["specs"][0][1]) <= 70
