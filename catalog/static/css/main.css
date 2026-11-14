@@ -162,12 +162,13 @@
     width: 40px;
     height: 40px;
     border-radius: 999px;
-    background: rgba(255,255,255,0.8);
-    border: 1px solid #e8eaee;
-    color: #0f1419;
+    background: #0f1419;
+    border: 1px solid #0f1419;
+    color: #fff;
+    cursor: pointer;
     transition: background 0.2s;
   }
-  .header__cart:hover { background: #fff; }
+  .header__cart:hover { background: #1e252f; }
   .header__cart svg { width: 19px; height: 19px; }
   
   .header__actions form { display: inline-flex; margin: 0; }
