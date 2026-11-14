@@ -39,16 +39,10 @@ def quotes_list(request):
     if not request.user.is_authenticated:
         return JsonResponse({"items": []})
     today = timezone.localdate()
-    quotes = Quote.objects.filter(user=request.user).select_related("superseded_in").order_by("-created_at")
+    quotes = Quote.objects.filter(user=request.user).order_by("-created_at")
     items = []
     for q in quotes:
-        replaced = hasattr(q, "superseded_in")
-        if replaced:
-            status = "Заменено новым"
-        elif q.valid_until < today:
-            status = "Срок истёк"
-        else:
-            status = f"Действует до {q.valid_until:%d.%m.%Y}"
+        status = "Срок истёк" if q.valid_until < today else f"Действует до {q.valid_until:%d.%m.%Y}"
         items.append({
             "number": q.number, "created_at": q.created_at.astimezone().strftime("%d.%m.%Y"),
             "status": status, "total": float(q.total), "items_count": len(q.items),

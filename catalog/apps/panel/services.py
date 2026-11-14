@@ -927,7 +927,7 @@ def create_invoice(user, *, buyer_type, name, inn, contact_name, phone, email, d
     else:
         fields.update(buyer_name=name.strip(), contact_name=name.strip())
     today = timezone.localdate()
-    # Клиент есть на сайте — заказ попадёт в его «Мои заказы», а в чат придёт счёт
+    # Клиент есть на сайте — заказ попадёт в его «Заказы», а в чат придёт счёт
     owner, conversation = client_channel(phone, deal)
     if owner is not None or conversation is not None:
         fields.update(user=owner, conversation=conversation,
