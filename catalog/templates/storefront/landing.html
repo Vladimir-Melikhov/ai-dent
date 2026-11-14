@@ -17,7 +17,7 @@
     style="position: relative; z-index: 10;"
   >
     <h1 class="hero__title" id="hero-title" data-hold="{{ hero_hold_ms }}">
-      <span class="hero__typed" id="hero-typed">{% for line in hero_first_lines %}{{ line }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</span><span class="hero__cursor" aria-hidden="true"></span>
+      <span class="hero__typed" id="hero-typed">{% for line in hero_first_lines %}{{ line }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</span>
     </h1>
     {{ hero_phrases|json_script:"hero-phrases" }}
 
