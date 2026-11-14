@@ -226,6 +226,21 @@
     padding-top: 20px;
   }
   
+  /* Печатная машинка в заголовке: курсор мигает, высота резервируется под две строки — страница не прыгает */
+  .hero__title { min-height: 2.2em; }
+  .hero__cursor {
+    display: inline-block;
+    width: 0.06em;
+    height: 0.85em;
+    margin-left: 0.06em;
+    vertical-align: -0.06em;
+    background: #111827;
+    border-radius: 1px;
+    animation: hero-cursor-blink 1.05s steps(1) infinite;
+  }
+  @keyframes hero-cursor-blink { 50% { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .hero__cursor { animation: none; } }
+
   .hero__title {
     font-size: clamp(40px, 6vw, 68px);
     font-weight: 900;

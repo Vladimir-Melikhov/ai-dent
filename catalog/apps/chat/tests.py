@@ -351,3 +351,24 @@ def test_usage_summary_by_day(admin_client):
     assert "Сводка по дням" in page and today in page
     assert "<strong>0,05</strong>" in page and "<strong>1,00</strong>" in page  # и попытка без диалога
     assert "75 %" in page and "50 %" in page  # доля чтения из кэша, доля резервной модели
+
+
+# --- заголовок главной: печатающиеся фразы
+
+def test_landing_title_shows_first_phrase_and_passes_all_to_script(client, settings, redis_client):
+    settings.HERO_PHRASES = ["Первая/строка", "Вторая", "Третья <b>"]
+    html = client.get("/").content.decode()
+    assert 'id="hero-title"' in html and "Первая<br>строка" in html  # без JS видна первая фраза
+    import json
+    import re
+
+    raw = re.search(r'<script id="hero-phrases" type="application/json">(.*?)</script>', html, re.S).group(1)
+    assert json.loads(raw) == ["Первая/строка", "Вторая", "Третья <b>"]
+    assert "<b>" not in raw  # разметка из .env не попадает на страницу как есть
+    assert "js/hero-typing" in html
+
+
+def test_default_hero_phrases():
+    from django.conf import settings
+
+    assert len(settings.HERO_PHRASES) >= 3 and all(settings.HERO_PHRASES)

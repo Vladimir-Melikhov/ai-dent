@@ -22,6 +22,9 @@ def landing(request):
         "agent_unavailable": unavailable,
         "chat_inline": True,
         "chat_has_dialog": settings.CHAT_WIDGET_ENABLED and not unavailable and has_dialog(request),
+        "hero_phrases": settings.HERO_PHRASES,
+        "hero_first_lines": settings.HERO_PHRASES[0].split("/"),
+        "hero_hold_ms": int(settings.HERO_TYPING_HOLD_SECONDS * 1000),
     })
 
 

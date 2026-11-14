@@ -327,6 +327,15 @@ MANAGER_EMAIL = env("MANAGER_EMAIL", default="")
 # Рассылка для писем со счётом и о смене статуса, через запятую
 NOTIFY_EMAILS = env_list("NOTIFY_EMAILS")
 
+# Фразы под печатную машинку в заголовке главной. Разделитель фраз — «|», перенос строки внутри фразы — «/».
+# Не задано — стандартный набор ниже
+HERO_PHRASES = [p.strip() for p in env("HERO_PHRASES", default="").split("|") if p.strip()] or [
+    "ИИ подберёт/для вас оборудование",
+    "Опишите задачу — ИИ найдёт/микроскоп, сканер или рентген",
+    "Оснастите кабинет за вечер:/ИИ сравнит, посчитает и подготовит КП",
+]
+HERO_TYPING_HOLD_SECONDS = float(env("HERO_TYPING_HOLD_SECONDS", default="6.5"))
+
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
 # Прокси для Telegram API; не задан — берётся тот же, что у Claude API (ANTHROPIC_PROXY_URL), иначе напрямую
