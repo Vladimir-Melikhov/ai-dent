@@ -2,7 +2,7 @@
 # С доменом Caddy сам получает сертификат Let's Encrypt и переводит http на https.
 # Не задан — :80 без HTTPS (локальный стенд)
 {$SITE_ADDRESS::80} {
-    encode gzip
+    encode zstd gzip
 
     header {
         X-Content-Type-Options "nosniff"
@@ -40,8 +40,11 @@
     }
 
     # Media — Caddy отдаёт из смонтированного тома (быстрее, чем через Django)
+    # Загруженные файлы не перезаписываются (повтор имени получает суффикс), поэтому кэш на месяц:
+    # без него браузер на каждой странице заново спрашивает сервер про каждую картинку
     handle /media/* {
         root * /srv
+        header Cache-Control "public, max-age=2592000"
         file_server
     }
 

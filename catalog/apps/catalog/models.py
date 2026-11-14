@@ -140,6 +140,12 @@ class ProductImage(models.Model):
     def __str__(self):
         return f"{self.product.name} — изображение #{self.pk}"
 
+    def save(self, *args, **kwargs):
+        from .images import optimize_field
+
+        optimize_field(self.image)  # новая загрузка уходит в WebP до 1600 px
+        super().save(*args, **kwargs)
+
 
 class ProductOption(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="options", verbose_name="Товар")
@@ -181,6 +187,12 @@ class ProductContentBlock(models.Model):
 
     def __str__(self):
         return f"{self.product.name} — {self.get_block_type_display()}"
+
+    def save(self, *args, **kwargs):
+        from .images import optimize_field
+
+        optimize_field(self.image)
+        super().save(*args, **kwargs)
     
 
 class CurrencyRate(models.Model):

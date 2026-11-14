@@ -370,7 +370,7 @@ function renderProduct(product) {
     ${
       tooth
         ? tooth.outerHTML
-        : `<div class="product-page__tooth"><img src="/static/img/teeth.png" alt=""></div>`
+        : `<div class="product-page__tooth"><img src="/static/img/teeth.webp" alt=""></div>`
     }
 
     <section class="product-hero">

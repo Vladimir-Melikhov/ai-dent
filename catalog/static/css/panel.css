@@ -289,7 +289,7 @@ body.auth { display: grid; place-items: center; padding: 24px; }
 
 /* стеклянный зуб за блоками: стекло карточек размывает его, как матовое */
 .bg::before { content: ""; position: absolute; right: -4vw; top: 50%; width: min(78vh, 62vw); aspect-ratio: 1051 / 1024; transform: translateY(-46%) rotate(-6deg);
-  background: url(../img/teeth.png) center / contain no-repeat; opacity: .34; filter: saturate(.8) brightness(.85); }
+  background: url(../img/teeth.webp) center / contain no-repeat; opacity: .34; filter: saturate(.8) brightness(.85); }
 @media (max-width: 720px) { .bg::before { right: -30vw; width: 110vw; opacity: .38; } }
 
 /* значки происхождения и телефон на карточке сделки */

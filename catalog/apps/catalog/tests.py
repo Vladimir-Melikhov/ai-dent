@@ -74,3 +74,29 @@ def test_stale_rate_warns_in_telegram(eur_product):
 def test_admin_rates_page(admin_client):
     page = admin_client.get("/admin/catalog/currencyrate/").content.decode()
     assert "Обновить курсы ЦБ" in page
+
+
+# --- оптимизация фото
+
+def _upload(size, fmt="PNG", name="big.png"):
+    import io
+
+    from django.core.files.uploadedfile import SimpleUploadedFile
+    from PIL import Image
+
+    buffer = io.BytesIO()
+    Image.new("RGB", size, (200, 30, 30)).save(buffer, fmt)
+    return SimpleUploadedFile(name, buffer.getvalue(), content_type=f"image/{fmt.lower()}")
+
+
+@pytest.mark.django_db
+def test_uploaded_photo_becomes_small_webp(eur_product, settings, tmp_path):
+    from PIL import Image
+
+    from .models import ProductImage
+
+    settings.MEDIA_ROOT = tmp_path
+    image = ProductImage.objects.create(product=eur_product, image=_upload((4000, 3000)))
+    assert image.image.name.endswith(".webp")
+    with Image.open(image.image.path) as opened:
+        assert opened.format == "WEBP" and max(opened.size) == 1600

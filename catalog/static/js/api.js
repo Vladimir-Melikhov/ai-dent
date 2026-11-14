@@ -276,6 +276,8 @@ export function productCard(p) {
       <img
         src="${imageUrl(p.primary_image_path)}"
         alt="${escapeHTML(p.name)}"
+        loading="lazy"
+        decoding="async"
       >
     `
     : "";
