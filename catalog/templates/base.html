@@ -101,9 +101,8 @@
   <div class="cookie-banner" id="cookie-banner" hidden>
     <div class="cookie-banner__inner">
       <p class="cookie-banner__text">
-        Мы используем cookie для работы сайта и улучшения сервиса. Продолжая пользоваться сайтом, вы соглашаетесь
-        с <a href="{% url 'storefront:privacy' %}">Политикой конфиденциальности</a>
-        и <a href="{% url 'storefront:terms' %}">Пользовательским соглашением</a>.
+        Мы используем cookie для работы сайта и улучшения сервиса. Подробнее — в
+        <a href="{% url 'storefront:privacy' %}">Политике конфиденциальности</a>.
       </p>
       <button type="button" class="cookie-banner__accept" id="cookie-accept">Принять</button>
     </div>
@@ -165,8 +164,14 @@
         <label class="auth-consent">
           <input type="checkbox" id="auth-consent">
           <span>
-            Соглашаюсь с <a href="{% url 'storefront:privacy' %}" target="_blank" rel="noopener">политикой конфиденциальности</a>
-            и <a href="{% url 'storefront:terms' %}" target="_blank" rel="noopener">пользовательским соглашением</a>
+            Даю согласие на обработку персональных данных в соответствии с
+            <a href="{% url 'storefront:privacy' %}" target="_blank" rel="noopener">политикой конфиденциальности</a>
+          </span>
+        </label>
+        <label class="auth-consent">
+          <input type="checkbox" id="auth-terms">
+          <span>
+            Принимаю условия <a href="{% url 'storefront:terms' %}" target="_blank" rel="noopener">пользовательского соглашения</a>
           </span>
         </label>
         <button type="button" id="auth-send" class="auth-btn">Получить код</button>

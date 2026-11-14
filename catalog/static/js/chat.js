@@ -120,7 +120,10 @@ if (root) {
       <input class="chat-form__input" name="name" autocomplete="name" placeholder="Имя (по желанию)" aria-label="Имя">
       <input class="chat-form__input" name="city" placeholder="Город (по желанию)" aria-label="Город">
       <label class="chat-form__consent"><input type="checkbox" name="consent">
-        <span>Соглашаюсь на обработку персональных данных по <a href="/privacy/" target="_blank" rel="noopener">политике конфиденциальности</a></span>
+        <span>Даю согласие на обработку персональных данных по <a href="/privacy/" target="_blank" rel="noopener">политике конфиденциальности</a></span>
+      </label>
+      <label class="chat-form__consent"><input type="checkbox" name="terms">
+        <span>Принимаю условия <a href="/terms/" target="_blank" rel="noopener">пользовательского соглашения</a></span>
       </label>
       <button class="chat-form__submit" type="submit">Отправить заявку</button>
       <p class="chat-form__error" role="alert"></p>`;
@@ -133,7 +136,7 @@ if (root) {
       const error = form.querySelector(".chat-form__error");
       const digits = extractPhoneDigits(phone.value);
       if (digits.length !== 10) { error.textContent = "Введите телефон полностью"; return; }
-      if (!form.elements.consent.checked) { error.textContent = "Подтвердите согласие"; return; }
+      if (!form.elements.consent.checked || !form.elements.terms.checked) { error.textContent = "Подтвердите согласие и условия соглашения"; return; }
       error.textContent = "";
       form.querySelector("button").disabled = true;
       try {
@@ -202,7 +205,10 @@ if (root) {
       <input class="chat-form__input" name="delivery_address" placeholder="Адрес доставки (по желанию)" aria-label="Адрес доставки">
       <textarea class="chat-form__input" name="comment" rows="2" placeholder="Комментарий (по желанию)" aria-label="Комментарий"></textarea>
       <label class="chat-form__consent"><input type="checkbox" name="consent">
-        <span>Соглашаюсь на обработку персональных данных по <a href="/privacy/" target="_blank" rel="noopener">политике конфиденциальности</a></span>
+        <span>Даю согласие на обработку персональных данных по <a href="/privacy/" target="_blank" rel="noopener">политике конфиденциальности</a></span>
+      </label>
+      <label class="chat-form__consent"><input type="checkbox" name="terms">
+        <span>Принимаю условия <a href="/terms/" target="_blank" rel="noopener">пользовательского соглашения</a></span>
       </label>
       <button class="chat-form__submit" type="submit" disabled>Оформить заказ</button>
       <p class="chat-form__error" role="alert"></p>`;
@@ -264,7 +270,7 @@ if (root) {
       if (innLength && f.inn.value.length !== innLength) { error.textContent = `ИНН — ${innLength} цифр`; return; }
       if (digits.length !== 10) { error.textContent = "Введите телефон полностью"; return; }
       if (!f.delivery_city.value.trim()) { error.textContent = "Укажите город доставки"; return; }
-      if (!f.consent.checked) { error.textContent = "Подтвердите согласие"; return; }
+      if (!f.consent.checked || !f.terms.checked) { error.textContent = "Подтвердите согласие и условия соглашения"; return; }
       error.textContent = "";
       submit.disabled = true;
       const body = { buyer_type: type, contact_phone: "+7" + digits, consent: true, cart_version: version };

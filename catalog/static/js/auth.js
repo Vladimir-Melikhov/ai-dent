@@ -55,13 +55,15 @@ function getCookie(name) {
 
   /* ---- согласие с политикой/соглашением: мягко блокирует отправку кода ---- */
   const consentBox = document.getElementById("auth-consent");
+  const termsBox = document.getElementById("auth-terms");
   const sendBtn = document.getElementById("auth-send");
   function syncConsentState() {
     if (!consentBox || !sendBtn) return;
-    sendBtn.disabled = !consentBox.checked;
+    sendBtn.disabled = !(consentBox.checked && (!termsBox || termsBox.checked));
   }
   if (consentBox) {
     consentBox.addEventListener("change", syncConsentState);
+    if (termsBox) termsBox.addEventListener("change", syncConsentState);
     syncConsentState();
   }
 
@@ -75,6 +77,7 @@ function getCookie(name) {
     document.getElementById("auth-error-phone").textContent = "";
     document.getElementById("auth-error-code").textContent = "";
     if (consentBox) consentBox.checked = false;
+    if (termsBox) termsBox.checked = false;
     syncConsentState();
   }
   
@@ -90,8 +93,8 @@ function getCookie(name) {
     const phone = normalizedPhone(document.getElementById("auth-phone"));
     const err = document.getElementById("auth-error-phone");
     err.textContent = "";
-    if (consentBox && !consentBox.checked) {
-      err.textContent = "Подтвердите согласие с условиями";
+    if ((consentBox && !consentBox.checked) || (termsBox && !termsBox.checked)) {
+      err.textContent = "Подтвердите согласие и условия соглашения";
       return;
     }
     if (!phone) { err.textContent = "Введите телефон"; return; }

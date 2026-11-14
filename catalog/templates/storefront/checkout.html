@@ -195,8 +195,15 @@
             <label class="auth-consent">
               <input type="checkbox" id="co-consent">
               <span>
-                Соглашаюсь с <a href="{% url 'storefront:privacy' %}" target="_blank" rel="noopener">политикой конфиденциальности</a>
-                и <a href="{% url 'storefront:terms' %}" target="_blank" rel="noopener">пользовательским соглашением</a>
+                Даю согласие на обработку персональных данных в соответствии с
+                <a href="{% url 'storefront:privacy' %}" target="_blank" rel="noopener">политикой конфиденциальности</a>
+              </span>
+            </label>
+
+            <label class="auth-consent">
+              <input type="checkbox" id="co-terms">
+              <span>
+                Принимаю условия <a href="{% url 'storefront:terms' %}" target="_blank" rel="noopener">пользовательского соглашения</a>
               </span>
             </label>
 

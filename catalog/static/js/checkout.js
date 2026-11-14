@@ -202,7 +202,12 @@
 
     const consent = el("co-consent");
     if (consent && !consent.checked) {
-      if (errorBox) errorBox.textContent = "Подтвердите согласие с политикой конфиденциальности и соглашением";
+      if (errorBox) errorBox.textContent = "Подтвердите согласие на обработку персональных данных";
+      return;
+    }
+    const terms = el("co-terms");
+    if (terms && !terms.checked) {
+      if (errorBox) errorBox.textContent = "Примите условия пользовательского соглашения";
       return;
     }
   
