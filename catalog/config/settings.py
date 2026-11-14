@@ -329,6 +329,8 @@ NOTIFY_EMAILS = env_list("NOTIFY_EMAILS")
 
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
+# Прокси для Telegram API; не задан — берётся тот же, что у Claude API (ANTHROPIC_PROXY_URL), иначе напрямую
+TELEGRAM_PROXY_URL = os.environ.get("TELEGRAM_PROXY_URL") or os.environ.get("ANTHROPIC_PROXY_URL", "")
 # Ссылки в админку в уведомлениях Telegram: путь админки становится известен Telegram
 TELEGRAM_ADMIN_LINKS = env("TELEGRAM_ADMIN_LINKS", default="True") == "True"
 # SMS с кодом входа: notificore — 2FA API Notificore; console — код в лог (только локальный стенд).

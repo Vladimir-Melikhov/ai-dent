@@ -7,17 +7,22 @@ from django.conf import settings
 logger = logging.getLogger(__name__)
 
 
+def _post(text: str) -> None:
+    """Одно место, где уходит запрос к Telegram: через прокси, если он задан (напрямую api.telegram.org недоступен)."""
+    url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage"
+    data = urllib.parse.urlencode({"chat_id": settings.TELEGRAM_CHAT_ID, "text": text}).encode()
+    proxy = settings.TELEGRAM_PROXY_URL
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({"https": proxy, "http": proxy}) if proxy else urllib.request.ProxyHandler())
+    with opener.open(urllib.request.Request(url, data=data), timeout=10) as resp:
+        resp.read()
+
+
 def send_telegram(text: str) -> bool:
     """Сообщение в чат менеджеров."""
-    token = settings.TELEGRAM_BOT_TOKEN
-    chat_id = settings.TELEGRAM_CHAT_ID
-    if not token or not chat_id:
+    if not settings.TELEGRAM_BOT_TOKEN or not settings.TELEGRAM_CHAT_ID:
         return False
-    url = f"https://api.telegram.org/bot{token}/sendMessage"
-    data = urllib.parse.urlencode({"chat_id": chat_id, "text": text}).encode()
     try:
-        with urllib.request.urlopen(urllib.request.Request(url, data=data), timeout=5) as resp:
-            resp.read()
+        _post(text)
         logger.info("Сообщение в Telegram отправлено")
         return True
     except Exception as e:
@@ -43,13 +48,8 @@ def send_order_telegram(order):
     ]
     text = "\n".join(lines)
 
-    url = f"https://api.telegram.org/bot{token}/sendMessage"
-    data = urllib.parse.urlencode({"chat_id": chat_id, "text": text}).encode()
-    req = urllib.request.Request(url, data=data)
-
     try:
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            resp.read()
+        _post(text)
         logger.info("Заказ %s: сообщение в Telegram отправлено", order.number)
     except Exception as e:
         logger.error("Заказ %s: ошибка отправки в Telegram: %s", order.number, e)

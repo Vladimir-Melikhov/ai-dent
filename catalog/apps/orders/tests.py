@@ -163,3 +163,31 @@ def test_shortlist_price_in_rubles(client, usd_product):
     client.post("/accounts/shortlist/toggle/", data=json.dumps({"product_id": usd_product.pk}),
                 content_type="application/json")
     assert client.get("/accounts/shortlist/").json()["items"][0]["price"] == 95500.0
+
+
+# --- Telegram через прокси
+
+def test_telegram_goes_through_proxy(settings):
+    from unittest import mock
+
+    from .telegram import send_telegram
+
+    settings.TELEGRAM_BOT_TOKEN, settings.TELEGRAM_CHAT_ID = "123:abc", "42"
+    settings.TELEGRAM_PROXY_URL = "http://user:pass@proxy.example:3128"
+    with mock.patch("apps.orders.telegram.urllib.request.build_opener") as build:
+        assert send_telegram("привет") is True
+    handler = build.call_args.args[0]
+    assert handler.proxies["https"] == "http://user:pass@proxy.example:3128"
+    request = build.return_value.open.call_args.args[0]
+    assert request.full_url == "https://api.telegram.org/bot123:abc/sendMessage"
+
+
+def test_telegram_without_proxy_goes_direct(settings):
+    from unittest import mock
+
+    from .telegram import send_telegram
+
+    settings.TELEGRAM_BOT_TOKEN, settings.TELEGRAM_CHAT_ID, settings.TELEGRAM_PROXY_URL = "123:abc", "42", ""
+    with mock.patch("apps.orders.telegram.urllib.request.build_opener") as build:
+        assert send_telegram("привет") is True
+    assert "https" not in build.call_args.args[0].proxies or not build.call_args.args[0].proxies["https"].startswith("http://user")
