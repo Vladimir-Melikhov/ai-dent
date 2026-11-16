@@ -712,20 +712,37 @@
 .drawer__nav { display: none; }
 
 @media (max-width: 960px) {
+  /* порядок: вкладки → разделы → содержимое → итог → аккаунт внизу */
+  .drawer__head { order: 1; }
+  .drawer__nav { order: 2; }
+  .drawer__body { order: 3; }
+  .drawer__foot { order: 4; }
+  .drawer__account { order: 5; }
+
   .drawer__nav {
     display: flex;
-    gap: 6px;
-    padding: 12px 16px 0;
+    gap: 8px;
+    padding: 12px 16px;
+    border-bottom: 1px solid #e8eaee;
   }
   .drawer__nav a {
     flex: 1 1 0;
     text-align: center;
     padding: 9px 6px;
     border-radius: 999px;
-    background: rgba(15, 20, 25, .06);
+    background: #f1f2f5;
     color: #0f1419;
     font-size: 13px;
     font-weight: 700;
     text-decoration: none;
   }
+
+  .drawer__account {
+    border-bottom: none;
+    border-top: 1px solid #e8eaee;
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+    flex-wrap: nowrap;
+  }
+  .drawer__account-phone { white-space: nowrap; }
+  .drawer__account-actions { gap: 16px; }
 }
