@@ -710,7 +710,6 @@
 
 /* Разделы сайта в панели — только там, где нет меню в шапке */
 .drawer__nav { display: none; }
-.drawer__cats { display: none; }
 
 @media (max-width: 960px) {
   /* порядок: разделы → вкладки → содержимое → итог → аккаунт внизу */
@@ -746,59 +745,4 @@
   }
   .drawer__account-phone { white-space: nowrap; }
   .drawer__account-actions { gap: 16px; }
-
-  .drawer__nav a,
-  .drawer__nav-cat {
-    flex: 1 1 0;
-    text-align: center;
-    padding: 9px 6px;
-    border-radius: 999px;
-    background: #f1f2f5;
-    color: #0f1419;
-    font-family: inherit;
-    font-size: 13px;
-    font-weight: 700;
-    text-decoration: none;
-    border: none;
-    cursor: pointer;
-  }
-  .drawer__nav-cat {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 4px;
-  }
-  .drawer__nav-cat svg {
-    width: 14px;
-    height: 14px;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 2.2;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    transition: transform .2s ease;
-  }
-  .drawer__nav-cat[aria-expanded="true"] { background: #111827; color: #fff; }
-  .drawer__nav-cat[aria-expanded="true"] svg { transform: rotate(180deg); }
-
-  .drawer__cats {
-    order: 1;
-    display: block;
-    padding: 4px 16px 10px;
-    border-bottom: 1px solid #e8eaee;
-    max-height: 45vh;
-    overflow-y: auto;
-  }
-  .drawer__cats[hidden] { display: none; }
-  .drawer__cats a {
-    display: block;
-    padding: 11px 4px;
-    border-bottom: 1px solid #f1f2f5;
-    color: #0f1419;
-    font-size: 14px;
-    font-weight: 600;
-    text-decoration: none;
-  }
-  .drawer__cats a:last-child { border-bottom: none; }
-  .drawer__cats .drawer__cats-all { font-weight: 800; }
 }
