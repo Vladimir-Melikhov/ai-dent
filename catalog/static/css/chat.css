@@ -1151,12 +1151,6 @@
       border-radius: 20px;
     }
   
-    /* Клавиатура открыта — чат во всю видимую область над ней */
-    .chat--inline.is-active.is-kb {
-      height: var(--chat-vh, min(76dvh, 720px));
-      min-height: 0;
-    }
-
     /* Лента сообщений */
     .chat--inline.is-active .chat__feed {
       padding: 12px 12px 8px;
