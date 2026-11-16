@@ -286,6 +286,12 @@ MEDIA_ROOT = BASE_DIR / "media"
 
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
 
+# Контакты на странице «Контакты»: пустое значение — строка не показывается
+CONTACT_PHONE = env("CONTACT_PHONE", default="")
+CONTACT_EMAIL = env("CONTACT_EMAIL", default="")
+CONTACT_TELEGRAM = env("CONTACT_TELEGRAM", default="").lstrip("@")
+CONTACT_HOURS = env("CONTACT_HOURS", default="")
+
 SITE_ORIGIN = env("SITE_ORIGIN", default="http://localhost").rstrip("/")
 
 CHAT_WIDGET_ENABLED = env("CHAT_WIDGET_ENABLED", default="False") == "True"

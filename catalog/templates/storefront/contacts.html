@@ -1,0 +1,480 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Контакты — Ай-Дент{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/product.css' %}">
+
+<style>
+  .product-page__tooth {
+    opacity: 0.28 !important;
+  }
+
+  .info-page {
+    position: relative;
+    z-index: 2;
+    max-width: 1040px;
+    margin: 0 auto;
+    padding: 64px 24px 100px;
+  }
+
+  .info-hero {
+    max-width: 720px;
+    margin-bottom: 40px;
+  }
+
+  .info-hero__eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: "Instrument Sans", sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .22em;
+    text-transform: uppercase;
+    color: #747d8b;
+    margin-bottom: 16px;
+  }
+
+  .info-hero__eyebrow::before {
+    content: "";
+    width: 28px;
+    height: 1px;
+    background: #aeb5bf;
+  }
+
+  .info-hero__title {
+    margin: 0;
+    font-family: var(--font);
+    font-size: clamp(34px, 5.5vw, 52px);
+    font-weight: 250;
+    letter-spacing: -.05em;
+    line-height: 1.05;
+    color: #11151b;
+  }
+
+  .info-hero__title strong {
+    font-weight: 650;
+    font-style: italic;
+  }
+
+  .info-hero__lead {
+    max-width: 560px;
+    margin: 18px 0 0;
+    font-size: 16px;
+    line-height: 1.6;
+    font-weight: 500;
+    color: #3d4654;
+  }
+
+  .info-intro {
+    display: grid;
+    grid-template-columns: 160px 1fr;
+    gap: 28px;
+    padding: 24px 0;
+    border-top: 1px solid rgba(25, 30, 38, .12);
+    border-bottom: 1px solid rgba(25, 30, 38, .12);
+    margin-bottom: 20px;
+  }
+
+  .info-intro__label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: #8a929e;
+    padding-top: 3px;
+  }
+
+  .info-intro__text {
+    margin: 0;
+    font-size: 16px;
+    line-height: 1.55;
+    color: #1a1f27;
+  }
+
+  .info-intro__text strong {
+    font-weight: 700;
+  }
+
+  .info-values {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin: 0 0 40px;
+  }
+
+  .info-value {
+    padding: 24px 22px;
+    background: rgba(255, 255, 255, .88);
+    border: 1px solid rgba(25, 30, 38, .1);
+    border-radius: 20px;
+    box-shadow: 0 8px 24px rgba(15, 20, 25, .04);
+  }
+
+  .info-value__number {
+    font-family: "Instrument Sans", sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .16em;
+    color: #9aa2ad;
+    margin-bottom: 28px;
+  }
+
+  .info-value__title {
+    margin: 0 0 8px;
+    font-family: var(--font);
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -.025em;
+    color: #11151b;
+  }
+
+  .info-value__text {
+    margin: 0;
+    font-size: 13.5px;
+    line-height: 1.55;
+    color: #4a5360;
+  }
+
+  .info-story {
+    display: grid;
+    grid-template-columns: 160px 1fr;
+    gap: 28px;
+    margin-bottom: 40px;
+  }
+
+  .info-story__label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: #8a929e;
+    padding-top: 6px;
+  }
+
+  .info-story__title {
+    margin: 0 0 16px;
+    font-family: var(--font);
+    font-size: clamp(26px, 3.5vw, 36px);
+    font-weight: 300;
+    letter-spacing: -.04em;
+    line-height: 1.1;
+    color: #11151b;
+  }
+
+  .info-story__title strong {
+    font-weight: 650;
+  }
+
+  .info-story__content p {
+    margin: 0 0 12px;
+    font-size: 15px;
+    line-height: 1.65;
+    font-weight: 500;
+    color: #3d4654;
+  }
+
+  .info-story__content p:last-child {
+    margin-bottom: 0;
+  }
+
+  .info-founders {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 40px;
+  }
+
+  .info-founder {
+    padding: 24px 22px;
+    background: rgba(255, 255, 255, .88);
+    border: 1px solid rgba(25, 30, 38, .1);
+    border-radius: 20px;
+    box-shadow: 0 8px 24px rgba(15, 20, 25, .04);
+  }
+
+  .info-founder__role {
+    margin-bottom: 20px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: #8c95a1;
+  }
+
+  .info-founder__title {
+    margin: 0 0 8px;
+    font-family: var(--font);
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -.025em;
+    color: #11151b;
+  }
+
+  .info-founder__text {
+    margin: 0;
+    font-size: 13.5px;
+    line-height: 1.55;
+    color: #4a5360;
+  }
+
+  .info-statement {
+    padding: 36px 32px;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, .9);
+    border: 1px solid rgba(25, 30, 38, .1);
+    box-shadow: 0 8px 24px rgba(15, 20, 25, .04);
+    margin-bottom: 40px;
+  }
+
+  .info-statement__label {
+    margin-bottom: 12px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: #89929f;
+  }
+
+  .info-statement__title {
+    margin: 0;
+    max-width: 640px;
+    font-family: var(--font);
+    font-size: clamp(24px, 3.5vw, 36px);
+    font-weight: 250;
+    letter-spacing: -.04em;
+    line-height: 1.15;
+    color: #11151b;
+  }
+
+  .info-statement__title strong {
+    font-weight: 700;
+    font-style: italic;
+  }
+
+  .info-req {
+    padding-top: 24px;
+    border-top: 1px solid rgba(25, 30, 38, .12);
+    margin-bottom: 8px;
+  }
+
+  .info-req__title {
+    margin: 0 0 18px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: #8a929e;
+  }
+
+  .info-req dl {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    row-gap: 10px;
+    margin: 0;
+  }
+
+  .info-req dt {
+    font-size: 12px;
+    color: #929aa5;
+  }
+
+  .info-req dd {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: #2a313c;
+  }
+
+  .info-cta {
+    padding-top: 28px;
+  }
+
+  .info-cta a {
+    display: inline-flex;
+    align-items: center;
+    gap: 20px;
+    padding: 13px 16px 13px 20px;
+    border-radius: 999px;
+    background: #15191f;
+    color: #fff;
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 700;
+    transition: transform .2s ease, background .2s ease;
+  }
+
+  .info-cta a span {
+    font-size: 16px;
+    line-height: 1;
+  }
+
+  .info-cta a:hover {
+    transform: translateY(-2px);
+    background: #272d35;
+  }
+
+  @media (max-width: 800px) {
+    .info-page {
+      padding: 40px 16px 80px;
+    }
+
+    .info-intro,
+    .info-story {
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+
+    .info-values,
+    .info-founders {
+      grid-template-columns: 1fr;
+    }
+
+    .info-req dl {
+      grid-template-columns: 1fr;
+      row-gap: 4px;
+    }
+
+    .info-req dt {
+      margin-top: 10px;
+    }
+
+    .info-req dt:first-child {
+      margin-top: 0;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .info-value,
+    .info-founder {
+      padding: 20px 18px;
+    }
+    .info-statement {
+      padding: 26px 22px;
+    }
+    .product-page__tooth { opacity: .35; }
+  }
+
+  .contact-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin: 0 0 24px;
+  }
+  .contact-card {
+    display: block;
+    padding: 24px 22px;
+    background: rgba(255, 255, 255, .88);
+    border: 1px solid rgba(25, 30, 38, .1);
+    border-radius: 20px;
+    box-shadow: 0 8px 24px rgba(15, 20, 25, .04);
+    color: inherit;
+    text-decoration: none;
+    transition: transform .2s ease, box-shadow .2s ease;
+  }
+  a.contact-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 30px rgba(15, 20, 25, .08);
+  }
+  .contact-card__label {
+    font-family: "Instrument Sans", sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: #9aa2ad;
+    margin-bottom: 18px;
+  }
+  .contact-card__value {
+    font-family: var(--font);
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -.025em;
+    color: #11151b;
+    overflow-wrap: anywhere;
+  }
+  .contact-card__note {
+    margin: 6px 0 0;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #5c6370;
+  }
+  @media (max-width: 640px) {
+    .contact-grid { grid-template-columns: 1fr; }
+    .contact-card { padding: 20px 18px; }
+  }
+</style>
+{% endblock %}
+
+
+{% block content %}
+
+<div class="product-page__tooth">
+  <img src="{% static 'img/teeth.webp' %}" alt="">
+</div>
+
+<section class="info-page">
+
+  <header class="info-hero">
+    <div class="info-hero__eyebrow">Контакты</div>
+    <h1 class="info-hero__title">
+      Поможем с выбором<br>
+      <strong>и поставкой.</strong>
+    </h1>
+    <p class="info-hero__lead">
+      Напишите или позвоните — подскажем по оборудованию,
+      подготовим коммерческое предложение и организуем доставку.
+    </p>
+  </header>
+
+  <div class="contact-grid">
+    {% if contact_phone %}
+    <a class="contact-card" href="tel:{{ contact_phone_href }}">
+      <div class="contact-card__label">Телефон</div>
+      <div class="contact-card__value">{{ contact_phone }}</div>
+      {% if contact_hours %}<p class="contact-card__note">{{ contact_hours }}</p>{% endif %}
+    </a>
+    {% endif %}
+    {% if contact_email %}
+    <a class="contact-card" href="mailto:{{ contact_email }}">
+      <div class="contact-card__label">Почта</div>
+      <div class="contact-card__value">{{ contact_email }}</div>
+    </a>
+    {% endif %}
+    {% if contact_telegram %}
+    <a class="contact-card" href="https://t.me/{{ contact_telegram }}" target="_blank" rel="noopener">
+      <div class="contact-card__label">Telegram</div>
+      <div class="contact-card__value">@{{ contact_telegram }}</div>
+    </a>
+    {% endif %}
+    <div class="contact-card">
+      <div class="contact-card__label">Адрес</div>
+      <div class="contact-card__value">Московская обл., г. Реутов</div>
+      <p class="contact-card__note">Отправляем по всей России. Самовывоз — по согласованию с менеджером.</p>
+    </div>
+  </div>
+
+  <section class="info-req">
+    <h2 class="info-req__title">Реквизиты</h2>
+    <dl>
+      <dt>Продавец</dt>
+      <dd>ИП Мелихов Владимир Семёнович</dd>
+      <dt>ИНН</dt>
+      <dd>616808573750</dd>
+      <dt>ОГРНИП</dt>
+      <dd>326508100167700</dd>
+    </dl>
+  </section>
+
+  <div class="info-cta">
+    <a href="{% url 'storefront:catalog' %}">
+      Смотреть каталог
+      <span aria-hidden="true">→</span>
+    </a>
+  </div>
+
+</section>
+
+{% endblock %}

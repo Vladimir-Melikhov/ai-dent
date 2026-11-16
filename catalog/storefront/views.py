@@ -50,6 +50,19 @@ def about(request):
     return render(request, "storefront/about.html")
 
 
+def contacts(request):
+    from django.conf import settings
+
+    phone = settings.CONTACT_PHONE
+    return render(request, "storefront/contacts.html", {
+        "contact_phone": phone,
+        "contact_phone_href": "".join(ch for ch in phone if ch.isdigit() or ch == "+"),
+        "contact_email": settings.CONTACT_EMAIL,
+        "contact_telegram": settings.CONTACT_TELEGRAM,
+        "contact_hours": settings.CONTACT_HOURS,
+    })
+
+
 @ensure_csrf_cookie
 def privacy(request):
     return render(request, "storefront/privacy.html")

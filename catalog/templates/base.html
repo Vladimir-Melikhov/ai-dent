@@ -28,6 +28,7 @@
       <a href="{% url 'storefront:catalog' %}">Каталог</a>
       <a href="{% url 'storefront:delivery' %}">Доставка</a>
       <a href="{% url 'storefront:about' %}">О нас</a>
+      <a href="{% url 'storefront:contacts' %}">Контакты</a>
     </nav>
 
     <div class="header__actions">
@@ -65,6 +66,7 @@
         <a href="{% url 'storefront:catalog' %}">Каталог</a>
         <a href="{% url 'storefront:delivery' %}">Доставка</a>
         <a href="{% url 'storefront:about' %}">О нас</a>
+        <a href="{% url 'storefront:contacts' %}">Контакты</a>
         <a href="{% url 'storefront:privacy' %}">Политика конфиденциальности</a>
         <a href="{% url 'storefront:terms' %}">Пользовательское соглашение</a>
       </nav>
@@ -92,6 +94,7 @@
         <a href="{% url 'storefront:catalog' %}">Каталог</a>
         <a href="{% url 'storefront:delivery' %}">Доставка</a>
         <a href="{% url 'storefront:about' %}">О нас</a>
+        <a href="{% url 'storefront:contacts' %}">Контакты</a>
       </nav>
       {% if request.user.is_authenticated %}
       <div class="drawer__account" id="drawer-account">
