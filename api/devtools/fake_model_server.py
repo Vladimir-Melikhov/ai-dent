@@ -141,7 +141,21 @@ def decide(body: dict) -> Reply:
             result = block["content"]
         if block.get("is_error"):
             result = str(result)
-        return answer_after_tool(calls.get(block["tool_use_id"], ""), result)
+        tool = calls.get(block["tool_use_id"], "")
+        def user_text(m):
+            c = m["content"]
+            return c if isinstance(c, str) else "".join(b.get("text", "") for b in c if isinstance(b, dict))
+
+        wants_order = any(m["role"] == "user" and "оформ" in user_text(m).lower() for m in messages[-8:])
+        if tool == "open_order_form" and block.get("is_error") and last_shown(body) and "cart_set_item" in available:
+            # Как настоящая модель: корзина пуста — кладём показанный товар и открываем форму
+            return Reply(blocks=[thinking(), text("Сначала положу товар в корзину."),
+                                 tool_use("cart_set_item", {"product_id": last_shown(body)[0], "quantity": 1})],
+                         stop_reason="tool_use")
+        if tool == "cart_set_item" and wants_order and "open_order_form" in available:
+            return Reply(blocks=[thinking(), text("Положил в корзину, открываю оформление."),
+                                 tool_use("open_order_form", {})], stop_reason="tool_use")
+        return answer_after_tool(tool, result)
 
     said = "".join(b.get("text", "") for b in content if isinstance(b, dict)) if isinstance(content, list) else content
     low = said.lower()
