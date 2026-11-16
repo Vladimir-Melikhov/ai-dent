@@ -13,6 +13,7 @@ document.addEventListener("DOMContentLoaded", () => {
     show(row("loupe_kind"), on);
     show(group("loupe_options"), on);
     show(group("loupe_distances"), on);
+    show(group("loupe_frames"), on);
     show(row("loupe_ipd"), on && kind && kind.value === "individual");
   }
 

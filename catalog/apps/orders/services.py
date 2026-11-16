@@ -103,8 +103,45 @@ def has_foreign_currency(lines: list[CartLine]) -> bool:
     return any(line.item.product.currency != Product.Currency.RUB for line in lines)
 
 
+def loupe_selection(product, config) -> dict | None:
+    """Параметры бинокулярной лупы из формы заказа: проверка по данным товара и строки для заказа.
+
+    Не лупа — None. «Уточнит менеджер» (later) допустимо вместо выбора; иначе нужны увеличение,
+    рабочее расстояние и, у индивидуальных, межзрачковое расстояние.
+    """
+    data = product.loupe_data()
+    if data is None:
+        return None
+    config = config if isinstance(config, dict) else {}
+    zero = "0"
+    if config.get("later") is True:
+        return {"summary": "параметры лупы уточнит менеджер",
+                "options": [{"name": "Параметры лупы", "value": "уточнит менеджер", "price_delta": zero}]}
+    zoom, distance = str(config.get("zoom") or ""), str(config.get("distance") or "")
+    ipd = " ".join(str(config.get("ipd") or "").split())[:40]
+    frames = data["frames"]
+    frame = str(config.get("frame") or "") if len(frames) > 1 else (frames[0] if frames else "")
+    if zoom not in [o["zoom"] for o in data["options"]]:
+        raise CartInvalid(f"{product.name}: выберите увеличение или отметьте, что параметры уточнит менеджер")
+    if data["distances"] and distance not in data["distances"]:
+        raise CartInvalid(f"{product.name}: выберите рабочее расстояние")
+    if len(frames) > 1 and frame not in frames:
+        raise CartInvalid(f"{product.name}: выберите оправу")
+    if data["ask_ipd"] and not ipd:
+        raise CartInvalid(f"{product.name}: укажите межзрачковое расстояние или отметьте, что уточнит менеджер")
+    options = [{"name": "Увеличение", "value": zoom, "price_delta": zero}]
+    if distance:
+        options.append({"name": "Рабочее расстояние", "value": distance, "price_delta": zero})
+    if frame:
+        options.append({"name": "Оправа", "value": frame, "price_delta": zero})
+    if ipd:
+        options.append({"name": "Межзрачковое расстояние", "value": ipd, "price_delta": zero})
+    return {"summary": ", ".join(o["value"] if o["name"] == "Увеличение" else f"{o['name'].lower()} {o['value']}"
+                                 for o in options), "options": options}
+
+
 @transaction.atomic
-def create_order_from_cart(owner, data: dict, created_by: str, version: str, *, conversation=None,
+def create_order_from_cart(owner, data: dict, created_by: str, version: str, *, conversation=None, loupe=None,
                            actor=OrderStatusHistory.Actor.CUSTOMER, actor_user=None) -> Order:
     """Общая для /checkout/ и чата. Счёт здесь не создаётся."""
     lines = cart_lines(owner)
@@ -119,6 +156,10 @@ def create_order_from_cart(owner, data: dict, created_by: str, version: str, *, 
         if not 1 <= line.item.quantity <= MAX_ITEM_QUANTITY:
             raise CartInvalid(f"{line.item.product.name}: некорректное количество")
 
+    # Параметры лупы из формы в чате (loupe=None — заказ с витрины: параметры уточняет менеджер)
+    loupe_lines = {line.item.id: loupe_selection(line.item.product, (loupe or {}).get(str(line.item.product_id)))
+                   for line in lines} if loupe is not None else {}
+
     order = Order.objects.create(
         **owner, status=Order.Status.PENDING_CONFIRMATION, payment_status=Order.PaymentStatus.NONE,
         # Временный уникальный номер до получения id: пустые номера двух одновременных заказов конфликтуют
@@ -132,12 +173,13 @@ def create_order_from_cart(owner, data: dict, created_by: str, version: str, *, 
         product = line.item.product
         foreign = product.currency != Product.Currency.RUB
         total += line.line_total
+        chosen = loupe_lines.get(line.item.id)
         OrderItem.objects.create(
-            order=order, product=product, product_name=product.name,
+            order=order, product=product, product_name=f"{product.name} ({chosen['summary']})" if chosen else product.name,
             unit_price=line.unit_price, quantity=line.item.quantity, line_total=line.line_total,
             selected_options=[
                 {"id": o.id, "name": o.name, "value": o.value, "price_delta": str(o.price_delta)} for o in line.options
-            ],
+            ] + (chosen["options"] if chosen else []),
             source_price=product.price, source_currency=product.currency,
             exchange_rate=rate_on(product.currency, today) if foreign else None,
         )

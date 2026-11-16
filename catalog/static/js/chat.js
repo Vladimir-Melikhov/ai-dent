@@ -190,6 +190,8 @@ if (root) {
       <p class="chat-form__title">Оформление заказа</p>
       <div class="chat-order__items">Загружаю корзину…</div>
       <p class="chat-order__note" hidden>${CURRENCY_NOTE}</p>
+      <div class="chat-order__step" hidden></div>
+      <div class="chat-order__rest">
       <div class="chat-order__types" role="radiogroup" aria-label="Покупатель">
         <label><input type="radio" name="buyer_type" value="legal" checked> Юрлицо</label>
         <label><input type="radio" name="buyer_type" value="ip"> ИП</label>
@@ -211,11 +213,83 @@ if (root) {
         <span>Принимаю условия <a href="/terms/" target="_blank" rel="noopener">пользовательского соглашения</a></span>
       </label>
       <button class="chat-form__submit" type="submit" disabled>Оформить заказ</button>
+      </div>
       <p class="chat-form__error" role="alert"></p>`;
     const f = form.elements;
     const error = form.querySelector(".chat-form__error");
     const submit = form.querySelector("button[type=submit]");
     let version = "";
+    // Параметры бинокулярных луп: id товара → {zoom, distance, ipd, later}; шаг пройден → открывается форма
+    const loupes = {};
+    let stepDone = false;
+    const step = form.querySelector(".chat-order__step");
+    const rest = form.querySelector(".chat-order__rest");
+
+    function loupeReady(item) {
+      const c = loupes[item.product_id] || {};
+      if (c.later) return true;
+      const l = item.loupe;
+      return !!c.zoom && (!l.distances.length || !!c.distance) && (l.frames.length < 2 || !!c.frame) && (!l.ask_ipd || !!(c.ipd || "").trim());
+    }
+
+    let syncStep = () => {};
+    // Обработчики шага — один раз: состав перерисовывается при каждом изменении корзины
+    step.addEventListener("click", e => {
+      const b = e.target.closest(".chat-loupe__seg button");
+      if (!b) return;
+      const box = b.closest("[data-pid]");
+      loupes[box.dataset.pid][b.closest(".chat-loupe__seg").dataset.group] = b.dataset.v;
+      step.querySelector("[name=loupe_later]").checked = false;
+      syncStep();
+    });
+    step.addEventListener("input", () => syncStep());
+
+    function renderStep(items) {
+      const withLoupe = items.filter(i => i.loupe);
+      step.hidden = stepDone || !withLoupe.length;
+      rest.hidden = !stepDone && withLoupe.length > 0;
+      if (step.hidden) return;
+      const seg = (list, group, label) => `<div class="chat-loupe__label">${label}</div>
+        <div class="chat-loupe__seg" data-group="${group}" style="--n:${list.length}">${
+          list.map((t, n) => `<button type="button" data-v="${escapeHTML(t)}">${escapeHTML(t)}</button>`).join("")}</div>`;
+      step.innerHTML = `<p class="chat-order__step-title">Для начала выберите параметры</p>` + withLoupe.map(i => `
+        <div class="chat-order__loupe" data-pid="${i.product_id}">
+          <div class="chat-loupe__name">${escapeHTML(i.name)}</div>
+          ${seg(i.loupe.options.map(o => o.zoom), "zoom", "Увеличение")}
+          ${i.loupe.distances.length ? seg(i.loupe.distances, "distance", "Рабочее расстояние") : ""}
+          ${i.loupe.frames.length > 1 ? seg(i.loupe.frames, "frame", "Оправа") : ""}
+          ${i.loupe.ask_ipd ? `<div class="chat-loupe__label">Межзрачковое расстояние, мм</div>
+            <input class="chat-form__input" name="loupe_ipd" inputmode="decimal" maxlength="40" placeholder="Например: 62"
+              aria-label="Межзрачковое расстояние">` : ""}
+        </div>`).join("") + `
+        <label class="chat-form__consent"><input type="checkbox" name="loupe_later">
+          <span>Не нужно — параметры уточнит менеджер</span></label>
+        <button class="chat-form__submit" type="button" name="loupe_next" disabled>Далее</button>`;
+      const next = step.querySelector("[name=loupe_next]");
+      const later = step.querySelector("[name=loupe_later]");
+      const sync = () => {
+        withLoupe.forEach(i => {
+          const box = step.querySelector(`[data-pid="${i.product_id}"]`);
+          const c = loupes[i.product_id] || (loupes[i.product_id] = {});
+          c.later = later.checked;
+          box.querySelectorAll(".chat-loupe__seg").forEach(g =>
+            g.querySelectorAll("button").forEach(b => b.classList.toggle("is-on", c[g.dataset.group] === b.dataset.v)));
+          const input = box.querySelector("[name=loupe_ipd]");
+          if (input) c.ipd = input.value;
+          box.classList.toggle("is-muted", later.checked);
+        });
+        next.disabled = !withLoupe.every(loupeReady);
+      };
+      syncStep = sync;
+      later.addEventListener("change", sync);
+      next.addEventListener("click", () => {
+        stepDone = true;
+        step.hidden = true;
+        rest.hidden = false;
+        scrollDown();
+      });
+      sync();
+    }
 
     function buyerType() { return form.querySelector("[name=buyer_type]:checked").value; }
 
@@ -233,11 +307,13 @@ if (root) {
       try {
         const data = await fetch("/cart/").then(r => r.json());
         version = data.version;
+        renderStep(data.items);
         if (!data.items.length) {
           box.textContent = "Корзина пуста — добавьте товары, и консультант откроет форму снова.";
           submit.disabled = true;
           return;
         }
+        // Лупы убрали из корзины — шаг параметров не нужен
         box.innerHTML = data.items.map(i => `
           <div class="chat-order__line"><span>${escapeHTML(i.name)} × ${i.quantity}</span>
           <span>${i.line_total != null ? formatPrice(i.line_total) : "—"}</span></div>`).join("")
@@ -273,7 +349,10 @@ if (root) {
       if (!f.consent.checked || !f.terms.checked) { error.textContent = "Подтвердите согласие и условия соглашения"; return; }
       error.textContent = "";
       submit.disabled = true;
-      const body = { buyer_type: type, contact_phone: "+7" + digits, consent: true, cart_version: version };
+      const body = { buyer_type: type, contact_phone: "+7" + digits, consent: true, cart_version: version, loupe: {} };
+      Object.entries(loupes).forEach(([pid, c]) => {
+        body.loupe[pid] = c.later ? { later: true } : { zoom: c.zoom, distance: c.distance, frame: c.frame, ipd: (c.ipd || "").trim() };
+      });
       ["company_name", "buyer_name", "inn", "contact_name", "contact_email", "delivery_city", "delivery_address", "comment"]
         .forEach(name => { if (!f[name].hidden) body[name] = f[name].value.trim(); });
       try {
@@ -424,7 +503,8 @@ if (root) {
         const v = r.values[i];
         return `<span class="chat-compare__k">${escapeHTML(r.name)}</span><span class="chat-compare__t${v === "—" ? " is-none" : ""}">${escapeHTML(formatValue(v))}</span>`;
       }).join("");
-      const tags = (p.pick ? `<span class="chat-compare__tag chat-compare__tag--pick">${escapeHTML(p.pick)}</span>` : "")
+      const tags = (p.badge ? `<span class="chat-compare__tag chat-compare__tag--badge">${escapeHTML(p.badge)}</span>` : "")
+        + (p.pick ? `<span class="chat-compare__tag chat-compare__tag--pick">${escapeHTML(p.pick)}</span>` : "")
         + (p.cheapest ? '<span class="chat-compare__tag">Дешевле</span>' : "");
       return `<div class="chat-compare__card${p.pick ? " is-pick" : ""}">
         <div class="chat-compare__tags">${tags}</div>

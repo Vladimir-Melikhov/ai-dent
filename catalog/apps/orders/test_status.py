@@ -13,7 +13,7 @@ from django.core import mail
 from django.core.mail.backends.base import BaseEmailBackend
 from django.utils import timezone
 
-from apps.catalog.models import Brand, Category, CurrencyRate, Product
+from apps.catalog.models import Brand, Category, CurrencyRate, LoupeDistance, LoupeFrame, LoupeOption, Product
 from apps.chat.models import Conversation, Message
 from conftest import next_published
 from .models import Invoice, Order, OrderChange, OrderItem, OrderStatusHistory
@@ -161,6 +161,63 @@ def test_chat_order_rejects_changed_cart(client, products):
     response = post(client, "/chat/order/", {**LEGAL, "cart_version": stale})
     assert response.status_code == 409 and response.json()["error"] == "cart_changed"
     assert not Order.objects.exists()
+
+
+@pytest.fixture
+def binocular(products):
+    """Индивидуальная бинокулярная лупа с двумя увеличениями и двумя рабочими расстояниями."""
+    product = products["loupe"]
+    Product.objects.filter(pk=product.pk).update(is_loupe=True, loupe_kind="individual")
+    for i, (zoom, field) in enumerate([("2.5×", "130 мм"), ("3.5×", "95 мм")]):
+        LoupeOption.objects.create(product=product, zoom=zoom, field_of_view=field, sort_order=i)
+    for i, distance in enumerate(["340 мм", "420 мм"]):
+        LoupeDistance.objects.create(product=product, distance=distance, sort_order=i)
+    return product
+
+
+def test_cart_tells_the_form_about_loupe_choices(client, binocular):
+    add(client, binocular)
+    loupe = client.get("/cart/").json()["items"][0]["loupe"]
+    assert loupe["ask_ipd"] is True and loupe["distances"] == ["340 мм", "420 мм"]
+    assert [o["zoom"] for o in loupe["options"]] == ["2.5×", "3.5×"]
+
+
+def test_chat_order_needs_loupe_choice_or_later(client, binocular):
+    add(client, binocular)
+    for loupe in ({}, {str(binocular.pk): {"zoom": "2.5×", "distance": "340 мм"}},  # нет межзрачкового
+                  {str(binocular.pk): {"zoom": "9×", "distance": "340 мм", "ipd": "62"}}):  # такого увеличения нет
+        response = chat_order(client, loupe=loupe)
+        assert response.status_code == 400, loupe
+    assert not Order.objects.exists()
+
+
+def test_loupe_choice_goes_into_the_order(client, binocular, django_capture_on_commit_callbacks):
+    add(client, binocular)
+    with django_capture_on_commit_callbacks(execute=True):
+        response = chat_order(client, loupe={str(binocular.pk): {"zoom": "3.5×", "distance": "420 мм", "ipd": "62"}})
+    assert response.status_code == 200, response.content
+    item = Order.objects.get().items.get()
+    assert item.product_name.endswith("(3.5×, рабочее расстояние 420 мм, межзрачковое расстояние 62)")
+    assert [o["name"] for o in item.selected_options] == ["Увеличение", "Рабочее расстояние", "Межзрачковое расстояние"]
+    assert item.unit_price == binocular.price_rub
+
+
+def test_loupe_choice_can_be_left_to_manager(client, binocular, django_capture_on_commit_callbacks):
+    add(client, binocular)
+    with django_capture_on_commit_callbacks(execute=True):
+        assert chat_order(client, loupe={str(binocular.pk): {"later": True}}).status_code == 200
+    assert "уточнит менеджер" in Order.objects.get().items.get().product_name
+
+
+def test_loupe_frame_is_asked_only_when_there_are_several(client, binocular, django_capture_on_commit_callbacks):
+    LoupeFrame.objects.create(product=binocular, name="Классическая", sort_order=0)
+    LoupeFrame.objects.create(product=binocular, name="Спортивная", sort_order=1)
+    add(client, binocular)
+    choice = {"zoom": "2.5×", "distance": "340 мм", "ipd": "62"}
+    assert chat_order(client, loupe={str(binocular.pk): choice}).status_code == 400  # оправа не выбрана
+    with django_capture_on_commit_callbacks(execute=True):
+        assert chat_order(client, loupe={str(binocular.pk): {**choice, "frame": "Спортивная"}}).status_code == 200
+    assert "оправа Спортивная" in Order.objects.get().items.get().product_name
 
 
 def test_under_order_product_can_be_ordered(client, products, django_capture_on_commit_callbacks):

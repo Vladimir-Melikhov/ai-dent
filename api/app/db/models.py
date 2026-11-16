@@ -57,6 +57,7 @@ class Product(Base):
     is_loupe: Mapped[bool]
     loupe_kind: Mapped[str]
     loupe_ipd: Mapped[str]
+    badge: Mapped[str]
     priority: Mapped[int]
     is_active: Mapped[bool]
     created_at: Mapped[datetime.datetime]

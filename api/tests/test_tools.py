@@ -227,3 +227,17 @@ def test_comparison_pick_must_be_among_shown(catalog):
     assert ok.widget["pick"] == {"product_id": catalog["pico"], "label": "Для терапевта"}
     foreign = run_tool("show_comparison", {"product_ids": ids, "pick": {"product_id": 1, "label": "чужой"}})
     assert foreign.widget["pick"] is None
+
+
+def test_comparison_shows_badge_from_admin(catalog):
+    from app.ai.tools import comparison_view, active_products
+    from .conftest import admin_sql
+
+    admin_sql("UPDATE catalog_product SET badge = 'Хит' WHERE id = $1", catalog["extaro"])
+
+    async def go():
+        async with async_session_factory() as session:
+            return comparison_view(await active_products(session, [catalog["extaro"], catalog["pico"]]))
+
+    by_id = {p["id"]: p for p in run_async(go())["products"]}
+    assert (by_id[catalog["extaro"]]["badge"], by_id[catalog["pico"]]["badge"]) == ("Хит", "")

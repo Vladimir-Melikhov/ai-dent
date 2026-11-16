@@ -48,7 +48,8 @@ def last_shown(body: dict) -> list[int]:
                     continue
                 items = data.get("shown") or data.get("products") or []
                 if items:
-                    shown = [p["id"] for p in items]
+                    # Лупы с настройкой — первыми: «оформи» относится к тому, что показали выбором
+                    shown = [p["id"] for p in sorted(items, key=lambda p: not p.get("loupe_options"))]
     return shown
 
 

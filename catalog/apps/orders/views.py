@@ -88,6 +88,7 @@ def cart_list(request):
             "under_order": p.stock_qty <= 0,
             "image": img.image.url if img else None,
             "slug": p.slug,
+            "loupe": p.loupe_data(),
         })
     return JsonResponse({
         "items": result,
@@ -382,7 +383,7 @@ def chat_order(request):
     conversation = current_conversation(owner)
     try:
         order = create_order_from_cart(
-            owner, fields, Order.CreatedBy.AI, version, conversation=conversation,
+            owner, fields, Order.CreatedBy.AI, version, conversation=conversation, loupe=data.get("loupe") or {},
             actor=OrderStatusHistory.Actor.AI, actor_user=request.user if request.user.is_authenticated else None,
         )
     except CartChanged:

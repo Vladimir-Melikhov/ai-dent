@@ -137,10 +137,30 @@ class Product(models.Model):
         max_length=40, blank=True, default="", db_default="", verbose_name="Межзрачковое расстояние",
         help_text="Например: 54–74 мм",
     )
+    # Метка выбора магазина: показывается в сравнении в чате («Хит», «Лучший выбор»)
+    badge = models.CharField(
+        max_length=24, blank=True, default="", db_default="", verbose_name="Метка",
+        help_text="Например: Хит, Лучший выбор. Показывается в сравнении товаров в чате.",
+    )
     priority = models.IntegerField(default=0, db_index=True, verbose_name="Приоритет")
     is_active = models.BooleanField(default=True, verbose_name="Активен")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Создан")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлён")
+
+    def loupe_data(self):
+        """Данные конфигуратора лупы для формы заказа; None — не лупа или нет увеличений."""
+        if not self.is_loupe:
+            return None
+        options = [{"zoom": o.zoom, "field": o.field_of_view} for o in self.loupe_options.all()]
+        if not options:
+            return None
+        return {
+            "kind": self.loupe_kind,
+            "options": options,
+            "distances": [d.distance for d in self.loupe_distances.all()],
+            "frames": [f.name for f in self.loupe_frames.all()],
+            "ask_ipd": self.loupe_kind == self.LoupeKind.INDIVIDUAL,
+        }
 
     class Meta:
         verbose_name = "Товар"
@@ -245,6 +265,24 @@ class LoupeDistance(models.Model):
 
     def __str__(self):
         return self.distance
+
+
+class LoupeFrame(models.Model):
+    """Вариант оправы лупы (классическая, спортивная…). Нет вариантов — выбора оправы нет."""
+
+    product = models.ForeignKey(
+        Product, on_delete=models.CASCADE, related_name="loupe_frames", verbose_name="Товар"
+    )
+    name = models.CharField(max_length=40, verbose_name="Оправа", help_text="Например: Классическая")
+    sort_order = models.PositiveSmallIntegerField(default=0, verbose_name="Порядок")
+
+    class Meta:
+        verbose_name = "Оправа"
+        verbose_name_plural = "Оправы"
+        ordering = ["sort_order", "id"]
+
+    def __str__(self):
+        return self.name
 
 
 class ProductContentBlock(models.Model):

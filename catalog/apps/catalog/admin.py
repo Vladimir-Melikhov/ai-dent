@@ -10,6 +10,7 @@ from .models import (
     Category,
     CurrencyRate,
     LoupeDistance,
+    LoupeFrame,
     LoupeOption,
     Product,
     ProductImage,
@@ -44,6 +45,14 @@ class LoupeDistanceInline(TabularInline):
     fields = ["distance", "sort_order"]
     verbose_name = "Рабочее расстояние"
     verbose_name_plural = "Бинокулярная лупа: рабочие расстояния (от увеличения не зависят)"
+
+
+class LoupeFrameInline(TabularInline):
+    model = LoupeFrame
+    extra = 1
+    fields = ["name", "sort_order"]
+    verbose_name = "Оправа"
+    verbose_name_plural = "Бинокулярная лупа: оправы (если у лупы они бывают разные; нет — оставьте пустым)"
 
 
 class ProductContentBlockInline(StackedInline):
@@ -84,10 +93,11 @@ class ProductAdmin(ModelAdmin):
         "price",
         "stock_qty",
         "priority",
+        "badge",
         "is_active",
     ]
     list_filter = ["brand", "category", "is_active"]
-    list_editable = ["price", "stock_qty", "priority", "is_active"]
+    list_editable = ["price", "stock_qty", "priority", "badge", "is_active"]
     search_fields = ["name", "sku"]
     prepopulated_fields = {"slug": ("name",)}
     inlines = [
@@ -95,6 +105,7 @@ class ProductAdmin(ModelAdmin):
         ProductOptionInline,
         LoupeOptionInline,
         LoupeDistanceInline,
+        LoupeFrameInline,
         ProductContentBlockInline,
     ]
 

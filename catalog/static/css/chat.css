@@ -611,11 +611,11 @@
     border: 1px solid var(--border-soft);
     border-radius: var(--radius-sm);
     background: #fff;
-    font-size: 12px;
+    font-size: 14px;
     line-height: 1.35;
   }
 
-  .chat-compare__title { margin-bottom: 8px; font-size: 13px; font-weight: 700; color: var(--text); }
+  .chat-compare__title { margin-bottom: 10px; font-size: 16px; font-weight: 700; color: var(--text); }
   .chat-compare__grid { display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: 6px; }
 
   /* Карточки делят строки сетки: цена и каждый параметр стоят на одной линии у всех товаров */
@@ -625,19 +625,19 @@
     grid-row: span var(--r);
     row-gap: 0;
     align-content: start;
-    padding: 8px 7px;
+    padding: 10px 9px;
     border: 1px solid var(--border-soft);
-    border-radius: 10px;
+    border-radius: 12px;
   }
 
 
-  .chat-compare__name { font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; }
+  .chat-compare__name { font-size: 15px; font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; }
   .chat-compare__name a { color: inherit; text-decoration: none; }
   .chat-compare__name a:hover { text-decoration: underline; }
-  .chat-compare__brand { margin-top: 2px; color: var(--muted); font-size: 11px; }
-  .chat-compare__price { margin-top: 6px; font-size: 15px; font-weight: 800; color: var(--text); }
-  .chat-compare__avail { color: var(--muted); font-size: 11px; }
-  .chat-compare__tags { display: flex; flex-wrap: wrap; gap: 3px; min-height: 20px; margin-bottom: 4px; }
+  .chat-compare__brand { margin-top: 2px; color: var(--text-2, #4a5361); font-size: 13px; }
+  .chat-compare__price { margin-top: 8px; font-size: 18px; font-weight: 800; color: var(--text); }
+  .chat-compare__avail { color: var(--text-2, #4a5361); font-size: 13px; }
+  .chat-compare__tags { display: flex; flex-wrap: wrap; align-items: flex-start; align-content: flex-start; gap: 4px; min-height: 20px; margin-bottom: 4px; }
 
   .chat-compare__tag {
     display: inline-block;
@@ -645,23 +645,24 @@
     border-radius: var(--radius-pill);
     background: var(--text);
     color: #fff;
-    font-size: 10px;
-    font-weight: 600;
+    font-size: 12px;
+    font-weight: 700;
     line-height: 1.5;
   }
 
   /* Пометка под задачу — контурная плашка и рамка потолще; «Дешевле» — залитая */
   .chat-compare__tag--pick { background: #fff; color: var(--text); box-shadow: inset 0 0 0 1.5px var(--text); }
+  .chat-compare__tag--badge { background: #fff; color: var(--text); box-shadow: inset 0 0 0 1.5px var(--text); }
   .chat-compare__card.is-pick { border-color: var(--text); box-shadow: inset 0 0 0 1px var(--text); }
   .chat-compare__brand b { color: var(--text); font-weight: 800; }
-  .chat-compare__k { display: block; margin-top: 7px; font-size: 10px; text-transform: uppercase; color: var(--muted); }
-  .chat-compare__t { font-weight: 600; overflow-wrap: anywhere; }
+  .chat-compare__k { display: block; margin-top: 9px; font-size: 11px; font-weight: 600; letter-spacing: .02em; text-transform: uppercase; color: var(--text-2, #4a5361); }
+  .chat-compare__t { font-size: 14px; font-weight: 700; overflow-wrap: anywhere; }
   .chat-compare__t.is-none { font-weight: 400; color: var(--muted); }
 
   .chat-compare__cols { display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: 8px; font-weight: 600; }
   .chat-compare__cols span { overflow-wrap: anywhere; }
   .chat-compare__row { padding: 8px 0 0; }
-  .chat-compare__label { margin-bottom: 2px; font-size: 10px; font-weight: 600; text-transform: uppercase; color: var(--muted); }
+  .chat-compare__label { margin-bottom: 2px; font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--muted); }
   .chat-compare__extra { margin-top: 6px; border-top: 1px solid var(--border-soft); }
 
   .chat-compare__extra[hidden] { display: none; }
@@ -672,15 +673,15 @@
     border: none;
     background: none;
     color: var(--accent);
-    font: 600 12px/1.2 var(--font);
+    font: 600 14px/1.2 var(--font);
     cursor: pointer;
   }
 
   .chat-compare__same {
-    margin: 4px 0 0;
-    font-size: 12px;
+    margin: 6px 0 0;
+    font-size: 13px;
     line-height: 1.4;
-    color: var(--muted);
+    color: var(--text-2, #4a5361);
   }
 
   .chat-loupe {
@@ -1335,3 +1336,10 @@
       font-size: 16px !important;
   }
 }
+
+.chat-order__step { display: grid; gap: 8px; }
+.chat-order__step[hidden], .chat-order__rest[hidden] { display: none; }
+.chat-order__rest { display: grid; gap: 8px; }
+.chat-order__step-title { margin: 0; font-weight: 600; }
+.chat-order__loupe { display: grid; gap: 6px; padding: 10px 0; border-top: 1px solid var(--border, rgba(15, 20, 28, .12)); }
+.chat-order__loupe.is-muted { opacity: .45; }

@@ -211,6 +211,7 @@ def comparison_view(products: list[Product], pick: dict | None = None) -> dict:
     while len(rows) < COMPARE_SHOWN and different:
         rows.append(different.pop(0))
     view = comparison_table(products)
+    badges = {p.id: getattr(p, "badge", "") for p in products}  # метка из админки: «Хит», «Лучший выбор»
     prices = [p["price_rub"] for p in view["products"]]
     cheapest = min(prices) if all(v is not None for v in prices) and len(set(prices)) > 1 else None
     # Общее «Бинокулярные лупы» — заголовком над блоком, а из названий карточек убирается: место дороже
@@ -220,6 +221,7 @@ def comparison_view(products: list[Product], pick: dict | None = None) -> dict:
         item["name"] = short(CATEGORY_PREFIX.sub("", item["name"]) or item["name"], 40)
         item["pick"] = pick["label"] if pick and pick.get("product_id") == item["id"] else ""
         item["cheapest"] = cheapest is not None and item["price_rub"] == cheapest
+        item["badge"] = badges.get(item["id"], "")
     return {
         "title": title,
         "products": view["products"],
