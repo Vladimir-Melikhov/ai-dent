@@ -49,31 +49,7 @@
       </button>
     </div>
 
-    <button type="button" class="header__burger" id="nav-toggle" aria-label="Меню" aria-expanded="false" hidden>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M3 6h18M3 12h18M3 18h18"></path>
-      </svg>
-    </button>
   </header>
-
-  <!-- Мобильное меню (выезжающая панель) -->
-  <div class="mobnav" id="mobnav" hidden>
-    <div class="mobnav__overlay" id="mobnav-overlay"></div>
-    <aside class="mobnav__panel">
-      <div class="mobnav__head">
-        <a href="{% url 'storefront:landing' %}" class="mobnav__logo">
-          <img src="{% static 'img/logo.webp' %}" alt="Ай-Дент">
-        </a>
-        <button type="button" class="mobnav__x" id="mobnav-x" aria-label="Закрыть">✕</button>
-      </div>
-      <nav class="mobnav__links">
-        <a href="{% url 'storefront:catalog' %}">Каталог</a>
-        <a href="{% url 'storefront:delivery' %}">Доставка</a>
-        <a href="{% url 'storefront:about' %}">О нас</a>
-      </nav>
-      <div class="mobnav__foot">Ай-Дент — оборудование для стоматологии</div>
-    </aside>
-  </div>
 
   <main>
     {% block content %}{% endblock %}
@@ -112,6 +88,11 @@
   <div class="drawer" id="drawer" hidden data-auth="{% if request.user.is_authenticated %}1{% else %}0{% endif %}" data-phone="{{ request.user.phone|default:'' }}">
     <div class="drawer__overlay" id="drawer-close"></div>
     <aside class="drawer__panel">
+      <nav class="drawer__nav" aria-label="Разделы сайта">
+        <a href="{% url 'storefront:catalog' %}">Каталог</a>
+        <a href="{% url 'storefront:delivery' %}">Доставка</a>
+        <a href="{% url 'storefront:about' %}">О нас</a>
+      </nav>
       {% if request.user.is_authenticated %}
       <div class="drawer__account" id="drawer-account">
         <span class="drawer__account-phone">{{ request.user.phone }}</span>
@@ -230,7 +211,6 @@
   <script type="module" src="{% static 'js/drawer.js' %}"></script>
   {% if chat_widget_enabled %}<script type="module" src="{% static 'js/chat.js' %}"></script>{% endif %}
   <script src="{% static 'js/cookie.js' %}"></script>
-  <script src="{% static 'js/nav.js' %}"></script>
   {% if not request.user.is_authenticated %}
   <script src="{% static 'js/auth.js' %}"></script>
   {% endif %}

@@ -706,3 +706,26 @@
       padding: 6px 0;
     }
   }
+
+
+/* Разделы сайта в панели — только там, где нет меню в шапке */
+.drawer__nav { display: none; }
+
+@media (max-width: 960px) {
+  .drawer__nav {
+    display: flex;
+    gap: 6px;
+    padding: 12px 16px 0;
+  }
+  .drawer__nav a {
+    flex: 1 1 0;
+    text-align: center;
+    padding: 9px 6px;
+    border-radius: 999px;
+    background: rgba(15, 20, 25, .06);
+    color: #0f1419;
+    font-size: 13px;
+    font-weight: 700;
+    text-decoration: none;
+  }
+}

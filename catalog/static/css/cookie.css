@@ -73,6 +73,7 @@
   }
 
   .cookie-banner__text {
+    flex: 0 0 auto;
     line-height: 1.4;
   }
 
