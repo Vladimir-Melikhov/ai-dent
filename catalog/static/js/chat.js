@@ -331,6 +331,18 @@ if (root) {
     });
   }
 
+  /* Телефон: высота чата не меняется; один раз после появления клавиатуры
+     подводим низ чата к её верхней кромке */
+  const phone = window.matchMedia("(max-width: 640px)");
+  if (inlineMode) {
+    input.addEventListener("focus", () => {
+      if (!phone.matches) return;
+      setTimeout(() => {
+        if (root.classList.contains("is-active")) root.scrollIntoView({ block: "end", behavior: "auto" });
+      }, 350);
+    });
+  }
+
   function setActive(on) {
     if (!inlineMode || root.classList.contains("is-active") === on) return;
     root.classList.toggle("is-active", on);
