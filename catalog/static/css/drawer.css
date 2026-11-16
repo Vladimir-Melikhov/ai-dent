@@ -712,9 +712,9 @@
 .drawer__nav { display: none; }
 
 @media (max-width: 960px) {
-  /* порядок: вкладки → разделы → содержимое → итог → аккаунт внизу */
-  .drawer__head { order: 1; }
-  .drawer__nav { order: 2; }
+  /* порядок: разделы → вкладки → содержимое → итог → аккаунт внизу */
+  .drawer__nav { order: 1; }
+  .drawer__head { order: 2; }
   .drawer__body { order: 3; }
   .drawer__foot { order: 4; }
   .drawer__account { order: 5; }
