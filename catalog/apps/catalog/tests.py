@@ -100,3 +100,18 @@ def test_uploaded_photo_becomes_small_webp(eur_product, settings, tmp_path):
     assert image.image.name.endswith(".webp")
     with Image.open(image.image.path) as opened:
         assert opened.format == "WEBP" and max(opened.size) == 1600
+
+
+def test_product_admin_has_loupe_checkbox_and_rows(admin_client, eur_product):
+    response = admin_client.get(f"/admin/catalog/product/{eur_product.pk}/change/")
+    page = response.content.decode()
+    assert response.status_code == 200
+    assert 'id="id_is_loupe"' in page and 'id="id_loupe_kind"' in page and 'id="id_loupe_ipd"' in page
+    assert "loupe_options-TOTAL_FORMS" in page and "loupe_distances-TOTAL_FORMS" in page
+
+
+def test_loupe_migration_copies_json_to_tables():
+    from importlib import import_module
+
+    migration = import_module("apps.catalog.migrations.0007_loupe_relational")
+    assert callable(migration.copy_json_to_tables)

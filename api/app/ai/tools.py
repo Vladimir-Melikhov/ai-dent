@@ -100,7 +100,8 @@ def brief(product: Product) -> dict:
 
 
 def _with_relations(stmt):
-    return stmt.options(selectinload(Product.brand), selectinload(Product.category), selectinload(Product.images))
+    return stmt.options(selectinload(Product.brand), selectinload(Product.category), selectinload(Product.images),
+                          selectinload(Product.loupe_options), selectinload(Product.loupe_distances))
 
 
 async def active_products(session: AsyncSession, ids: list[int]) -> list[Product]:
@@ -127,7 +128,8 @@ def comparison_table(products: list[Product]) -> dict:
     rows = rows[:MAX_COMPARISON_ROWS]
     return {
         "products": [
-            {"id": p.id, "slug": p.slug, "name": p.name, "brand": p.brand.name, "price_rub": money(p.price_rub),
+            {"id": p.id, "slug": p.slug, "name": p.name, "brand": p.brand.name, "country": p.brand.country or "",
+             "price_rub": money(p.price_rub),
              "availability": "в наличии" if p.stock_qty > 0 else "под заказ"}
             for p in products
         ],
@@ -138,28 +140,14 @@ def comparison_table(products: list[Product]) -> dict:
     }
 
 
-COMPARE_SHOWN = 5  # строк сравнения (кроме цены); остальные отличия — под кнопкой
+COMPARE_SHOWN = 4  # главных параметров в карточке; остальные отличия — под кнопкой
+KEY_WORDS = ("увеличен", "поле обзор", "глубин", "вес", "мощност", "освещ", "матриц", "разрешен")
 COMPARE_SAME = 4  # общих характеристик в строке «Одинаково»
 MAX_FACT_LEN = 40  # длиннее — это маркетинговая фраза, а не характеристика
 MAX_LABEL_LEN = 24
-
-NUMBER_RE = re.compile(r"\d+(?:[.,]\d+)?")
-
-
-def bars(values: list[str]) -> list[int] | None:
-    """Длины полосок (в процентах от максимума), если значения — числа с одной и той же единицей."""
-    numbers, units = [], set()
-    for value in values:
-        found = NUMBER_RE.findall(value)
-        if not found:
-            return None
-        numbers.append(max(float(n.replace(",", ".")) for n in found))
-        units.add(re.sub(r"[\d.,\s/–—\-]+", "", value))
-    top = max(numbers)
-    if len(units) != 1 or top <= 0 or len(set(numbers)) == 1:
-        return None
-    return [max(round(n / top * 100), 4) for n in numbers]
-
+MAX_PICK_LEN = 28  # пометка на карточке: «Для терапевта»
+CATEGORY_PREFIX = re.compile(r"^бинокуляр\w*\s+луп\w*\s+", re.IGNORECASE)
+HIDDEN_WORDS = ("рабоч",)  # рабочее расстояние зависит от посадки: в сравнение не выносим
 
 def short(text: str, limit: int) -> str:
     return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
@@ -190,54 +178,73 @@ def facts(characteristics: dict | None) -> dict[str, str]:
     return result
 
 
-def comparison_view(products: list[Product]) -> dict:
-    """Сжатая таблица для чата: цена и до COMPARE_SHOWN отличий с полосками; остальное — «ещё» и «одинаково»."""
-    per_product = [facts(p.characteristics) for p in products]
+def comparison_view(products: list[Product], pick: dict | None = None) -> dict:
+    """Сравнение для чата: карточки рядом — цена, пометка «кому подходит», 3 главных параметра.
+    Остальные отличия — под кнопкой, общее — одной строкой."""
+    per_product = [{k: v for k, v in facts(p.characteristics).items() if not any(w in k.lower() for w in HIDDEN_WORDS)}
+                   for p in products]
     keys: list[str] = []
     for table in per_product:
         for key in table:
             if key not in keys:
                 keys.append(key)
-    different, same = [], []
+    # Ключевые параметры показываем всегда, даже если у моделей они совпадают; остальное — только отличия
+    def rank(key: str) -> int:
+        low = key.lower()
+        return next((i for i, word in enumerate(KEY_WORDS) if word in low), len(KEY_WORDS))
+
+    key_keys = sorted((k for k in keys if rank(k) < len(KEY_WORDS)), key=rank)[:COMPARE_SHOWN]
+    rows, different, same = [], [], []
     for key in keys:
         values = [table.get(key, "—") for table in per_product]
+        row = {"name": short(key, MAX_LABEL_LEN), "values": values}
+        if key in key_keys:
+            continue
         if len(set(values)) == 1:
             if values[0] != "—":
-                same.append(f"{short(key, MAX_LABEL_LEN)}: {values[0]}")
+                same.append(f"{row['name']}: {values[0]}")
         else:
-            present = [v for v in values if v != "—"]
-            row = {"name": short(key, MAX_LABEL_LEN), "values": values}
-            row["bars"] = bars(values) if len(present) == len(values) else None
             different.append(row)
-    # Сначала числовые строки с полосками, потом заполненные у всех, потом остальные
-    different.sort(key=lambda row: (row["bars"] is None, row["values"].count("—")))
+    rows = [{"name": short(k, MAX_LABEL_LEN), "values": [t.get(k, "—") for t in per_product]} for k in key_keys]
+    # Если ключевых мало, добираем отличиями, известными у нескольких товаров
+    different.sort(key=lambda row: row["values"].count("—"))
+    while len(rows) < COMPARE_SHOWN and different:
+        rows.append(different.pop(0))
     view = comparison_table(products)
     prices = [p["price_rub"] for p in view["products"]]
-    price_row = None
-    if all(v is not None for v in prices):
-        price_row = {"name": "Цена", "values": [f"{v:,.0f} ₽".replace(",", " ") for v in prices],
-                     "bars": bars([str(int(v)) for v in prices])}
+    cheapest = min(prices) if all(v is not None for v in prices) and len(set(prices)) > 1 else None
+    # Общее «Бинокулярные лупы» — заголовком над блоком, а из названий карточек убирается: место дороже
+    title = "Бинокулярные лупы" if all(CATEGORY_PREFIX.match(p["name"]) for p in view["products"]) else ""
     for item in view["products"]:
-        item["name"] = short(item["name"], 40)
+        item["full_name"] = item["name"]
+        item["name"] = short(CATEGORY_PREFIX.sub("", item["name"]) or item["name"], 40)
+        item["pick"] = pick["label"] if pick and pick.get("product_id") == item["id"] else ""
+        item["cheapest"] = cheapest is not None and item["price_rub"] == cheapest
     return {
+        "title": title,
         "products": view["products"],
-        "rows": ([price_row] if price_row else []) + different[:COMPARE_SHOWN],
-        "more": different[COMPARE_SHOWN:MAX_COMPARISON_ROWS],
+        "rows": rows,
+        "more": different[:MAX_COMPARISON_ROWS],
         "same": same[:COMPARE_SAME],
     }
 
 
 def loupe_view(product: Product) -> dict | None:
-    """Данные ползунка бинокулярной лупы; без структурных данных — None (останутся карточка и текст)."""
-    loupe = product.loupe
-    if not isinstance(loupe, dict) or not loupe.get("options"):
+    """Данные блока бинокулярной лупы; без галочки или без увеличений — None (останутся карточка и текст)."""
+    if not product.is_loupe or not product.loupe_options:
         return None
+    individual = product.loupe_kind == "individual"
     return {
         "product": {"id": product.id, "slug": product.slug, "name": product.name, "brand": product.brand.name,
                     "price_rub": money(product.price_rub),
                     "availability": "в наличии" if product.stock_qty > 0 else "под заказ"},
-        "kind": loupe.get("kind"),
-        "options": loupe["options"],
+        "kind": product.loupe_kind or None,
+        "options": [{"zoom": o.zoom, **({"field": o.field_of_view} if o.field_of_view else {})}
+                    for o in product.loupe_options],
+        # Рабочее расстояние от увеличения не зависит — свой список
+        "distances": [d.distance for d in product.loupe_distances],
+        # Межзрачковое расстояние нужно только индивидуальным лупам
+        "ipd": product.loupe_ipd if individual and product.loupe_ipd else "",
     }
 
 
@@ -250,7 +257,8 @@ async def hydrate_widget(session: AsyncSession, widget: dict) -> dict | None:
         return {"widget": kind, "products": cards} if cards else None
     if kind == "comparison":
         products = await active_products(session, ids)
-        return {"widget": kind, "table": comparison_view(products)} if len(products) >= 2 else None
+        table = comparison_view(products, widget.get("pick"))
+        return {"widget": kind, "table": table} if len(products) >= 2 else None
     if kind == "loupe":
         products = await active_products(session, ids)
         view = loupe_view(products[0]) if products else None
@@ -427,8 +435,14 @@ class ShowArgs(Args):
     product_ids: list[int] = Field(min_length=1, max_length=4)
 
 
+class ComparePick(Args):
+    product_id: int
+    label: str = Field(max_length=MAX_PICK_LEN)
+
+
 class CompareArgs(Args):
     product_ids: list[int] = Field(min_length=2, max_length=3)
+    pick: ComparePick | None = None
 
 
 async def run_show(ctx: ToolContext, args: ShowArgs) -> ToolOutput:
@@ -449,8 +463,10 @@ async def run_compare(ctx: ToolContext, args: CompareArgs) -> ToolOutput:
     products = await active_products(ctx.session, ids)
     if len(products) < 2:
         raise ToolError("для сравнения нужно минимум два товара из каталога")
-    return ToolOutput(comparison_table(products),
-                      widget={"widget": "comparison", "product_ids": [p.id for p in products]})
+    shown = [p.id for p in products]
+    pick = {"product_id": args.pick.product_id, "label": args.pick.label.strip()} if (
+        args.pick and args.pick.product_id in shown and args.pick.label.strip()) else None
+    return ToolOutput(comparison_table(products), widget={"widget": "comparison", "product_ids": shown, "pick": pick})
 
 
 class LoupeArgs(Args):
@@ -463,7 +479,8 @@ async def run_loupe(ctx: ToolContext, args: LoupeArgs) -> ToolOutput:
     if view is None:
         raise ToolError("у этого товара нет данных о вариантах увеличения: покажи его карточкой и расскажи по характеристикам")
     return ToolOutput(
-        {"kind": view["kind"], "options": view["options"], "price_rub": view["product"]["price_rub"]},
+        {"kind": view["kind"], "options": view["options"], "distances": view["distances"],
+         "interpupillary_distance": view["ipd"], "price_rub": view["product"]["price_rub"]},
         widget={"widget": "loupe", "product_ids": [products[0].id]},
     )
 
@@ -595,16 +612,20 @@ TOOLS: list[Tool] = [
     Tool(
         name="show_comparison",
         description=(
-            "Показать клиенту сжатую таблицу сравнения 2–3 товаров: только отличия. Цена и наличие в таблице "
-            "уже есть. Текст сравнения пишешь сам."
+            "Показать клиенту сравнение 2–3 товаров: цена, бренд и страна, главные параметры рядом. В pick — "
+            "пометка на одной карточке под задачу клиента (label до 28 символов, например «Для терапевта»): только "
+            "когда задача известна и есть основание в базе знаний или каталоге. "
+            "Текст сравнения пишешь сам."
         ),
-        args=CompareArgs, schema=obj({"product_ids": INT_LIST}, ["product_ids"]),
+        args=CompareArgs, schema=obj({"product_ids": INT_LIST, "pick": obj(
+            {"product_id": {"type": "integer"}, "label": {"type": "string"}}, ["product_id", "label"])}, ["product_ids"]),
         run=run_compare, status="preparing",
     ),
     Tool(
         name="show_loupe",
         description=(
-            "Показать клиенту бинокулярную лупу с ползунком: увеличение → рабочее расстояние, поле обзора, глубина. "
+            "Показать клиенту бинокулярную лупу: выбор увеличения (от него зависит поле обзора) и выбор рабочего "
+            "расстояния (от увеличения не зависит). "
             "Только для луп с данными о вариантах увеличения; для одной лупы, вместо карточки. Текст пишешь сам."
         ),
         args=LoupeArgs, schema=obj({"product_id": {"type": "integer"}}, ["product_id"]),

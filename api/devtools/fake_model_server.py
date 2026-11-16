@@ -59,14 +59,31 @@ def answer_after_tool(name: str, result) -> Reply:
         products = result.get("products", [])
         if not products:
             return Reply(blocks=[thinking(), text("В каталоге такого не нашёл. Расскажите подробнее, что нужно, — подберу альтернативу.")])
+        with_loupe = [p for p in products if p.get("loupe_options")]
+        if with_loupe and "луп" in " ".join(p["name"].lower() for p in products):
+            return Reply(blocks=[thinking(), tool_use("show_loupe", {"product_id": with_loupe[0]["id"]})],
+                         stop_reason="tool_use")
         return Reply(blocks=[thinking(), tool_use("show_products", {"product_ids": [p["id"] for p in products[:3]]})],
                      stop_reason="tool_use")
     if name == "show_products":
         lines = [f"- **{p['name']}** — {rub(p['price_rub'])}, {p['availability']}" for p in result.get("shown", [])]
         return Reply(blocks=[thinking(), text(
             "Подобрал варианты:\n" + "\n".join(lines) + "\n\nМогу сравнить их или положить нужный в корзину.")])
+    if name == "show_loupe":
+        return Reply(blocks=[thinking(), text(
+            "Переключайте увеличение — рабочее расстояние и поле обзора меняются. "
+            "Для кого подбираете: терапевт, хирург, ортопед? Подскажу, какое увеличение взять.")])
     if name == "show_comparison":
-        return Reply(blocks=[thinking(), text("Сравнение — в таблице выше. Подскажите, что важнее: камера, увеличение или бюджет?")])
+        products = result.get("products", [])
+        rows = result.get("rows", [])
+        known = [sum(1 for r in rows if r["values"][i] != "—") for i in range(len(products))]
+        cheapest = min(products, key=lambda p: p["price_rub"] if p["price_rub"] is not None else float("inf"))
+        richest = products[known.index(max(known))]
+        parts = [f"Самая доступная — **{cheapest['name']}**, {rub(cheapest['price_rub'])}."]
+        if richest["id"] != cheapest["id"] and max(known) > min(known):
+            parts.append(f"Подробнее всего описана **{richest['name']}**: по ней в каталоге больше всего заявленных параметров.")
+        parts.append("Подскажите, кто будет работать (терапевт, хирург, ортопед) и сколько часов в день, — назову одну модель.")
+        return Reply(blocks=[thinking(), text(" ".join(parts))])
     if name == "catalog_overview":
         names = ", ".join(c["name"] for c in result.get("categories", []) if c["products"])
         return Reply(blocks=[thinking(), text(f"В каталоге есть: {names}. Что подбираем?")])
@@ -134,7 +151,7 @@ def decide(body: dict) -> Reply:
         return Reply(blocks=[thinking(), text("Секунду, посмотрю."), tool_use(name, payload)], stop_reason="tool_use")
 
     if "сравн" in low and "show_comparison" in available and len(shown) >= 2:
-        return call("show_comparison", {"product_ids": shown[:3]})
+        return call("show_comparison", {"product_ids": shown[:3], "pick": {"product_id": shown[min(2, len(shown) - 1)], "label": "Для терапевта"}})
     if any(w in low for w in ("скидк", "лизинг", "ремонт", "менеджер")) and "open_lead_form" in available:
         return call("open_lead_form", {"topic": said[:200]})
     if ("кп" in low.split() or "коммерческ" in low) and "create_quote" in available:

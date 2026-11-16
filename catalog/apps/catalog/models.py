@@ -70,15 +70,22 @@ class Category(models.Model):
         super().save(*args, **kwargs)
 
 
-LOUPE_OPTION_KEYS = {"zoom", "distance", "field", "depth"}
+# validate_loupe и LOUPE_HELP остались только для старых миграций 0005–0006: поле loupe заменено полями ниже
+LOUPE_OPTION_KEYS = {"zoom", "field", "depth"}
+LOUPE_HELP = (
+    'Только для бинокулярных луп. Рабочее расстояние от увеличения не зависит — оно в distances, '
+    'а options — увеличения с полем обзора. Пример: {"kind": "individual", "distances": ["340 мм", "420 мм"], '
+    '"options": [{"zoom": "2.5×", "field": "130 мм"}, {"zoom": "3.5×", "field": "95 мм"}]}. '
+    'kind — "universal" или "individual"; distances и field по желанию, zoom обязателен.'
+)
 
 
 def validate_loupe(value):
-    """Данные лупы: вид и список вариантов увеличения — иначе чат не сможет их показать."""
+    """Данные лупы: вид, увеличения и рабочие расстояния — иначе чат не сможет их показать."""
     if value in (None, {}):
         return
-    if not isinstance(value, dict) or set(value) - {"kind", "options"}:
-        raise ValidationError("Ожидается объект с ключами kind и options.")
+    if not isinstance(value, dict) or set(value) - {"kind", "options", "distances"}:
+        raise ValidationError("Ожидается объект с ключами kind, options и distances.")
     if value.get("kind") not in ("universal", "individual"):
         raise ValidationError('kind: "universal" (универсальные) или "individual" (индивидуальные).')
     options = value.get("options")
@@ -86,9 +93,13 @@ def validate_loupe(value):
         raise ValidationError("options: список от 1 до 12 вариантов.")
     for option in options:
         if not isinstance(option, dict) or not option.get("zoom") or set(option) - LOUPE_OPTION_KEYS:
-            raise ValidationError("Вариант: объект с обязательным zoom и, по желанию, distance, field, depth.")
+            raise ValidationError("Вариант: объект с обязательным zoom и, по желанию, field, depth.")
         if not all(isinstance(v, str) and len(v) <= 40 for v in option.values()):
             raise ValidationError("Значения варианта — короткие строки.")
+    distances = value.get("distances", [])
+    if not isinstance(distances, list) or len(distances) > 6 or not all(
+            isinstance(d, str) and 0 < len(d) <= 40 for d in distances):
+        raise ValidationError("distances: до 6 коротких строк, например «340 мм».")
 
 
 class Product(models.Model):
@@ -111,14 +122,20 @@ class Product(models.Model):
     stock_qty = models.PositiveIntegerField(default=0, verbose_name="Остаток")
     description = models.TextField(blank=True, verbose_name="Описание")
     characteristics = models.JSONField(default=dict, blank=True, verbose_name="Характеристики")
-    # Только бинокулярные лупы: чат показывает ползунок «увеличение → рабочее расстояние»
-    loupe = models.JSONField(
-        null=True, blank=True, validators=[validate_loupe], verbose_name="Данные лупы",
-        help_text=(
-            'Только для бинокулярных луп. Пример: {"kind": "individual", "options": ['
-            '{"zoom": "2.5×", "distance": "340–420 мм", "field": "110 мм", "depth": "200 мм"}]}. '
-            'kind — "universal" или "individual"; в options нужен только zoom, остальное по желанию.'
-        ),
+    # Бинокулярные лупы: в чате вместо карточки — выбор увеличения и рабочего расстояния, поле обзора рядом
+    is_loupe = models.BooleanField(default=False, db_default=False, verbose_name="Бинокулярная лупа")
+
+    class LoupeKind(models.TextChoices):
+        UNIVERSAL = "universal", "Универсальные"
+        INDIVIDUAL = "individual", "Индивидуальные"
+
+    loupe_kind = models.CharField(
+        max_length=12, choices=LoupeKind.choices, blank=True, default="", db_default="", verbose_name="Тип лупы"
+    )
+    # Только для индивидуальных: универсальным межзрачковое расстояние не нужно
+    loupe_ipd = models.CharField(
+        max_length=40, blank=True, default="", db_default="", verbose_name="Межзрачковое расстояние",
+        help_text="Например: 54–74 мм",
     )
     priority = models.IntegerField(default=0, db_index=True, verbose_name="Приоритет")
     is_active = models.BooleanField(default=True, verbose_name="Активен")
@@ -189,6 +206,45 @@ class ProductOption(models.Model):
 
     def __str__(self):
         return f"{self.name}: {self.value}"
+
+
+class LoupeOption(models.Model):
+    """Увеличение бинокулярной лупы и поле обзора при нём."""
+
+    product = models.ForeignKey(
+        Product, on_delete=models.CASCADE, related_name="loupe_options", verbose_name="Товар"
+    )
+    zoom = models.CharField(max_length=20, verbose_name="Увеличение", help_text="Например: 3.5×")
+    field_of_view = models.CharField(
+        max_length=20, blank=True, verbose_name="Поле обзора", help_text="Число и единица: 95 мм"
+    )
+    sort_order = models.PositiveSmallIntegerField(default=0, verbose_name="Порядок")
+
+    class Meta:
+        verbose_name = "Увеличение"
+        verbose_name_plural = "Увеличения и поле обзора"
+        ordering = ["sort_order", "id"]
+
+    def __str__(self):
+        return self.zoom
+
+
+class LoupeDistance(models.Model):
+    """Рабочее расстояние лупы: от увеличения не зависит, поэтому отдельный список."""
+
+    product = models.ForeignKey(
+        Product, on_delete=models.CASCADE, related_name="loupe_distances", verbose_name="Товар"
+    )
+    distance = models.CharField(max_length=20, verbose_name="Рабочее расстояние", help_text="Например: 340 мм")
+    sort_order = models.PositiveSmallIntegerField(default=0, verbose_name="Порядок")
+
+    class Meta:
+        verbose_name = "Рабочее расстояние"
+        verbose_name_plural = "Рабочие расстояния"
+        ordering = ["sort_order", "id"]
+
+    def __str__(self):
+        return self.distance
 
 
 class ProductContentBlock(models.Model):

@@ -9,6 +9,8 @@ from .models import (
     Brand,
     Category,
     CurrencyRate,
+    LoupeDistance,
+    LoupeOption,
     Product,
     ProductImage,
     ProductOption,
@@ -24,6 +26,24 @@ class ProductImageInline(TabularInline):
 class ProductOptionInline(TabularInline):
     model = ProductOption
     extra = 1
+
+
+class LoupeOptionInline(TabularInline):
+    """Увеличения лупы: «увеличение → поле обзора». Блок показывается, когда стоит галочка «Бинокулярная лупа»."""
+
+    model = LoupeOption
+    extra = 2
+    fields = ["zoom", "field_of_view", "sort_order"]
+    verbose_name = "Увеличение"
+    verbose_name_plural = "Бинокулярная лупа: увеличения и поле обзора"
+
+
+class LoupeDistanceInline(TabularInline):
+    model = LoupeDistance
+    extra = 2
+    fields = ["distance", "sort_order"]
+    verbose_name = "Рабочее расстояние"
+    verbose_name_plural = "Бинокулярная лупа: рабочие расстояния (от увеличения не зависят)"
 
 
 class ProductContentBlockInline(StackedInline):
@@ -73,8 +93,25 @@ class ProductAdmin(ModelAdmin):
     inlines = [
         ProductImageInline,
         ProductOptionInline,
+        LoupeOptionInline,
+        LoupeDistanceInline,
         ProductContentBlockInline,
     ]
+
+    class Media:
+        # Галочка «Бинокулярная лупа» раскрывает поля лупы; тип «индивидуальные» — межзрачковое расстояние
+        js = ["admin/loupe.js"]
+
+    def save_related(self, request, form, formsets, change):
+        super().save_related(request, form, formsets, change)
+        product = form.instance
+        if product.is_loupe and not product.loupe_options.exists():
+            messages.warning(request, "У лупы нет ни одного увеличения: в чате она будет обычной карточкой.")
+        if product.is_loupe and not product.loupe_kind:
+            messages.warning(request, "У лупы не выбран тип (универсальные или индивидуальные).")
+        if product.loupe_kind != Product.LoupeKind.INDIVIDUAL and product.loupe_ipd:
+            # Универсальным межзрачковое расстояние не нужно
+            Product.objects.filter(pk=product.pk).update(loupe_ipd="")
 
 
 @admin.register(CurrencyRate)

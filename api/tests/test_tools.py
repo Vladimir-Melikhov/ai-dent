@@ -105,8 +105,8 @@ def test_comparison_widget_is_compact(catalog):
 
     view = run_async(go())
     names_ = [row["name"] for row in view["rows"]]
-    assert set(names_) == {"Цена", "Камера", "Вариоскоп"}  # «Увеличение» одинаково — не строка, а общее
-    assert view["same"] == ["Увеличение: 4–25×"] and view["more"] == []
+    # Ключевой параметр (увеличение) виден всегда, даже если у моделей он одинаков; остальные отличия — следом
+    assert names_ == ["Увеличение", "Камера", "Вариоскоп"] and view["more"] == [] and view["same"] == []
 
 
 def test_facts_flatten_groups_and_drop_marketing_lines():
@@ -117,23 +117,113 @@ def test_facts_flatten_groups_and_drop_marketing_lines():
     assert facts(chars) == {"Увеличение": "2.8x", "Рабочее расстояние": "360 / 420 мм", "Вес": "44 г"}
 
 
-def test_show_loupe_needs_structured_data(catalog):
-    import json
-
+def make_loupe(product_id, kind="individual", ipd="54–74 мм", distances=("340 мм", "420 мм"),
+               zooms=(("2.5×", "130 мм"), ("3.5×", "95 мм"))):
     from .conftest import admin_sql
 
+    admin_sql("UPDATE catalog_product SET is_loupe = true, loupe_kind = $1, loupe_ipd = $2 WHERE id = $3",
+              kind, ipd, product_id)
+    for i, d in enumerate(distances):
+        admin_sql("INSERT INTO catalog_loupedistance(product_id, distance, sort_order) VALUES ($1, $2, $3)", product_id, d, i)
+    for i, (zoom, field) in enumerate(zooms):
+        admin_sql("INSERT INTO catalog_loupeoption(product_id, zoom, field_of_view, sort_order) VALUES ($1, $2, $3, $4)",
+                  product_id, zoom, field, i)
+
+
+def test_show_loupe_needs_the_checkbox_and_zooms(catalog):
     with pytest.raises(ToolError, match="нет данных"):
         run_tool("show_loupe", {"product_id": catalog["loupe"]})
-    loupe = {"kind": "individual", "options": [{"zoom": "2.5×", "distance": "340 мм"}, {"zoom": "3.5×", "distance": "320 мм"}]}
-    admin_sql("UPDATE catalog_product SET loupe = $1::jsonb WHERE id = $2", json.dumps(loupe), catalog["loupe"])
+    make_loupe(catalog["loupe"])
     output = run_tool("show_loupe", {"product_id": catalog["loupe"]})
     assert output.widget == {"widget": "loupe", "product_ids": [catalog["loupe"]]}
-    assert output.result["options"][1]["distance"] == "320 мм"
+    assert output.result["options"][1] == {"zoom": "3.5×", "field": "95 мм"}
 
 
-def test_bars_only_for_numbers_with_same_unit():
-    from app.ai.tools import bars
+def test_loupe_distances_are_independent_of_zoom_and_ipd_only_for_individual(catalog):
+    make_loupe(catalog["loupe"])
+    result = run_tool("show_loupe", {"product_id": catalog["loupe"]}).result
+    assert result["distances"] == ["340 мм", "420 мм"] and result["interpupillary_distance"] == "54–74 мм"
+    assert result["kind"] == "individual"
 
-    assert bars(["2.5x", "5x"]) == [50, 100]
-    assert bars(["360 / 420 мм", "300 мм"]) == [100, 71]
-    assert bars(["44 г", "2.8x"]) is None and bars(["Full HD", "4K"]) is None and bars(["3x", "3x"]) is None
+
+def test_universal_loupe_has_no_interpupillary_distance(catalog):
+    make_loupe(catalog["loupe"], kind="universal", ipd="54–74 мм")  # даже если значение осталось в базе
+    result = run_tool("show_loupe", {"product_id": catalog["loupe"]}).result
+    assert result["interpupillary_distance"] == ""
+
+
+def test_comparison_widget_is_compact(catalog):
+    from app.ai.tools import comparison_view, active_products
+
+    async def go():
+        async with async_session_factory() as session:
+            return comparison_view(await active_products(session, [catalog["extaro"], catalog["pico"]]))
+
+    view = run_async(go())
+    names_ = [row["name"] for row in view["rows"]]
+    # Ключевой параметр (увеличение) виден всегда, даже если у моделей он одинаков; остальные отличия — следом
+    assert names_ == ["Увеличение", "Камера", "Вариоскоп"] and view["more"] == [] and view["same"] == []
+
+
+def test_facts_flatten_groups_and_drop_marketing_lines():
+    from app.ai.tools import facts
+
+    chars = {"Оптика": ["Увеличение: 2.8x", "Высокоразрешающая TTL-оптика", "Рабочее расстояние: 360 / 420 мм"],
+             "Прочее": {"Вес": "44 г"}}
+    assert facts(chars) == {"Увеличение": "2.8x", "Рабочее расстояние": "360 / 420 мм", "Вес": "44 г"}
+
+
+def test_comparison_marks_cheapest_and_country(catalog):
+    from app.ai.tools import comparison_view, active_products
+
+    async def go():
+        async with async_session_factory() as session:
+            return comparison_view(await active_products(session, [catalog["extaro"], catalog["pico"]]))
+
+    view = run_async(go())
+    by_id = {p["id"]: p for p in view["products"]}
+    assert by_id[catalog["pico"]]["cheapest"] and not by_id[catalog["extaro"]]["cheapest"]
+    assert by_id[catalog["extaro"]]["country"] == "Германия"
+
+
+def test_comparison_hides_working_distance():
+    from types import SimpleNamespace as N
+
+    from app.ai.tools import comparison_view
+
+    def product(i, chars):
+        return N(id=i, slug=f"s{i}", name=f"Лупа {i}", brand=N(name="B", country="С"), price_rub=100 * i, stock_qty=1,
+                 characteristics=chars)
+
+    view = comparison_view([product(1, {"Оптика": ["Увеличение: 2.8x", "Рабочее расстояние: 360 мм"]}),
+                            product(2, {"Оптика": ["Увеличение: 3x"]})])
+    text = str(view)
+    assert "Рабочее" not in text and "360" not in text
+
+
+def test_comparison_shortens_names_and_marks_pick():
+    from types import SimpleNamespace as N
+
+    from app.ai.tools import comparison_view
+
+    def product(i, name):
+        return N(id=i, slug=f"s{i}", name=name, brand=N(name="B", country="Китай"), price_rub=100 * i, stock_qty=1,
+                 characteristics={})
+
+    view = comparison_view([product(1, "Бинокулярная лупа TTL XC-View 2.8"), product(2, "Бинокулярные лупы SLT Zumax"),
+                            product(3, "Микроскоп")], {"product_id": 2, "label": "Для терапевта"})
+    names_ = [p["name"] for p in view["products"]]
+    assert names_ == ["TTL XC-View 2.8", "SLT Zumax", "Микроскоп"]
+    assert view["title"] == ""  # не все товары — лупы: заголовка нет
+    loupes = comparison_view([product(1, "Бинокулярная лупа TTL XC-View 2.8"), product(2, "Бинокулярные лупы SLT Zumax")])
+    assert loupes["title"] == "Бинокулярные лупы"
+    assert view["products"][0]["full_name"] == "Бинокулярная лупа TTL XC-View 2.8"
+    assert [p["pick"] for p in view["products"]] == ["", "Для терапевта", ""]
+
+
+def test_comparison_pick_must_be_among_shown(catalog):
+    ids = [catalog["extaro"], catalog["pico"]]
+    ok = run_tool("show_comparison", {"product_ids": ids, "pick": {"product_id": catalog["pico"], "label": "Для терапевта"}})
+    assert ok.widget["pick"] == {"product_id": catalog["pico"], "label": "Для терапевта"}
+    foreign = run_tool("show_comparison", {"product_ids": ids, "pick": {"product_id": 1, "label": "чужой"}})
+    assert foreign.widget["pick"] is None

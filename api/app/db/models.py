@@ -53,8 +53,10 @@ class Product(Base):
     price_rub: Mapped[decimal.Decimal | None] = mapped_column(Numeric(12, 2))
     stock_qty: Mapped[int]
     characteristics: Mapped[dict] = mapped_column(JSON)
-    # Бинокулярные лупы: {kind, options: [{zoom, distance, field, depth}]}; у остальных товаров пусто
-    loupe: Mapped[dict | None] = mapped_column(JSON)
+    # Бинокулярные лупы: галочка, тип, межзрачковое расстояние (у индивидуальных); увеличения и расстояния — в таблицах
+    is_loupe: Mapped[bool]
+    loupe_kind: Mapped[str]
+    loupe_ipd: Mapped[str]
     priority: Mapped[int]
     is_active: Mapped[bool]
     created_at: Mapped[datetime.datetime]
@@ -68,6 +70,8 @@ class Product(Base):
         back_populates="product", order_by="ProductImage.sort_order"
     )
     options: Mapped[list["ProductOption"]] = relationship(back_populates="product")
+    loupe_options: Mapped[list["LoupeOption"]] = relationship(order_by="LoupeOption.sort_order, LoupeOption.id")
+    loupe_distances: Mapped[list["LoupeDistance"]] = relationship(order_by="LoupeDistance.sort_order, LoupeDistance.id")
 
     @property
     def primary_image_path(self) -> str | None:
@@ -75,6 +79,25 @@ class Product(Base):
             return None
         primary = next((img for img in self.images if img.is_primary), None)
         return (primary or self.images[0]).image
+
+
+class LoupeOption(Base):
+    __tablename__ = "catalog_loupeoption"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    product_id: Mapped[int] = mapped_column(ForeignKey("catalog_product.id"))
+    zoom: Mapped[str]
+    field_of_view: Mapped[str]
+    sort_order: Mapped[int]
+
+
+class LoupeDistance(Base):
+    __tablename__ = "catalog_loupedistance"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    product_id: Mapped[int] = mapped_column(ForeignKey("catalog_product.id"))
+    distance: Mapped[str]
+    sort_order: Mapped[int]
 
 
 class ProductImage(Base):

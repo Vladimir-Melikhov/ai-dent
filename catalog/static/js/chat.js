@@ -401,30 +401,43 @@ if (root) {
     return value == null ? "—" : String(value);
   }
 
-  // Сравнение: цвет товара в легенде совпадает с цветом его полоски в каждом параметре
-  function compareLegend(p, i) {
-    const name = p.slug ? `<a href="/product/${encodeURIComponent(p.slug)}/">${escapeHTML(p.name)}</a>` : escapeHTML(p.name);
-    const price = p.price_rub != null ? formatPrice(p.price_rub) : "цена по запросу";
-    return `<div class="chat-compare__item c${i}"><i></i><div>${name}<span>${price} · ${escapeHTML(p.availability)}</span></div></div>`;
+  // Сравнение: карточки рядом — название, бренд и страна с флагом, крупная цена, главные параметры;
+  // остальные отличия под кнопкой
+  function countryLine(brand, country) {
+    return `${escapeHTML(brand || "")}${country ? ` · <b>${escapeHTML(country)}</b>` : ""}`;
   }
 
   function compareRows(rows) {
     return rows.map(r => `
       <div class="chat-compare__row"><div class="chat-compare__label">${escapeHTML(r.name)}</div>
-      ${r.values.map((v, i) => `<div class="chat-compare__val c${i}"><i></i>
-        ${r.bars ? `<b class="chat-compare__bar"><u style="width:${r.bars[i]}%"></u></b>` : ""}
-        <span>${escapeHTML(formatValue(v))}</span></div>`).join("")}</div>`).join("");
+      <div class="chat-compare__cols">${r.values.map(v => `<span>${escapeHTML(formatValue(v))}</span>`).join("")}</div></div>`).join("");
   }
 
-  // Только отличия: числовые — полосками, остальные — коротким текстом; прочее под кнопкой
   function renderComparison(table) {
     const el = document.createElement("div");
     el.className = "chat-widget chat-compare";
+    el.style.setProperty("--n", table.products.length);
     const more = table.more || [];
+    const cards = table.products.map((p, i) => {
+      const name = p.slug ? `<a href="/product/${encodeURIComponent(p.slug)}/" title="${escapeHTML(p.full_name || p.name)}">${escapeHTML(p.name)}</a>` : escapeHTML(p.name);
+      const params = table.rows.map(r => {
+        const v = r.values[i];
+        return `<span class="chat-compare__k">${escapeHTML(r.name)}</span><span class="chat-compare__t${v === "—" ? " is-none" : ""}">${escapeHTML(formatValue(v))}</span>`;
+      }).join("");
+      const tags = (p.pick ? `<span class="chat-compare__tag chat-compare__tag--pick">${escapeHTML(p.pick)}</span>` : "")
+        + (p.cheapest ? '<span class="chat-compare__tag">Дешевле</span>' : "");
+      return `<div class="chat-compare__card${p.pick ? " is-pick" : ""}">
+        <div class="chat-compare__tags">${tags}</div>
+        <div class="chat-compare__name">${name}</div>
+        <div class="chat-compare__brand">${countryLine(p.brand, p.country)}</div>
+        <div class="chat-compare__price">${p.price_rub != null ? formatPrice(p.price_rub) : "цена по запросу"}</div>
+        <div class="chat-compare__avail">${escapeHTML(p.availability)}</div>
+        ${params}</div>`;
+    }).join("");
     const same = table.same && table.same.length ? `<p class="chat-compare__same">Одинаково: ${table.same.map(escapeHTML).join(" · ")}</p>` : "";
     el.innerHTML = `
-      <div class="chat-compare__legend">${table.products.map(compareLegend).join("")}</div>
-      ${compareRows(table.rows)}
+      ${table.title ? `<div class="chat-compare__title">${escapeHTML(table.title)}</div>` : ""}
+      <div class="chat-compare__grid" style="--r:${5 + table.rows.length * 2}">${cards}</div>
       ${more.length ? `<div class="chat-compare__extra" hidden>${compareRows(more)}</div>
         <button type="button" class="chat-compare__more">Ещё отличия (${more.length})</button>` : ""}
       ${same}`;
@@ -439,41 +452,88 @@ if (root) {
     return el;
   }
 
+  const TEETH = 17;       // зубов в ряду: нечётное число, чтобы рамка стояла по центру
+  const TOOTH_MM = 8.5;   // средняя ширина зуба: по ней оценивается, сколько зубов в поле
+
   const LOUPE_KINDS = { universal: "Универсальные", individual: "Индивидуальные" };
 
-  // Бинокулярная лупа: ползунок по вариантам увеличения, ниже — рабочее расстояние и остальное для выбранного
+  function numberOf(text) {
+    const n = parseFloat(String(text || "").replace(",", "."));
+    return Number.isFinite(n) ? n : null;
+  }
+
+  // Бинокулярная лупа. Увеличение и рабочее расстояние выбираются независимо; от увеличения меняется
+  // только поле обзора — оно рисуется кругом, который плавно сужается, а число «докручивается»
   function renderLoupe(ui) {
     const el = document.createElement("div");
     el.className = "chat-widget chat-loupe";
     const p = ui.product;
     const options = ui.options;
+    const distances = ui.distances || [];
     const kind = LOUPE_KINDS[ui.kind] ? `<span class="chat-loupe__kind">${LOUPE_KINDS[ui.kind]}</span>` : "";
     const name = p.slug ? `<a href="/product/${encodeURIComponent(p.slug)}/">${escapeHTML(p.name)}</a>` : escapeHTML(p.name);
     const price = p.price_rub != null ? formatPrice(p.price_rub) : "цена по запросу";
-    const single = options.length < 2;
+    const fields = options.map(o => numberOf(o.field));
+    const widest = fields.every(f => f != null) ? Math.max(...fields) : 0;
+    const unit = (options.find(o => o.field) || {}).field?.replace(/^[\d.,\s–-]+/, "") || "";
+    const seg = (items, group, label) => `<div class="chat-loupe__label">${label}</div>
+      <div class="chat-loupe__seg" data-group="${group}" style="--n:${items.length}">${
+        items.map((t, i) => `<button type="button" data-i="${i}">${escapeHTML(t)}</button>`).join("")}</div>`;
     el.innerHTML = `
       <div class="chat-loupe__head"><div class="chat-loupe__name">${name}</div>${kind}</div>
       <div class="chat-loupe__meta">${price} · ${escapeHTML(p.availability)}</div>
-      <div class="chat-loupe__zoom"></div>
-      ${single ? "" : `<input class="chat-loupe__range" type="range" min="0" max="${options.length - 1}" step="1" value="0" aria-label="Увеличение">
-      <div class="chat-loupe__ticks">${options.map((o, i) => `<button type="button" data-i="${i}">${escapeHTML(o.zoom)}</button>`).join("")}</div>`}
-      <dl class="chat-loupe__facts"></dl>`;
-    const zoom = el.querySelector(".chat-loupe__zoom");
-    const facts = el.querySelector(".chat-loupe__facts");
-    const range = el.querySelector(".chat-loupe__range");
-    const ticks = el.querySelectorAll(".chat-loupe__ticks button");
-    const LABELS = [["distance", "Рабочее расстояние"], ["field", "Поле обзора"], ["depth", "Глубина резкости"]];
-    function select(i) {
-      const o = options[i];
-      zoom.innerHTML = `<span>Увеличение</span><strong>${escapeHTML(o.zoom)}</strong>`;
-      facts.innerHTML = LABELS.filter(([key]) => o[key]).map(([key, label]) =>
-        `<div><dt>${label}</dt><dd>${escapeHTML(o[key])}</dd></div>`).join("");
-      ticks.forEach((t, n) => t.classList.toggle("is-on", n === i));
-      if (range) range.value = String(i);
+      ${options.length > 1 ? seg(options.map(o => o.zoom), "zoom", "Увеличение")
+        : `<div class="chat-loupe__label">Увеличение</div><div class="chat-loupe__fixed">${escapeHTML(options[0].zoom)}</div>`}
+      ${distances.length > 1 ? seg(distances, "distance", "Рабочее расстояние")
+        : distances.length ? `<div class="chat-loupe__label">Рабочее расстояние</div><div class="chat-loupe__fixed">${escapeHTML(distances[0])}</div>` : ""}
+      ${ui.ipd ? `<div class="chat-loupe__label">Межзрачковое расстояние</div><div class="chat-loupe__fixed">${escapeHTML(ui.ipd)}</div>` : ""}
+      <div class="chat-loupe__view">
+        <div class="chat-loupe__fov"><span>Поле обзора</span><strong></strong></div>
+        ${widest ? `<div class="chat-loupe__arch" aria-hidden="true">
+          <div class="chat-loupe__teeth">${"<b><i></i></b>".repeat(TEETH)}</div>
+          <u class="chat-loupe__span"></u></div>` : ""}
+      </div>`;
+    const teeth = el.querySelectorAll(".chat-loupe__teeth b");
+    const span = el.querySelector(".chat-loupe__span");
+    const out = el.querySelector(".chat-loupe__fov strong");
+    let shown = null;
+    let raf = 0;
+    // Число плавно «доезжает» до нового значения
+    function tween(to) {
+      cancelAnimationFrame(raf);
+      const from = shown == null ? to : shown;
+      const start = performance.now();
+      const step = now => {
+        const t = Math.min(1, (now - start) / 350);
+        const v = from + (to - from) * (1 - Math.pow(1 - t, 3));
+        shown = v;
+        out.textContent = `${Math.round(v)} ${unit}`.trim();
+        if (t < 1) raf = requestAnimationFrame(step);
+      };
+      raf = requestAnimationFrame(step);
     }
-    if (range) range.addEventListener("input", () => select(Number(range.value)));
-    ticks.forEach(t => t.addEventListener("click", () => select(Number(t.dataset.i))));
-    select(0);
+    function pick(group, i) {
+      el.querySelectorAll(`[data-group="${group}"] button`).forEach((b, n) => b.classList.toggle("is-on", n === i));
+    }
+    function selectZoom(i) {
+      pick("zoom", i);
+      const f = fields[i];
+      if (f != null && widest) {
+        // Видно целое нечётное число зубов — полоска под ними стоит по центру ряда симметрично
+        const n = Math.max(1, Math.min(TEETH, 2 * Math.round((f / TOOTH_MM - 1) / 2) + 1));
+        const from = (TEETH - n) / 2;
+        teeth.forEach((t, k) => t.classList.toggle("is-on", k >= from && k < from + n));
+        span.style.left = `calc(${from / TEETH * 100}% + 2px)`;
+        span.style.width = `calc(${n / TEETH * 100}% - 4px)`;
+        tween(f);
+      } else {
+        out.textContent = options[i].field || "—";
+      }
+    }
+    el.querySelectorAll('[data-group="zoom"] button').forEach(b => b.addEventListener("click", () => selectZoom(Number(b.dataset.i))));
+    el.querySelectorAll('[data-group="distance"] button').forEach(b => b.addEventListener("click", () => pick("distance", Number(b.dataset.i))));
+    pick("distance", 0);
+    selectZoom(options.length - 1);
     return el;
   }
 
