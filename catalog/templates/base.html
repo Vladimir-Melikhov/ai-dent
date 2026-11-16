@@ -91,11 +91,12 @@
     <div class="drawer__overlay" id="drawer-close"></div>
     <aside class="drawer__panel">
       <nav class="drawer__nav" aria-label="Разделы сайта">
-        <a href="{% url 'storefront:catalog' %}">Каталог</a>
+        <button type="button" class="drawer__nav-cat" id="drawer-cat-toggle" aria-expanded="false" aria-controls="drawer-cats">Каталог <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></button>
         <a href="{% url 'storefront:delivery' %}">Доставка</a>
         <a href="{% url 'storefront:about' %}">О нас</a>
         <a href="{% url 'storefront:contacts' %}">Контакты</a>
       </nav>
+      <div class="drawer__cats" id="drawer-cats" data-catalog-url="{% url 'storefront:catalog' %}" hidden></div>
       {% if request.user.is_authenticated %}
       <div class="drawer__account" id="drawer-account">
         <span class="drawer__account-phone">{{ request.user.phone }}</span>

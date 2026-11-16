@@ -233,3 +233,39 @@ function getCookie(name) {
       if (data.ok) window.location.href = data.redirect || "/";
     });
   }
+
+/* Каталог по категориям в мобильной панели */
+(function () {
+  const toggle = document.getElementById("drawer-cat-toggle");
+  const box = document.getElementById("drawer-cats");
+  if (!toggle || !box) return;
+  let loaded = false;
+
+  function render(list) {
+    const base = box.dataset.catalogUrl;
+    const links = [`<a href="${base}" class="drawer__cats-all">Весь каталог</a>`];
+    list.forEach((c) => {
+      const slug = c.slug ?? c.id ?? "";
+      const name = c.name ?? c.title ?? slug;
+      links.push(`<a href="${base}?category=${encodeURIComponent(slug)}">${escapeHTML(name)}</a>`);
+    });
+    box.innerHTML = links.join("");
+  }
+
+  toggle.addEventListener("click", async () => {
+    const open = box.hidden;
+    box.hidden = !open;
+    toggle.setAttribute("aria-expanded", String(open));
+    if (open && !loaded) {
+      try {
+        const res = await fetch("/api/catalog/categories");
+        const data = await res.json();
+        const list = Array.isArray(data) ? data : (data.results || data.items || data.categories || []);
+        render(list);
+        loaded = true;
+      } catch (e) {
+        render([]);
+      }
+    }
+  });
+})();
