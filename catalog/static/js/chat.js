@@ -335,14 +335,18 @@ if (root) {
   const vv = window.visualViewport;
   const phone = window.matchMedia("(max-width: 640px)");
 
+  let alignTimer = 0;
+
   function fitKeyboard() {
     if (!inlineMode || !vv || !phone.matches || !root.classList.contains("is-kb")) return;
     root.style.setProperty("--chat-vh", Math.max(240, vv.height - 16) + "px");
     if (!root.classList.contains("is-active")) return;
-    requestAnimationFrame(() => {
+    /* выравниваем один раз, когда клавиатура доехала, а не на каждый кадр анимации */
+    clearTimeout(alignTimer);
+    alignTimer = setTimeout(() => {
       const top = root.getBoundingClientRect().top - vv.offsetTop - 8;
-      if (Math.abs(top) > 2) window.scrollBy({ top, behavior: "auto" });
-    });
+      if (Math.abs(top) > 24) window.scrollBy({ top, behavior: "auto" });
+    }, 250);
   }
 
   function setKeyboard(on) {
