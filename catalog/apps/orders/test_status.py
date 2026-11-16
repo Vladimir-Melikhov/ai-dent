@@ -13,7 +13,7 @@ from django.core import mail
 from django.core.mail.backends.base import BaseEmailBackend
 from django.utils import timezone
 
-from apps.catalog.models import Brand, Category, CurrencyRate, LoupeDistance, LoupeFrame, LoupeOption, Product
+from apps.catalog.models import Brand, Category, CurrencyRate, LoupeDistance, LoupeFrame, LoupeIpd, LoupeOption, Product
 from apps.chat.models import Conversation, Message
 from conftest import next_published
 from .models import Invoice, Order, OrderChange, OrderItem, OrderStatusHistory
@@ -207,6 +207,48 @@ def test_loupe_choice_can_be_left_to_manager(client, binocular, django_capture_o
     with django_capture_on_commit_callbacks(execute=True):
         assert chat_order(client, loupe={str(binocular.pk): {"later": True}}).status_code == 200
     assert "уточнит менеджер" in Order.objects.get().items.get().product_name
+
+
+def test_loupe_ipd_variants_are_chosen_from_the_list(client, binocular, django_capture_on_commit_callbacks):
+    for i, value in enumerate(["54–60 мм", "60–66 мм", "66–74 мм"]):
+        LoupeIpd.objects.create(product=binocular, value=value, sort_order=i)
+    add(client, binocular)
+    assert client.get("/cart/").json()["items"][0]["loupe"]["ipds"] == ["54–60 мм", "60–66 мм", "66–74 мм"]
+    base = {"zoom": "2.5×", "distance": "340 мм"}
+    for wrong in ({}, {"ipd": "62"}):  # не выбрано или не из списка
+        assert chat_order(client, loupe={str(binocular.pk): {**base, **wrong}}).status_code == 400
+    with django_capture_on_commit_callbacks(execute=True):
+        assert chat_order(client, loupe={str(binocular.pk): {**base, "ipd": "60–66 мм"}}).status_code == 200
+    assert "межзрачковое расстояние 60–66 мм" in Order.objects.get().items.get().product_name
+
+
+def test_ipd_can_be_skipped(client, binocular, django_capture_on_commit_callbacks):
+    LoupeIpd.objects.create(product=binocular, value="54–60 мм", sort_order=0)
+    LoupeIpd.objects.create(product=binocular, value="60–66 мм", sort_order=1)
+    add(client, binocular)
+    with django_capture_on_commit_callbacks(execute=True):
+        response = chat_order(client, loupe={str(binocular.pk): {"zoom": "2.5×", "distance": "340 мм", "ipd_skip": True}})
+    assert response.status_code == 200, response.content
+    options = Order.objects.get().items.get().selected_options
+    assert {"name": "Межзрачковое расстояние", "value": "уточнит менеджер", "price_delta": "0"} in options
+
+
+def test_distance_can_be_skipped(client, binocular, django_capture_on_commit_callbacks):
+    add(client, binocular)
+    with django_capture_on_commit_callbacks(execute=True):
+        response = chat_order(client, loupe={str(binocular.pk): {"zoom": "2.5×", "distance_skip": True, "ipd": "62"}})
+    assert response.status_code == 200, response.content
+    options = Order.objects.get().items.get().selected_options
+    assert {"name": "Рабочее расстояние", "value": "уточнит менеджер", "price_delta": "0"} in options
+
+
+def test_universal_loupe_never_asks_ipd(client, binocular, django_capture_on_commit_callbacks):
+    Product.objects.filter(pk=binocular.pk).update(loupe_kind="universal")
+    LoupeIpd.objects.create(product=binocular, value="58 мм")
+    add(client, binocular)
+    assert client.get("/cart/").json()["items"][0]["loupe"]["ipds"] == []
+    with django_capture_on_commit_callbacks(execute=True):
+        assert chat_order(client, loupe={str(binocular.pk): {"zoom": "2.5×", "distance": "340 мм"}}).status_code == 200
 
 
 def test_loupe_frame_is_asked_only_when_there_are_several(client, binocular, django_capture_on_commit_callbacks):

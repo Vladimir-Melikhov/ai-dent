@@ -123,19 +123,34 @@ def loupe_selection(product, config) -> dict | None:
     frame = str(config.get("frame") or "") if len(frames) > 1 else (frames[0] if frames else "")
     if zoom not in [o["zoom"] for o in data["options"]]:
         raise CartInvalid(f"{product.name}: выберите увеличение или отметьте, что параметры уточнит менеджер")
-    if data["distances"] and distance not in data["distances"]:
+    distance_skipped = config.get("distance_skip") is True  # «Пропустить»: рабочее расстояние уточнит менеджер
+    if distance_skipped:
+        distance = ""
+    elif data["distances"] and distance not in data["distances"]:
         raise CartInvalid(f"{product.name}: выберите рабочее расстояние")
     if len(frames) > 1 and frame not in frames:
         raise CartInvalid(f"{product.name}: выберите оправу")
-    if data["ask_ipd"] and not ipd:
+    ipds = data["ipds"]
+    ipd_skipped = config.get("ipd_skip") is True and len(ipds) != 1  # «Пропустить»: межзрачковое уточнит менеджер
+    if ipd_skipped:
+        ipd = ""
+    elif len(ipds) > 1 and ipd not in ipds:
+        raise CartInvalid(f"{product.name}: выберите межзрачковое расстояние")
+    if len(ipds) == 1:
+        ipd = ipds[0]
+    if data["ask_ipd"] and not ipds and not ipd and not ipd_skipped:
         raise CartInvalid(f"{product.name}: укажите межзрачковое расстояние или отметьте, что уточнит менеджер")
     options = [{"name": "Увеличение", "value": zoom, "price_delta": zero}]
     if distance:
         options.append({"name": "Рабочее расстояние", "value": distance, "price_delta": zero})
+    elif distance_skipped and data["distances"]:
+        options.append({"name": "Рабочее расстояние", "value": "уточнит менеджер", "price_delta": zero})
     if frame:
         options.append({"name": "Оправа", "value": frame, "price_delta": zero})
     if ipd:
         options.append({"name": "Межзрачковое расстояние", "value": ipd, "price_delta": zero})
+    elif ipd_skipped and data["ask_ipd"]:
+        options.append({"name": "Межзрачковое расстояние", "value": "уточнит менеджер", "price_delta": zero})
     return {"summary": ", ".join(o["value"] if o["name"] == "Увеличение" else f"{o['name'].lower()} {o['value']}"
                                  for o in options), "options": options}
 

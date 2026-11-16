@@ -56,7 +56,6 @@ class Product(Base):
     # Бинокулярные лупы: галочка, тип, межзрачковое расстояние (у индивидуальных); увеличения и расстояния — в таблицах
     is_loupe: Mapped[bool]
     loupe_kind: Mapped[str]
-    loupe_ipd: Mapped[str]
     badge: Mapped[str]
     priority: Mapped[int]
     is_active: Mapped[bool]
@@ -73,6 +72,7 @@ class Product(Base):
     options: Mapped[list["ProductOption"]] = relationship(back_populates="product")
     loupe_options: Mapped[list["LoupeOption"]] = relationship(order_by="LoupeOption.sort_order, LoupeOption.id")
     loupe_distances: Mapped[list["LoupeDistance"]] = relationship(order_by="LoupeDistance.sort_order, LoupeDistance.id")
+    loupe_ipds: Mapped[list["LoupeIpd"]] = relationship(order_by="LoupeIpd.sort_order, LoupeIpd.id")
 
     @property
     def primary_image_path(self) -> str | None:
@@ -98,6 +98,15 @@ class LoupeDistance(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     product_id: Mapped[int] = mapped_column(ForeignKey("catalog_product.id"))
     distance: Mapped[str]
+    sort_order: Mapped[int]
+
+
+class LoupeIpd(Base):
+    __tablename__ = "catalog_loupeipd"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    product_id: Mapped[int] = mapped_column(ForeignKey("catalog_product.id"))
+    value: Mapped[str]
     sort_order: Mapped[int]
 
 

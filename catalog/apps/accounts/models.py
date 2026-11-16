@@ -5,6 +5,8 @@ from django.contrib.auth.models import PermissionsMixin
 from django.core.validators import RegexValidator
 from django.db import models
 
+from .phone import normalize_phone
+
 
 phone_validator = RegexValidator(
     regex=r"^\+?[1-9]\d{9,14}$",
@@ -15,9 +17,14 @@ phone_validator = RegexValidator(
 class UserManager(BaseUserManager):
     use_in_migrations = True
 
+    def get_by_natural_key(self, username):
+        """Вход по телефону: 8…, 7… и +7… — один и тот же номер."""
+        return super().get_by_natural_key(normalize_phone(username) or username)
+
     def _create_user(self, phone, password, **extra_fields):
         if not phone:
             raise ValueError("Телефон обязателен")
+        phone = normalize_phone(phone) or phone
         user = self.model(phone=phone, **extra_fields)
         if password:
             user.set_password(password)
@@ -62,6 +69,15 @@ class User(AbstractBaseUser, PermissionsMixin):
     class Meta:
         verbose_name = "Пользователь"
         verbose_name_plural = "Пользователи"
+
+    def clean_fields(self, exclude=None):
+        # Админка и формы: «8…» и «7…» сохраняются как +7…, поэтому дубли ловятся до записи в базу
+        self.phone = normalize_phone(self.phone) or self.phone
+        super().clean_fields(exclude)
+
+    def save(self, *args, **kwargs):
+        self.phone = normalize_phone(self.phone) or self.phone
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.phone

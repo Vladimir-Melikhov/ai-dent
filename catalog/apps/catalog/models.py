@@ -132,11 +132,6 @@ class Product(models.Model):
     loupe_kind = models.CharField(
         max_length=12, choices=LoupeKind.choices, blank=True, default="", db_default="", verbose_name="Тип лупы"
     )
-    # Только для индивидуальных: универсальным межзрачковое расстояние не нужно
-    loupe_ipd = models.CharField(
-        max_length=40, blank=True, default="", db_default="", verbose_name="Межзрачковое расстояние",
-        help_text="Например: 54–74 мм",
-    )
     # Метка выбора магазина: показывается в сравнении в чате («Хит», «Лучший выбор»)
     badge = models.CharField(
         max_length=24, blank=True, default="", db_default="", verbose_name="Метка",
@@ -159,7 +154,9 @@ class Product(models.Model):
             "options": options,
             "distances": [d.distance for d in self.loupe_distances.all()],
             "frames": [f.name for f in self.loupe_frames.all()],
+            # Межзрачковое расстояние бывает только у индивидуальных; нет списка — клиент вводит своё значение
             "ask_ipd": self.loupe_kind == self.LoupeKind.INDIVIDUAL,
+            "ipds": [i.value for i in self.loupe_ipds.all()] if self.loupe_kind == self.LoupeKind.INDIVIDUAL else [],
         }
 
     class Meta:
@@ -236,7 +233,8 @@ class LoupeOption(models.Model):
     )
     zoom = models.CharField(max_length=20, verbose_name="Увеличение", help_text="Например: 3.5×")
     field_of_view = models.CharField(
-        max_length=20, blank=True, verbose_name="Поле обзора", help_text="Число и единица: 95 мм"
+        max_length=20, blank=True, verbose_name="Поле обзора (не обязательно)",
+        help_text="Можно не заполнять: полоса в чате тогда считается по увеличению. Если пишете — число и единица: 95 мм",
     )
     sort_order = models.PositiveSmallIntegerField(default=0, verbose_name="Порядок")
 
@@ -283,6 +281,24 @@ class LoupeFrame(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class LoupeIpd(models.Model):
+    """Вариант межзрачкового расстояния индивидуальной лупы (у модели их обычно три-четыре)."""
+
+    product = models.ForeignKey(
+        Product, on_delete=models.CASCADE, related_name="loupe_ipds", verbose_name="Товар"
+    )
+    value = models.CharField(max_length=40, verbose_name="Межзрачковое расстояние", help_text="Например: 58–66 мм")
+    sort_order = models.PositiveSmallIntegerField(default=0, verbose_name="Порядок")
+
+    class Meta:
+        verbose_name = "Межзрачковое расстояние"
+        verbose_name_plural = "Межзрачковые расстояния"
+        ordering = ["sort_order", "id"]
+
+    def __str__(self):
+        return self.value
 
 
 class ProductContentBlock(models.Model):

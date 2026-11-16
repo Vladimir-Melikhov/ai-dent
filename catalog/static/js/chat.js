@@ -229,7 +229,7 @@ if (root) {
       const c = loupes[item.product_id] || {};
       if (c.later) return true;
       const l = item.loupe;
-      return !!c.zoom && (!l.distances.length || !!c.distance) && (l.frames.length < 2 || !!c.frame) && (!l.ask_ipd || !!(c.ipd || "").trim());
+      return !!c.zoom && (!l.distances.length || c.distSkip || !!c.distance) && (l.frames.length < 2 || !!c.frame) && (l.ipds.length === 1 || !l.ask_ipd || c.ipdSkip || !!(c.ipd || "").trim());
     }
 
     let syncStep = () => {};
@@ -240,6 +240,22 @@ if (root) {
       const box = b.closest("[data-pid]");
       loupes[box.dataset.pid][b.closest(".chat-loupe__seg").dataset.group] = b.dataset.v;
       step.querySelector("[name=loupe_later]").checked = false;
+      const group = b.closest(".chat-loupe__seg").dataset.group;
+      if (group === "ipd") loupes[box.dataset.pid].ipdSkip = false;
+      if (group === "distance") loupes[box.dataset.pid].distSkip = false;
+      syncStep();
+    });
+    step.addEventListener("click", e => {
+      const skip = e.target.closest("[data-skip]");
+      if (!skip) return;
+      const c = loupes[skip.closest("[data-pid]").dataset.pid];
+      if (skip.dataset.skip === "distance") {
+        c.distSkip = !c.distSkip;
+        if (c.distSkip) c.distance = "";
+      } else {
+        c.ipdSkip = !c.ipdSkip;
+        if (c.ipdSkip) { c.ipd = ""; step.querySelectorAll("[name=loupe_ipd]").forEach(i => { i.value = ""; }); }
+      }
       syncStep();
     });
     step.addEventListener("input", () => syncStep());
@@ -256,11 +272,14 @@ if (root) {
         <div class="chat-order__loupe" data-pid="${i.product_id}">
           <div class="chat-loupe__name">${escapeHTML(i.name)}</div>
           ${seg(i.loupe.options.map(o => o.zoom), "zoom", "Увеличение")}
-          ${i.loupe.distances.length ? seg(i.loupe.distances, "distance", "Рабочее расстояние") : ""}
+          ${i.loupe.distances.length ? seg(i.loupe.distances, "distance", "Рабочее расстояние")
+            + '<button type="button" class="chat-order__skip" data-skip="distance">Пропустить — расстояние уточнит менеджер</button>' : ""}
           ${i.loupe.frames.length > 1 ? seg(i.loupe.frames, "frame", "Оправа") : ""}
-          ${i.loupe.ask_ipd ? `<div class="chat-loupe__label">Межзрачковое расстояние, мм</div>
+          ${i.loupe.ipds.length > 1 ? seg(i.loupe.ipds, "ipd", "Межзрачковое расстояние") : ""}
+          ${i.loupe.ask_ipd && !i.loupe.ipds.length ? `<div class="chat-loupe__label">Межзрачковое расстояние, мм</div>
             <input class="chat-form__input" name="loupe_ipd" inputmode="decimal" maxlength="40" placeholder="Например: 62"
               aria-label="Межзрачковое расстояние">` : ""}
+          ${i.loupe.ask_ipd && i.loupe.ipds.length !== 1 ? '<button type="button" class="chat-order__skip" data-skip="ipd">Пропустить — межзрачковое уточнит менеджер</button>' : ""}
         </div>`).join("") + `
         <label class="chat-form__consent"><input type="checkbox" name="loupe_later">
           <span>Не нужно — параметры уточнит менеджер</span></label>
@@ -275,7 +294,11 @@ if (root) {
           box.querySelectorAll(".chat-loupe__seg").forEach(g =>
             g.querySelectorAll("button").forEach(b => b.classList.toggle("is-on", c[g.dataset.group] === b.dataset.v)));
           const input = box.querySelector("[name=loupe_ipd]");
-          if (input) c.ipd = input.value;
+          if (input && input.value) { c.ipd = input.value; c.ipdSkip = false; }
+          const skipIpd = box.querySelector("[data-skip=ipd]");
+          if (skipIpd) skipIpd.classList.toggle("is-on", !!c.ipdSkip);
+          const skipDistance = box.querySelector("[data-skip=distance]");
+          if (skipDistance) skipDistance.classList.toggle("is-on", !!c.distSkip);
           box.classList.toggle("is-muted", later.checked);
         });
         next.disabled = !withLoupe.every(loupeReady);
@@ -351,7 +374,7 @@ if (root) {
       submit.disabled = true;
       const body = { buyer_type: type, contact_phone: "+7" + digits, consent: true, cart_version: version, loupe: {} };
       Object.entries(loupes).forEach(([pid, c]) => {
-        body.loupe[pid] = c.later ? { later: true } : { zoom: c.zoom, distance: c.distance, frame: c.frame, ipd: (c.ipd || "").trim() };
+        body.loupe[pid] = c.later ? { later: true } : { zoom: c.zoom, distance: c.distance, frame: c.frame, ipd: (c.ipd || "").trim(), ipd_skip: !!c.ipdSkip, distance_skip: !!c.distSkip };
       });
       ["company_name", "buyer_name", "inn", "contact_name", "contact_email", "delivery_city", "delivery_address", "comment"]
         .forEach(name => { if (!f[name].hidden) body[name] = f[name].value.trim(); });
@@ -532,9 +555,6 @@ if (root) {
     return el;
   }
 
-  const TEETH = 17;       // зубов в ряду: нечётное число, чтобы рамка стояла по центру
-  const TOOTH_MM = 8.5;   // средняя ширина зуба: по ней оценивается, сколько зубов в поле
-
   const LOUPE_KINDS = { universal: "Универсальные", individual: "Индивидуальные" };
 
   function numberOf(text) {
@@ -553,9 +573,12 @@ if (root) {
     const kind = LOUPE_KINDS[ui.kind] ? `<span class="chat-loupe__kind">${LOUPE_KINDS[ui.kind]}</span>` : "";
     const name = p.slug ? `<a href="/product/${encodeURIComponent(p.slug)}/">${escapeHTML(p.name)}</a>` : escapeHTML(p.name);
     const price = p.price_rub != null ? formatPrice(p.price_rub) : "цена по запросу";
-    const fields = options.map(o => numberOf(o.field));
-    const widest = fields.every(f => f != null) ? Math.max(...fields) : 0;
-    const unit = (options.find(o => o.field) || {}).field?.replace(/^[\d.,\s–-]+/, "") || "";
+    // Поле обзора рисуется полосой из центра: шире полоса — больше видно. Без цифр: по миллиметрам, если они
+    // заполнены у всех увеличений, иначе по увеличению (чем оно больше, тем поле уже)
+    const mm = options.map(o => numberOf(o.field));
+    const zooms = options.map(o => numberOf(o.zoom));
+    const sizes = mm.every(f => f) ? mm : zooms.every(z => z) ? zooms.map(z => 1 / z) : null;
+    const widest = sizes ? Math.max(...sizes) : 0;
     const seg = (items, group, label) => `<div class="chat-loupe__label">${label}</div>
       <div class="chat-loupe__seg" data-group="${group}" style="--n:${items.length}">${
         items.map((t, i) => `<button type="button" data-i="${i}">${escapeHTML(t)}</button>`).join("")}</div>`;
@@ -567,48 +590,21 @@ if (root) {
       ${distances.length > 1 ? seg(distances, "distance", "Рабочее расстояние")
         : distances.length ? `<div class="chat-loupe__label">Рабочее расстояние</div><div class="chat-loupe__fixed">${escapeHTML(distances[0])}</div>` : ""}
       ${ui.ipd ? `<div class="chat-loupe__label">Межзрачковое расстояние</div><div class="chat-loupe__fixed">${escapeHTML(ui.ipd)}</div>` : ""}
-      <div class="chat-loupe__view">
-        <div class="chat-loupe__fov"><span>Поле обзора</span><strong></strong></div>
-        ${widest ? `<div class="chat-loupe__arch" aria-hidden="true">
-          <div class="chat-loupe__teeth">${"<b><i></i></b>".repeat(TEETH)}</div>
-          <u class="chat-loupe__span"></u></div>` : ""}
-      </div>`;
-    const teeth = el.querySelectorAll(".chat-loupe__teeth b");
-    const span = el.querySelector(".chat-loupe__span");
-    const out = el.querySelector(".chat-loupe__fov strong");
-    let shown = null;
-    let raf = 0;
-    // Число плавно «доезжает» до нового значения
-    function tween(to) {
-      cancelAnimationFrame(raf);
-      const from = shown == null ? to : shown;
-      const start = performance.now();
-      const step = now => {
-        const t = Math.min(1, (now - start) / 350);
-        const v = from + (to - from) * (1 - Math.pow(1 - t, 3));
-        shown = v;
-        out.textContent = `${Math.round(v)} ${unit}`.trim();
-        if (t < 1) raf = requestAnimationFrame(step);
-      };
-      raf = requestAnimationFrame(step);
-    }
+      ${sizes ? `<div class="chat-loupe__view">
+        <div class="chat-loupe__label">Поле обзора</div>
+        <div class="chat-loupe__track" aria-hidden="true"><u class="chat-loupe__bar"></u></div>
+        <div class="chat-loupe__ends"><span>уже</span><span>шире</span></div>
+      </div>` : ""}`;
+    const bar = el.querySelector(".chat-loupe__bar");
     function pick(group, i) {
       el.querySelectorAll(`[data-group="${group}"] button`).forEach((b, n) => b.classList.toggle("is-on", n === i));
     }
     function selectZoom(i) {
       pick("zoom", i);
-      const f = fields[i];
-      if (f != null && widest) {
-        // Видно целое нечётное число зубов — полоска под ними стоит по центру ряда симметрично
-        const n = Math.max(1, Math.min(TEETH, 2 * Math.round((f / TOOTH_MM - 1) / 2) + 1));
-        const from = (TEETH - n) / 2;
-        teeth.forEach((t, k) => t.classList.toggle("is-on", k >= from && k < from + n));
-        span.style.left = `calc(${from / TEETH * 100}% + 2px)`;
-        span.style.width = `calc(${n / TEETH * 100}% - 4px)`;
-        tween(f);
-      } else {
-        out.textContent = options[i].field || "—";
-      }
+      if (!bar) return;
+      // Одно увеличение — сравнивать не с чем, полоса средней ширины
+      const width = options.length === 1 ? 60 : Math.max(22, (sizes[i] / widest) * 100);
+      bar.style.width = `${width}%`;
     }
     el.querySelectorAll('[data-group="zoom"] button').forEach(b => b.addEventListener("click", () => selectZoom(Number(b.dataset.i))));
     el.querySelectorAll('[data-group="distance"] button').forEach(b => b.addEventListener("click", () => pick("distance", Number(b.dataset.i))));

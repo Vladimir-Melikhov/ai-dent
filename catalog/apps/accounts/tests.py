@@ -229,3 +229,26 @@ def test_cleanup_keeps_sessions_linked_to_order_or_lead():
     call_command("cleanup_anon_sessions")
 
     assert set(AnonSession.objects.values_list("pk", flat=True)) == {with_order.pk, with_lead.pk}
+
+
+# --- телефон: 8…, 7… и +7… — один номер
+
+@pytest.mark.django_db
+def test_phone_is_stored_normalized_and_login_accepts_any_form(client):
+    from django.contrib.auth import authenticate, get_user_model
+
+    User = get_user_model()
+    user = User.objects.create_superuser("8 170 309-70-97", "pass-12345")
+    assert user.phone == "+71703097097"
+    for typed in ("81703097097", "+71703097097", "7 170 309 70 97", "+7 (170) 309-70-97"):
+        assert authenticate(username=typed, password="pass-12345") == user, typed
+    assert authenticate(username="81703097097", password="wrong") is None
+
+
+@pytest.mark.django_db
+def test_admin_login_form_accepts_eight(client):
+    from django.contrib.auth import get_user_model
+
+    get_user_model().objects.create_superuser("+71703097097", "pass-12345")
+    response = client.post("/admin/login/", {"username": "81703097097", "password": "pass-12345"})
+    assert response.status_code == 302 and "_auth_user_id" in client.session  # вошёл, ошибки формы нет

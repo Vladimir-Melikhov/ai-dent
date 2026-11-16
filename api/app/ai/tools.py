@@ -101,7 +101,8 @@ def brief(product: Product) -> dict:
 
 def _with_relations(stmt):
     return stmt.options(selectinload(Product.brand), selectinload(Product.category), selectinload(Product.images),
-                          selectinload(Product.loupe_options), selectinload(Product.loupe_distances))
+                          selectinload(Product.loupe_options), selectinload(Product.loupe_distances),
+                          selectinload(Product.loupe_ipds))
 
 
 async def active_products(session: AsyncSession, ids: list[int]) -> list[Product]:
@@ -246,7 +247,7 @@ def loupe_view(product: Product) -> dict | None:
         # Рабочее расстояние от увеличения не зависит — свой список
         "distances": [d.distance for d in product.loupe_distances],
         # Межзрачковое расстояние нужно только индивидуальным лупам
-        "ipd": product.loupe_ipd if individual and product.loupe_ipd else "",
+        "ipds": [i.value for i in product.loupe_ipds] if individual else [],
     }
 
 
@@ -482,7 +483,7 @@ async def run_loupe(ctx: ToolContext, args: LoupeArgs) -> ToolOutput:
         raise ToolError("у этого товара нет данных о вариантах увеличения: покажи его карточкой и расскажи по характеристикам")
     return ToolOutput(
         {"kind": view["kind"], "options": view["options"], "distances": view["distances"],
-         "interpupillary_distance": view["ipd"], "price_rub": view["product"]["price_rub"]},
+         "interpupillary_distances": view["ipds"], "price_rub": view["product"]["price_rub"]},
         widget={"widget": "loupe", "product_ids": [products[0].id]},
     )
 

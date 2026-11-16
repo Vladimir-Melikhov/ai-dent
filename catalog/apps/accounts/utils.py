@@ -31,16 +31,8 @@ def parse_json_body(request):
     return data if isinstance(data, dict) else None
 
 
-def normalize_phone(raw) -> str | None:
-    """8…/7…/+7… → +7XXXXXXXXXX; None — если номер некорректный."""
-    if not isinstance(raw, str):
-        return None
-    digits = re.sub(r"\D", "", raw)
-    if len(digits) == 11 and digits[0] in "78":
-        digits = digits[1:]
-    if len(digits) != 10:
-        return None
-    return "+7" + digits
+# Реализация вынесена в phone.py: модели пользователя тоже нормализуют номер, а utils импортирует модели
+from .phone import normalize_phone  # noqa: E402,F401
 
 
 def get_client_ip(request) -> str:

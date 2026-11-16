@@ -740,36 +740,26 @@
 
   .chat-loupe__view { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border-soft); }
 
-  /* Зубной ряд: одинаковые зубы; рамка охватывает те, что видны в поле при выбранном увеличении */
-  .chat-loupe__arch { position: relative; margin-top: 10px; padding: 0 0 10px; }
-  .chat-loupe__teeth { display: flex; }
-  .chat-loupe__teeth b { flex: 1 1 0; min-width: 0; padding: 0 2px; }
+  /* Поле обзора: полоса растёт из центра — шире полоса, больше видно */
+  .chat-loupe__track {
+    display: flex;
+    justify-content: center;
+    height: 14px;
+    margin-top: 8px;
+    border-radius: 7px;
+    background: rgba(15, 20, 28, .08);
+  }
 
-  .chat-loupe__teeth i {
+  .chat-loupe__bar {
     display: block;
-    height: 20px;
-    border: 1px solid rgba(15, 20, 28, .12);
-    border-radius: 6px 6px 9px 9px;
-    background: transparent;
-    transition: background .3s, border-color .3s;
+    width: 60%;
+    height: 100%;
+    border-radius: 7px;
+    background: var(--text);
+    transition: width .45s cubic-bezier(.3, 1.2, .5, 1);
   }
 
-  .chat-loupe__teeth b.is-on i { background: var(--text); border-color: var(--text); }
-
-  /* Тонкая скобка под видимыми зубами: её длина — поле обзора, края загнуты вверх */
-  .chat-loupe__span {
-    position: absolute;
-    bottom: 0;
-    height: 6px;
-    border: 1px solid var(--text);
-    border-top: 0;
-    border-radius: 0 0 4px 4px;
-    transition: left .45s cubic-bezier(.3, 1.2, .5, 1), width .45s cubic-bezier(.3, 1.2, .5, 1);
-  }
-
-  .chat-loupe__fov { display: flex; align-items: baseline; justify-content: space-between; }
-  .chat-loupe__fov span { display: block; font-size: 10px; font-weight: 600; text-transform: uppercase; color: var(--muted); }
-  .chat-loupe__fov strong { display: block; margin-top: 2px; font-size: 30px; line-height: 1.05; font-variant-numeric: tabular-nums; }
+  .chat-loupe__ends { display: flex; justify-content: space-between; margin-top: 4px; font-size: 12px; color: var(--muted); }
 
   .chat__lead-btn {
     display: block;
@@ -1343,3 +1333,6 @@
 .chat-order__step-title { margin: 0; font-weight: 600; }
 .chat-order__loupe { display: grid; gap: 6px; padding: 10px 0; border-top: 1px solid var(--border, rgba(15, 20, 28, .12)); }
 .chat-order__loupe.is-muted { opacity: .45; }
+
+.chat-order__skip { padding: 8px 12px; border: 1px dashed var(--border, rgba(15, 20, 28, .3)); border-radius: 10px; background: none; color: var(--muted); font: 600 13px/1.2 var(--font); text-align: left; cursor: pointer; }
+.chat-order__skip.is-on { border-style: solid; border-color: var(--text); color: var(--text); }

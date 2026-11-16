@@ -197,6 +197,7 @@ def catalog():
     }
     yield {"tag": tag, "brand": brand, "category": category, **items}
     ids = list(items.values())
+    admin_sql("DELETE FROM catalog_loupeipd WHERE product_id = ANY($1::bigint[])", ids)
     admin_sql("DELETE FROM catalog_loupeoption WHERE product_id = ANY($1::bigint[])", ids)
     admin_sql("DELETE FROM catalog_loupedistance WHERE product_id = ANY($1::bigint[])", ids)
     admin_sql("DELETE FROM orders_cartitem WHERE product_id = ANY($1::bigint[])", ids)

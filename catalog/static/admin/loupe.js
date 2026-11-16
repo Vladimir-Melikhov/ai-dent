@@ -14,7 +14,7 @@ document.addEventListener("DOMContentLoaded", () => {
     show(group("loupe_options"), on);
     show(group("loupe_distances"), on);
     show(group("loupe_frames"), on);
-    show(row("loupe_ipd"), on && kind && kind.value === "individual");
+    show(group("loupe_ipds"), on && kind && kind.value === "individual");
   }
 
   box.addEventListener("change", sync);

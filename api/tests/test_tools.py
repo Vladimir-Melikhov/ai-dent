@@ -117,12 +117,13 @@ def test_facts_flatten_groups_and_drop_marketing_lines():
     assert facts(chars) == {"Увеличение": "2.8x", "Рабочее расстояние": "360 / 420 мм", "Вес": "44 г"}
 
 
-def make_loupe(product_id, kind="individual", ipd="54–74 мм", distances=("340 мм", "420 мм"),
+def make_loupe(product_id, kind="individual", ipds=("54–60 мм", "60–66 мм", "66–74 мм"), distances=("340 мм", "420 мм"),
                zooms=(("2.5×", "130 мм"), ("3.5×", "95 мм"))):
     from .conftest import admin_sql
 
-    admin_sql("UPDATE catalog_product SET is_loupe = true, loupe_kind = $1, loupe_ipd = $2 WHERE id = $3",
-              kind, ipd, product_id)
+    admin_sql("UPDATE catalog_product SET is_loupe = true, loupe_kind = $1 WHERE id = $2", kind, product_id)
+    for i, value in enumerate(ipds):
+        admin_sql("INSERT INTO catalog_loupeipd(product_id, value, sort_order) VALUES ($1, $2, $3)", product_id, value, i)
     for i, d in enumerate(distances):
         admin_sql("INSERT INTO catalog_loupedistance(product_id, distance, sort_order) VALUES ($1, $2, $3)", product_id, d, i)
     for i, (zoom, field) in enumerate(zooms):
@@ -142,14 +143,14 @@ def test_show_loupe_needs_the_checkbox_and_zooms(catalog):
 def test_loupe_distances_are_independent_of_zoom_and_ipd_only_for_individual(catalog):
     make_loupe(catalog["loupe"])
     result = run_tool("show_loupe", {"product_id": catalog["loupe"]}).result
-    assert result["distances"] == ["340 мм", "420 мм"] and result["interpupillary_distance"] == "54–74 мм"
+    assert result["distances"] == ["340 мм", "420 мм"] and result["interpupillary_distances"] == ["54–60 мм", "60–66 мм", "66–74 мм"]
     assert result["kind"] == "individual"
 
 
 def test_universal_loupe_has_no_interpupillary_distance(catalog):
-    make_loupe(catalog["loupe"], kind="universal", ipd="54–74 мм")  # даже если значение осталось в базе
+    make_loupe(catalog["loupe"], kind="universal")  # даже если варианты остались в базе
     result = run_tool("show_loupe", {"product_id": catalog["loupe"]}).result
-    assert result["interpupillary_distance"] == ""
+    assert result["interpupillary_distances"] == []
 
 
 def test_comparison_widget_is_compact(catalog):

@@ -11,6 +11,7 @@ from .models import (
     CurrencyRate,
     LoupeDistance,
     LoupeFrame,
+    LoupeIpd,
     LoupeOption,
     Product,
     ProductImage,
@@ -45,6 +46,14 @@ class LoupeDistanceInline(TabularInline):
     fields = ["distance", "sort_order"]
     verbose_name = "Рабочее расстояние"
     verbose_name_plural = "Бинокулярная лупа: рабочие расстояния (от увеличения не зависят)"
+
+
+class LoupeIpdInline(TabularInline):
+    model = LoupeIpd
+    extra = 2
+    fields = ["value", "sort_order"]
+    verbose_name = "Межзрачковое расстояние"
+    verbose_name_plural = "Индивидуальные лупы: варианты межзрачкового расстояния (клиент выберет один)"
 
 
 class LoupeFrameInline(TabularInline):
@@ -105,6 +114,7 @@ class ProductAdmin(ModelAdmin):
         ProductOptionInline,
         LoupeOptionInline,
         LoupeDistanceInline,
+        LoupeIpdInline,
         LoupeFrameInline,
         ProductContentBlockInline,
     ]
@@ -120,9 +130,9 @@ class ProductAdmin(ModelAdmin):
             messages.warning(request, "У лупы нет ни одного увеличения: в чате она будет обычной карточкой.")
         if product.is_loupe and not product.loupe_kind:
             messages.warning(request, "У лупы не выбран тип (универсальные или индивидуальные).")
-        if product.loupe_kind != Product.LoupeKind.INDIVIDUAL and product.loupe_ipd:
+        if product.loupe_kind != Product.LoupeKind.INDIVIDUAL and product.loupe_ipds.exists():
             # Универсальным межзрачковое расстояние не нужно
-            Product.objects.filter(pk=product.pk).update(loupe_ipd="")
+            product.loupe_ipds.all().delete()
 
 
 @admin.register(CurrencyRate)
