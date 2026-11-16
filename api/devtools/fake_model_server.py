@@ -61,12 +61,17 @@ def answer_after_tool(name: str, result) -> Reply:
         if not products:
             return Reply(blocks=[thinking(), text("В каталоге такого не нашёл. Расскажите подробнее, что нужно, — подберу альтернативу.")])
         with_loupe = [p for p in products if p.get("loupe_options")]
-        if with_loupe and "луп" in " ".join(p["name"].lower() for p in products):
+        if len(products) == 1 and with_loupe:
             return Reply(blocks=[thinking(), tool_use("show_loupe", {"product_id": with_loupe[0]["id"]})],
                          stop_reason="tool_use")
         return Reply(blocks=[thinking(), tool_use("show_products", {"product_ids": [p["id"] for p in products[:3]]})],
                      stop_reason="tool_use")
     if name == "show_products":
+        shown_items = result.get("shown", [])
+        if len(shown_items) >= 2 and all("луп" in p["name"].lower() for p in shown_items):
+            # Обзор луп: карточки → сравнение → текст (так же велит подсказка)
+            return Reply(blocks=[thinking(), tool_use("show_comparison", {"product_ids": [p["id"] for p in shown_items[:3]]})],
+                         stop_reason="tool_use")
         lines = [f"- **{p['name']}** — {rub(p['price_rub'])}, {p['availability']}" for p in result.get("shown", [])]
         return Reply(blocks=[thinking(), text(
             "Подобрал варианты:\n" + "\n".join(lines) + "\n\nМогу сравнить их или положить нужный в корзину.")])
