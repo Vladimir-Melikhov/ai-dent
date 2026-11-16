@@ -53,6 +53,8 @@ class Product(Base):
     price_rub: Mapped[decimal.Decimal | None] = mapped_column(Numeric(12, 2))
     stock_qty: Mapped[int]
     characteristics: Mapped[dict] = mapped_column(JSON)
+    # Бинокулярные лупы: {kind, options: [{zoom, distance, field, depth}]}; у остальных товаров пусто
+    loupe: Mapped[dict | None] = mapped_column(JSON)
     priority: Mapped[int]
     is_active: Mapped[bool]
     created_at: Mapped[datetime.datetime]

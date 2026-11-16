@@ -94,3 +94,46 @@ def test_catalog_overview(catalog):
     assert category["products"] == 3 and category["price_rub_from"] == 95000.0
     brand = next(b for b in overview["brands"] if b["slug"] == f"zeiss-{catalog['tag']}")
     assert brand["country"] == "Германия"
+
+
+def test_comparison_widget_is_compact(catalog):
+    from app.ai.tools import comparison_view, active_products
+
+    async def go():
+        async with async_session_factory() as session:
+            return comparison_view(await active_products(session, [catalog["extaro"], catalog["pico"]]))
+
+    view = run_async(go())
+    names_ = [row["name"] for row in view["rows"]]
+    assert set(names_) == {"Цена", "Камера", "Вариоскоп"}  # «Увеличение» одинаково — не строка, а общее
+    assert view["same"] == ["Увеличение: 4–25×"] and view["more"] == []
+
+
+def test_facts_flatten_groups_and_drop_marketing_lines():
+    from app.ai.tools import facts
+
+    chars = {"Оптика": ["Увеличение: 2.8x", "Высокоразрешающая TTL-оптика", "Рабочее расстояние: 360 / 420 мм"],
+             "Прочее": {"Вес": "44 г"}}
+    assert facts(chars) == {"Увеличение": "2.8x", "Рабочее расстояние": "360 / 420 мм", "Вес": "44 г"}
+
+
+def test_show_loupe_needs_structured_data(catalog):
+    import json
+
+    from .conftest import admin_sql
+
+    with pytest.raises(ToolError, match="нет данных"):
+        run_tool("show_loupe", {"product_id": catalog["loupe"]})
+    loupe = {"kind": "individual", "options": [{"zoom": "2.5×", "distance": "340 мм"}, {"zoom": "3.5×", "distance": "320 мм"}]}
+    admin_sql("UPDATE catalog_product SET loupe = $1::jsonb WHERE id = $2", json.dumps(loupe), catalog["loupe"])
+    output = run_tool("show_loupe", {"product_id": catalog["loupe"]})
+    assert output.widget == {"widget": "loupe", "product_ids": [catalog["loupe"]]}
+    assert output.result["options"][1]["distance"] == "320 мм"
+
+
+def test_bars_only_for_numbers_with_same_unit():
+    from app.ai.tools import bars
+
+    assert bars(["2.5x", "5x"]) == [50, 100]
+    assert bars(["360 / 420 мм", "300 мм"]) == [100, 71]
+    assert bars(["44 г", "2.8x"]) is None and bars(["Full HD", "4K"]) is None and bars(["3x", "3x"]) is None

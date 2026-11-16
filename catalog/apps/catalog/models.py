@@ -70,6 +70,27 @@ class Category(models.Model):
         super().save(*args, **kwargs)
 
 
+LOUPE_OPTION_KEYS = {"zoom", "distance", "field", "depth"}
+
+
+def validate_loupe(value):
+    """Данные лупы: вид и список вариантов увеличения — иначе чат не сможет их показать."""
+    if value in (None, {}):
+        return
+    if not isinstance(value, dict) or set(value) - {"kind", "options"}:
+        raise ValidationError("Ожидается объект с ключами kind и options.")
+    if value.get("kind") not in ("universal", "individual"):
+        raise ValidationError('kind: "universal" (универсальные) или "individual" (индивидуальные).')
+    options = value.get("options")
+    if not isinstance(options, list) or not 1 <= len(options) <= 12:
+        raise ValidationError("options: список от 1 до 12 вариантов.")
+    for option in options:
+        if not isinstance(option, dict) or not option.get("zoom") or set(option) - LOUPE_OPTION_KEYS:
+            raise ValidationError("Вариант: объект с обязательным zoom и, по желанию, distance, field, depth.")
+        if not all(isinstance(v, str) and len(v) <= 40 for v in option.values()):
+            raise ValidationError("Значения варианта — короткие строки.")
+
+
 class Product(models.Model):
     class Currency(models.TextChoices):
         RUB = "RUB", "Рубли"
@@ -90,6 +111,15 @@ class Product(models.Model):
     stock_qty = models.PositiveIntegerField(default=0, verbose_name="Остаток")
     description = models.TextField(blank=True, verbose_name="Описание")
     characteristics = models.JSONField(default=dict, blank=True, verbose_name="Характеристики")
+    # Только бинокулярные лупы: чат показывает ползунок «увеличение → рабочее расстояние»
+    loupe = models.JSONField(
+        null=True, blank=True, validators=[validate_loupe], verbose_name="Данные лупы",
+        help_text=(
+            'Только для бинокулярных луп. Пример: {"kind": "individual", "options": ['
+            '{"zoom": "2.5×", "distance": "340–420 мм", "field": "110 мм", "depth": "200 мм"}]}. '
+            'kind — "universal" или "individual"; в options нужен только zoom, остальное по желанию.'
+        ),
+    )
     priority = models.IntegerField(default=0, db_index=True, verbose_name="Приоритет")
     is_active = models.BooleanField(default=True, verbose_name="Активен")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Создан")

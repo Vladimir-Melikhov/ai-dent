@@ -401,19 +401,79 @@ if (root) {
     return value == null ? "—" : String(value);
   }
 
+  // Сравнение: цвет товара в легенде совпадает с цветом его полоски в каждом параметре
+  function compareLegend(p, i) {
+    const name = p.slug ? `<a href="/product/${encodeURIComponent(p.slug)}/">${escapeHTML(p.name)}</a>` : escapeHTML(p.name);
+    const price = p.price_rub != null ? formatPrice(p.price_rub) : "цена по запросу";
+    return `<div class="chat-compare__item c${i}"><i></i><div>${name}<span>${price} · ${escapeHTML(p.availability)}</span></div></div>`;
+  }
+
+  function compareRows(rows) {
+    return rows.map(r => `
+      <div class="chat-compare__row"><div class="chat-compare__label">${escapeHTML(r.name)}</div>
+      ${r.values.map((v, i) => `<div class="chat-compare__val c${i}"><i></i>
+        ${r.bars ? `<b class="chat-compare__bar"><u style="width:${r.bars[i]}%"></u></b>` : ""}
+        <span>${escapeHTML(formatValue(v))}</span></div>`).join("")}</div>`).join("");
+  }
+
+  // Только отличия: числовые — полосками, остальные — коротким текстом; прочее под кнопкой
   function renderComparison(table) {
     const el = document.createElement("div");
     el.className = "chat-widget chat-compare";
-    // Название ведёт на страницу товара; у сравнений из старой истории slug нет — тогда просто текст
-    const head = table.products.map(p => {
-      const name = p.slug ? `<a href="/product/${encodeURIComponent(p.slug)}/">${escapeHTML(p.name)}</a>` : escapeHTML(p.name);
-      return `
-      <th>${name}
-      <span>${p.price_rub != null ? formatPrice(p.price_rub) : "цена по запросу"} · ${escapeHTML(p.availability)}</span></th>`;
-    }).join("");
-    const rows = table.rows.map(r => `
-      <tr><td>${escapeHTML(r.name)}</td>${r.values.map(v => `<td>${escapeHTML(formatValue(v))}</td>`).join("")}</tr>`).join("");
-    el.innerHTML = `<div class="chat-compare__scroll"><table><thead><tr><th></th>${head}</tr></thead><tbody>${rows}</tbody></table></div>`;
+    const more = table.more || [];
+    const same = table.same && table.same.length ? `<p class="chat-compare__same">Одинаково: ${table.same.map(escapeHTML).join(" · ")}</p>` : "";
+    el.innerHTML = `
+      <div class="chat-compare__legend">${table.products.map(compareLegend).join("")}</div>
+      ${compareRows(table.rows)}
+      ${more.length ? `<div class="chat-compare__extra" hidden>${compareRows(more)}</div>
+        <button type="button" class="chat-compare__more">Ещё отличия (${more.length})</button>` : ""}
+      ${same}`;
+    const button = el.querySelector(".chat-compare__more");
+    if (button) {
+      button.addEventListener("click", () => {
+        const extra = el.querySelector(".chat-compare__extra");
+        extra.hidden = !extra.hidden;
+        button.textContent = extra.hidden ? `Ещё отличия (${more.length})` : "Свернуть";
+      });
+    }
+    return el;
+  }
+
+  const LOUPE_KINDS = { universal: "Универсальные", individual: "Индивидуальные" };
+
+  // Бинокулярная лупа: ползунок по вариантам увеличения, ниже — рабочее расстояние и остальное для выбранного
+  function renderLoupe(ui) {
+    const el = document.createElement("div");
+    el.className = "chat-widget chat-loupe";
+    const p = ui.product;
+    const options = ui.options;
+    const kind = LOUPE_KINDS[ui.kind] ? `<span class="chat-loupe__kind">${LOUPE_KINDS[ui.kind]}</span>` : "";
+    const name = p.slug ? `<a href="/product/${encodeURIComponent(p.slug)}/">${escapeHTML(p.name)}</a>` : escapeHTML(p.name);
+    const price = p.price_rub != null ? formatPrice(p.price_rub) : "цена по запросу";
+    const single = options.length < 2;
+    el.innerHTML = `
+      <div class="chat-loupe__head"><div class="chat-loupe__name">${name}</div>${kind}</div>
+      <div class="chat-loupe__meta">${price} · ${escapeHTML(p.availability)}</div>
+      <div class="chat-loupe__zoom"></div>
+      ${single ? "" : `<input class="chat-loupe__range" type="range" min="0" max="${options.length - 1}" step="1" value="0" aria-label="Увеличение">
+      <div class="chat-loupe__ticks">${options.map((o, i) => `<button type="button" data-i="${i}">${escapeHTML(o.zoom)}</button>`).join("")}</div>`}
+      <dl class="chat-loupe__facts"></dl>`;
+    const zoom = el.querySelector(".chat-loupe__zoom");
+    const facts = el.querySelector(".chat-loupe__facts");
+    const range = el.querySelector(".chat-loupe__range");
+    const ticks = el.querySelectorAll(".chat-loupe__ticks button");
+    const LABELS = [["distance", "Рабочее расстояние"], ["field", "Поле обзора"], ["depth", "Глубина резкости"]];
+    function select(i) {
+      const o = options[i];
+      zoom.innerHTML = `<span>Увеличение</span><strong>${escapeHTML(o.zoom)}</strong>`;
+      facts.innerHTML = LABELS.filter(([key]) => o[key]).map(([key, label]) =>
+        `<div><dt>${label}</dt><dd>${escapeHTML(o[key])}</dd></div>`).join("");
+      ticks.forEach((t, n) => t.classList.toggle("is-on", n === i));
+      if (range) range.value = String(i);
+    }
+    if (range) range.addEventListener("input", () => select(Number(range.value)));
+    ticks.forEach(t => t.addEventListener("click", () => select(Number(t.dataset.i))));
+    select(0);
     return el;
   }
 
@@ -431,6 +491,7 @@ if (root) {
   function renderWidget(ui, options = {}) {
     if (ui.widget === "product_cards") return renderCards(ui.products);
     if (ui.widget === "comparison") return renderComparison(ui.table);
+    if (ui.widget === "loupe") return renderLoupe(ui);
     if (ui.widget === "quote") return renderQuote(ui);
     // sent — номер заявки или заказа, отправленных из этой формы; true — форма уже неактуальна, номера нет
     const done = sent => (sent === true ? null : sent);

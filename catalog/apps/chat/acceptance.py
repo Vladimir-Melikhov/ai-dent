@@ -239,6 +239,8 @@ def describe_widget(ui: dict) -> str:
                                         for p in ui.get("products", []))
     if kind == "comparison":
         return "сравнение: " + ", ".join(p["name"] for p in ui["table"]["products"])
+    if kind == "loupe":
+        return f"лупа с ползунком: {ui['product']['name']}, вариантов: {len(ui['options'])}"
     if kind == "quote":
         return f"КП № {ui.get('number')} на {rub(ui.get('total') or 0)}"
     return {"lead_form": "форма заявки", "order_form": "форма заказа"}.get(kind, kind)
