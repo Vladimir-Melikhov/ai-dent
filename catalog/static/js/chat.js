@@ -331,22 +331,45 @@ if (root) {
     });
   }
 
-  /* Телефон: высота чата не меняется; один раз после появления клавиатуры
-     подводим низ чата к её верхней кромке */
+  /* Телефон: пока открыта клавиатура, чат занимает видимую область и стоит прямо над ней */
+  const vv = window.visualViewport;
   const phone = window.matchMedia("(max-width: 640px)");
-  if (inlineMode) {
-    input.addEventListener("focus", () => {
-      if (!phone.matches) return;
-      setTimeout(() => {
-        if (root.classList.contains("is-active")) root.scrollIntoView({ block: "end", behavior: "auto" });
-      }, 350);
-    });
+
+  let alignTimer = 0;
+
+  function fitKeyboard() {
+    if (!inlineMode || !vv || !phone.matches || !root.classList.contains("is-kb")) return;
+    root.style.setProperty("--chat-vh", Math.max(240, vv.height - 16) + "px");
+    if (!root.classList.contains("is-active")) return;
+    /* выравниваем один раз, когда клавиатура доехала, а не на каждый кадр анимации */
+    clearTimeout(alignTimer);
+    alignTimer = setTimeout(() => {
+      const top = root.getBoundingClientRect().top - vv.offsetTop - 8;
+      if (Math.abs(top) > 24) window.scrollBy({ top, behavior: "auto" });
+    }, 250);
+  }
+
+  function setKeyboard(on) {
+    if (!inlineMode || !vv || !phone.matches) return;
+    root.classList.toggle("is-kb", on);
+    if (on) fitKeyboard();
+    else root.style.removeProperty("--chat-vh");
+  }
+
+  if (inlineMode && vv) {
+    input.addEventListener("focus", () => setKeyboard(true));
+    input.addEventListener("blur", () => setKeyboard(false));
+    vv.addEventListener("resize", fitKeyboard);
   }
 
   function setActive(on) {
     if (!inlineMode || root.classList.contains("is-active") === on) return;
     root.classList.toggle("is-active", on);
-    requestAnimationFrame(() => root.scrollIntoView({ block: on ? "end" : "center", behavior: "smooth" }));
+    if (root.classList.contains("is-kb")) {
+      fitKeyboard();
+    } else {
+      requestAnimationFrame(() => root.scrollIntoView({ block: on ? "end" : "center", behavior: "smooth" }));
+    }
     document.dispatchEvent(new CustomEvent("aidentchat:active", { detail: { active: on } }));
   }
 
