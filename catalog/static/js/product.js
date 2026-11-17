@@ -399,7 +399,7 @@ function initLoupeDemo(root, product) {
       <a class="ld__name" href="/product/${encodeURIComponent(loupe.slug)}/">${escapeHTML(loupe.name)} →</a>
       <div class="ld__row"><span>Увеличение</span><b>${escapeHTML(zoom.zoom)}</b></div>
       ${zoom.field ? `<div class="ld__row"><span>Поле обзора</span><b>${escapeHTML(zoom.field)}</b></div>` : ""}
-      <p class="ld__note">В круге — только поле обзора: какая область видна целиком. Увеличение и детализация здесь не отображаются: у лупы с большим полем обзора увеличение может быть и выше.</p>`;
+      <p class="ld__note">Показано только поле обзора — увеличение и детализация здесь не видны.</p>`;
   }
 
   box.addEventListener("click", (e) => {
