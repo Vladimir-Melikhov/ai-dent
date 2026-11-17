@@ -1105,3 +1105,4 @@ body:has(.product-page) {
 .ld__name:hover { border-bottom-color: var(--p-text); }
 .ld__row { display: flex; justify-content: space-between; gap: 16px; padding: 8px 0; border-bottom: 1px solid rgba(15, 20, 25, 0.1); font-size: 14px; }
 .ld__row span { color: var(--p-muted); }
+.ld__note { margin: 14px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--p-muted); }

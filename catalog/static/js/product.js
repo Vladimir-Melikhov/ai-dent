@@ -329,7 +329,7 @@ function renderProductCharacteristics(characteristics) {
   );
 }
 
-/* ---- Демонстрация увеличений: общий блок на все лупы, включается галочкой у товара ---- */
+/* ---- Блок «Поле обзора»: общий на все лупы, включается галочкой у товара ---- */
 function zoomNumber(zoom) {
   const m = String(zoom).replace(",", ".").match(/\d+(?:\.\d+)?/);
   return m ? parseFloat(m[0]) : 1;
@@ -355,7 +355,7 @@ function renderLoupeDemo(product) {
   return wrapGlass(
     `
     <div class="gb-head">
-      <span class="gb-eyebrow">Увеличения</span>
+      <span class="gb-eyebrow">Поле обзора</span>
       <h2 class="gb-title" style="font-style: italic; font-weight: 500; font-size: 2.1rem; letter-spacing: -0.02em; line-height: 1.15;">Как это выглядит</h2>
     </div>
     <div class="ld">
@@ -398,7 +398,8 @@ function initLoupeDemo(root, product) {
     box.querySelector(".ld__info").innerHTML = `
       <a class="ld__name" href="/product/${encodeURIComponent(loupe.slug)}/">${escapeHTML(loupe.name)} →</a>
       <div class="ld__row"><span>Увеличение</span><b>${escapeHTML(zoom.zoom)}</b></div>
-      ${zoom.field ? `<div class="ld__row"><span>Поле обзора</span><b>${escapeHTML(zoom.field)}</b></div>` : ""}`;
+      ${zoom.field ? `<div class="ld__row"><span>Поле обзора</span><b>${escapeHTML(zoom.field)}</b></div>` : ""}
+      <p class="ld__note">В круге — только поле обзора: какая область видна целиком. Увеличение и детализация здесь не отображаются: у лупы с большим полем обзора увеличение может быть и выше.</p>`;
   }
 
   box.addEventListener("click", (e) => {

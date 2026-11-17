@@ -79,7 +79,7 @@ class LoupeBrandOut(BaseModel):
 
 
 class LoupeDemoOut(BaseModel):
-    """Блок «Демонстрация увеличений»: все бренды, у которых есть бинокулярные лупы."""
+    """Блок «Поле обзора»: все бренды, у которых есть бинокулярные лупы."""
     brands: list[LoupeBrandOut]
 
 
