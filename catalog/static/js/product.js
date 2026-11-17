@@ -388,7 +388,7 @@ function initLoupeDemo(root, product) {
     const scale = fov && maxField ? 0.7 * (maxField / fov) : 0.55 + (zoomNumber(zoom.zoom) / maxZoom) * 1.9;
     box.querySelector(".ld__tooth").style.transform = `scale(${Math.min(scale, 3.2).toFixed(2)})`;
     box.querySelector(".ld__info").innerHTML = `
-      <div class="ld__name">${escapeHTML(loupe.name)}</div>
+      <a class="ld__name" href="/product/${encodeURIComponent(loupe.slug)}/">${escapeHTML(loupe.name)} →</a>
       <div class="ld__row"><span>Увеличение</span><b>${escapeHTML(zoom.zoom)}</b></div>
       ${zoom.field ? `<div class="ld__row"><span>Поле обзора</span><b>${escapeHTML(zoom.field)}</b></div>` : ""}
       <p class="ld__note">Схематично: масштаб зуба рассчитан по полю обзора.</p>`;
