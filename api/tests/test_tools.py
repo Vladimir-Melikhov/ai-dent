@@ -283,3 +283,22 @@ def test_loupe_demo_groups_all_loupes_by_brand(catalog):
     demo = run_async(go())
     loupes = [l for b in demo.brands for l in b.loupes]
     assert [l.slug for l in loupes] and [z.zoom for z in loupes[0].zooms] == ["2.5×", "3.5×"]
+
+
+def test_product_page_with_demo_checkbox_does_not_break(catalog):
+    """Галочка loupe_demo у товара и блок демонстрации в ответе — разные поля (раньше это был 500)."""
+    from app.routers.catalog import get_product
+    from .conftest import admin_sql
+
+    make_loupe(catalog["loupe"])
+    admin_sql("UPDATE catalog_product SET loupe_demo = true WHERE id = $1", catalog["loupe"])
+
+    async def go():
+        async with async_session_factory() as session:
+            from sqlalchemy import select
+            from app.db.models import Product
+            slug = (await session.execute(select(Product.slug).where(Product.id == catalog["loupe"]))).scalar_one()
+            return await get_product(slug, session)
+
+    out = run_async(go())
+    assert out.loupe_showcase and out.loupe_showcase.brands[0].loupes[0].zooms

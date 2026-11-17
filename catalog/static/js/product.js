@@ -333,7 +333,7 @@ function zoomNumber(zoom) {
 }
 
 function renderLoupeDemo(product) {
-  const demo = product.loupe_demo;
+  const demo = product.loupe_showcase;
   if (!demo || !demo.brands || !demo.brands.length) return "";
   return wrapGlass(
     `
@@ -358,7 +358,7 @@ function renderLoupeDemo(product) {
 function initLoupeDemo(root, product) {
   const box = root.querySelector(".ld");
   if (!box) return;
-  const brands = product.loupe_demo.brands;
+  const brands = product.loupe_showcase.brands;
   const own = brands.findIndex((b) => b.loupes.some((l) => l.slug === product.slug));
   const state = { brand: Math.max(own, 0), model: 0, zoom: 0 };
   if (own >= 0) state.model = brands[own].loupes.findIndex((l) => l.slug === product.slug);

@@ -111,7 +111,7 @@ async def get_product(slug: str, session: AsyncSession = Depends(get_session)):
         raise HTTPException(status_code=404, detail="Товар не найден")
     out = ProductDetailOut.model_validate(product)
     if product.is_loupe and product.loupe_demo:
-        out.loupe_demo = await loupe_demo(session)
+        out.loupe_showcase = await loupe_demo(session)
     return out
 
 

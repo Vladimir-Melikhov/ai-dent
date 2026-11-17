@@ -89,7 +89,8 @@ class ProductDetailOut(ProductListItemOut):
     images: list[ProductImageOut]
     options: list[ProductOptionOut]
     content_blocks: list[ContentBlockOut] = []
-    loupe_demo: LoupeDemoOut | None = None
+    # Не «loupe_demo»: так называется галочка у товара, и pydantic принял бы её за этот блок
+    loupe_showcase: LoupeDemoOut | None = None
 
 
 class ProductPageOut(BaseModel):
