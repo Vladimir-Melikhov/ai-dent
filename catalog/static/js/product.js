@@ -390,8 +390,7 @@ function initLoupeDemo(root, product) {
     box.querySelector(".ld__info").innerHTML = `
       <a class="ld__name" href="/product/${encodeURIComponent(loupe.slug)}/">${escapeHTML(loupe.name)} →</a>
       <div class="ld__row"><span>Увеличение</span><b>${escapeHTML(zoom.zoom)}</b></div>
-      ${zoom.field ? `<div class="ld__row"><span>Поле обзора</span><b>${escapeHTML(zoom.field)}</b></div>` : ""}
-      <p class="ld__note">Схематично: масштаб зуба рассчитан по полю обзора.</p>`;
+      ${zoom.field ? `<div class="ld__row"><span>Поле обзора</span><b>${escapeHTML(zoom.field)}</b></div>` : ""}`;
   }
 
   box.addEventListener("click", (e) => {
