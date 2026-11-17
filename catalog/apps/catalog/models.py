@@ -132,6 +132,19 @@ class Product(models.Model):
     loupe_kind = models.CharField(
         max_length=12, choices=LoupeKind.choices, blank=True, default="", db_default="", verbose_name="Тип лупы"
     )
+    # Параметры лупы для сравнения в чате: при галочке обязательны (у фиксированных пишем «фикс»)
+    loupe_depth = models.CharField(max_length=40, blank=True, default="", db_default="", verbose_name="Глубина фокуса",
+                                   help_text="Например: 200 мм")
+    loupe_weight = models.CharField(max_length=40, blank=True, default="", db_default="", verbose_name="Вес",
+                                    help_text="Например: 44 г")
+    loupe_tilt = models.CharField(max_length=40, blank=True, default="", db_default="", verbose_name="Угол наклона",
+                                  help_text="Например: 0–40° или «фикс»")
+    loupe_vertical = models.CharField(max_length=40, blank=True, default="", db_default="",
+                                      verbose_name="Вертикальная регулировка", help_text="Например: до 6 мм или «фикс»")
+    loupe_optics = models.CharField(max_length=40, blank=True, default="", db_default="",
+                                    verbose_name="Оптическая система", help_text="Например: галилеевская")
+    loupe_mount = models.CharField(max_length=40, blank=True, default="", db_default="",
+                                   verbose_name="Система крепления", help_text="Например: TTL или Flip-up")
     # Метка выбора магазина: показывается в сравнении в чате («Хит», «Лучший выбор»)
     badge = models.CharField(
         max_length=24, blank=True, default="", db_default="", verbose_name="Метка",
@@ -233,8 +246,8 @@ class LoupeOption(models.Model):
     )
     zoom = models.CharField(max_length=20, verbose_name="Увеличение", help_text="Например: 3.5×")
     field_of_view = models.CharField(
-        max_length=20, blank=True, verbose_name="Поле обзора (не обязательно)",
-        help_text="Можно не заполнять: полоса в чате тогда считается по увеличению. Если пишете — число и единица: 95 мм",
+        max_length=20, blank=True, verbose_name="Поле обзора",
+        help_text="Число и единица: 95 мм",
     )
     sort_order = models.PositiveSmallIntegerField(default=0, verbose_name="Порядок")
 

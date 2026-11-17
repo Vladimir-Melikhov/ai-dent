@@ -242,3 +242,30 @@ def test_comparison_shows_badge_from_admin(catalog):
 
     by_id = {p["id"]: p for p in run_async(go())["products"]}
     assert (by_id[catalog["extaro"]]["badge"], by_id[catalog["pico"]]["badge"]) == ("Хит", "")
+
+
+def test_loupe_comparison_takes_fixed_rows_from_loupe_fields():
+    from types import SimpleNamespace as N
+
+    from app.ai.tools import comparison_view
+
+    def opt(zoom, fov):
+        return N(zoom=zoom, field_of_view=fov)
+
+    def loupe(i, name, options, **fields):
+        base = dict(loupe_depth="", loupe_weight="", loupe_tilt="фикс", loupe_vertical="фикс",
+                    loupe_optics="галилеевская", loupe_mount="TTL")
+        return N(id=i, slug=f"s{i}", name=name, brand=N(name="B", country="С"), price_rub=100 * i, stock_qty=1,
+                 characteristics={"Поле обзора": "мусор"}, is_loupe=True, loupe_options=options, **{**base, **fields})
+
+    view = comparison_view([
+        loupe(1, "TTL XC-View 2.8", [opt("2.8x", "120–130 мм")], loupe_depth="200 мм", loupe_weight="44 г"),
+        loupe(2, "SLF Zumax", [opt("2.5x", "95 мм"), opt("3.0x", "80 мм"), opt("3.5x", "70 мм")],
+              loupe_tilt="0–40°", loupe_depth="150 мм", loupe_weight="50 г"),
+    ])
+    assert view["title"] == "Бинокулярные лупы"
+    assert [r["name"] for r in view["rows"]] == ["Увеличение", "Поле обзора", "Глубина фокуса", "Вес"]
+    assert view["rows"][1]["values"] == ["120–130 мм", "70–95 мм"]
+    more = {r["name"]: r["values"] for r in view["more"]}
+    assert more["Угол наклона"] == ["фикс", "0–40°"]
+    assert "мусор" not in str(view)

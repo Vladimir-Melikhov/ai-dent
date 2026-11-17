@@ -1,3 +1,4 @@
+from django import forms
 from django.contrib import admin, messages
 from django.shortcuts import redirect
 from django.urls import path
@@ -30,10 +31,38 @@ class ProductOptionInline(TabularInline):
     extra = 1
 
 
+LOUPE_REQUIRED = ["loupe_kind", "loupe_depth", "loupe_weight", "loupe_tilt", "loupe_vertical", "loupe_optics",
+                  "loupe_mount"]
+
+
+class ProductForm(forms.ModelForm):
+    class Meta:
+        model = Product
+        fields = "__all__"
+
+    def clean(self):
+        data = super().clean()
+        if data.get("is_loupe"):
+            for name in LOUPE_REQUIRED:
+                if not str(data.get(name) or "").strip():
+                    self.add_error(name, "Обязательно для бинокулярной лупы. У фиксированного параметра напишите «фикс».")
+        return data
+
+
+class LoupeOptionFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        for form in self.forms:
+            data = getattr(form, "cleaned_data", None) or {}
+            if data and not data.get("DELETE") and data.get("zoom") and not (data.get("field_of_view") or "").strip():
+                form.add_error("field_of_view", "Поле обзора обязательно")
+
+
 class LoupeOptionInline(TabularInline):
     """Увеличения лупы: «увеличение → поле обзора». Блок показывается, когда стоит галочка «Бинокулярная лупа»."""
 
     model = LoupeOption
+    formset = LoupeOptionFormSet
     extra = 2
     fields = ["zoom", "field_of_view", "sort_order"]
     verbose_name = "Увеличение"
@@ -109,6 +138,7 @@ class ProductAdmin(ModelAdmin):
     list_editable = ["price", "stock_qty", "priority", "badge", "is_active"]
     search_fields = ["name", "sku"]
     prepopulated_fields = {"slug": ("name",)}
+    form = ProductForm
     inlines = [
         ProductImageInline,
         ProductOptionInline,

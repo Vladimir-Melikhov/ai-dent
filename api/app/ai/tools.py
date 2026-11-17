@@ -179,11 +179,43 @@ def facts(characteristics: dict | None) -> dict[str, str]:
     return result
 
 
+LOUPE_ROWS = (("Увеличение", None), ("Поле обзора", None), ("Глубина фокуса", "loupe_depth"), ("Вес", "loupe_weight"),
+              ("Угол наклона", "loupe_tilt"), ("Вертикальная регулировка", "loupe_vertical"),
+              ("Оптическая система", "loupe_optics"), ("Система крепления", "loupe_mount"))
+
+
+def field_of_view(options) -> str:
+    """Поле обзора по увеличениям: одно значение — как есть, несколько — диапазон «от–до мм»."""
+    values = [o.field_of_view.strip() for o in options if (o.field_of_view or "").strip()]
+    if not values:
+        return "—"
+    nums = [re.search(r"\d+(?:[.,]\d+)?", v) for v in values]
+    if len(set(values)) == 1 or not all(nums):
+        return " / ".join(dict.fromkeys(values))
+    figures = [float(m.group().replace(",", ".")) for m in nums]
+    unit = re.sub(r"^[\d.,\s–-]+", "", values[0])
+    fmt = lambda x: f"{x:g}"
+    return f"{fmt(min(figures))}–{fmt(max(figures))} {unit}".strip()
+
+
+def loupe_specs(product: Product) -> dict[str, str]:
+    """Параметры лупы для сравнения — только из обязательных полей карточки товара."""
+    specs = {"Увеличение": " / ".join(o.zoom for o in product.loupe_options) or "—",
+             "Поле обзора": field_of_view(product.loupe_options)}
+    for label, attr in LOUPE_ROWS[2:]:
+        specs[label] = (getattr(product, attr, "") or "").strip() or "—"
+    return specs
+
+
 def comparison_view(products: list[Product], pick: dict | None = None) -> dict:
     """Сравнение для чата: карточки рядом — цена, пометка «кому подходит», 3 главных параметра.
     Остальные отличия — под кнопкой, общее — одной строкой."""
-    per_product = [{k: v for k, v in facts(p.characteristics).items() if not any(w in k.lower() for w in HIDDEN_WORDS)}
-                   for p in products]
+    all_loupes = all(getattr(p, "is_loupe", False) for p in products)
+    if all_loupes:
+        per_product = [loupe_specs(p) for p in products]
+    else:
+        per_product = [{k: v for k, v in facts(p.characteristics).items() if not any(w in k.lower() for w in HIDDEN_WORDS)}
+                       for p in products]
     keys: list[str] = []
     for table in per_product:
         for key in table:
@@ -194,7 +226,8 @@ def comparison_view(products: list[Product], pick: dict | None = None) -> dict:
         low = key.lower()
         return next((i for i, word in enumerate(KEY_WORDS) if word in low), len(KEY_WORDS))
 
-    key_keys = sorted((k for k in keys if rank(k) < len(KEY_WORDS)), key=rank)[:COMPARE_SHOWN]
+    key_keys = (keys[:COMPARE_SHOWN] if all_loupes
+                else sorted((k for k in keys if rank(k) < len(KEY_WORDS)), key=rank)[:COMPARE_SHOWN])
     rows, different, same = [], [], []
     for key in keys:
         values = [table.get(key, "—") for table in per_product]
@@ -216,7 +249,7 @@ def comparison_view(products: list[Product], pick: dict | None = None) -> dict:
     prices = [p["price_rub"] for p in view["products"]]
     cheapest = min(prices) if all(v is not None for v in prices) and len(set(prices)) > 1 else None
     # Общее «Бинокулярные лупы» — заголовком над блоком, а из названий карточек убирается: место дороже
-    title = "Бинокулярные лупы" if all(CATEGORY_PREFIX.match(p["name"]) for p in view["products"]) else ""
+    title = "Бинокулярные лупы" if all_loupes or all(CATEGORY_PREFIX.match(p["name"]) for p in view["products"]) else ""
     for item in view["products"]:
         item["full_name"] = item["name"]
         item["name"] = short(CATEGORY_PREFIX.sub("", item["name"]) or item["name"], 40)

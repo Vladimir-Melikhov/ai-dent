@@ -56,6 +56,12 @@ class Product(Base):
     # Бинокулярные лупы: галочка, тип, межзрачковое расстояние (у индивидуальных); увеличения и расстояния — в таблицах
     is_loupe: Mapped[bool]
     loupe_kind: Mapped[str]
+    loupe_depth: Mapped[str]
+    loupe_weight: Mapped[str]
+    loupe_tilt: Mapped[str]
+    loupe_vertical: Mapped[str]
+    loupe_optics: Mapped[str]
+    loupe_mount: Mapped[str]
     badge: Mapped[str]
     priority: Mapped[int]
     is_active: Mapped[bool]
