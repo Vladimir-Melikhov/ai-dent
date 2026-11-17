@@ -115,3 +115,35 @@ def test_loupe_migration_copies_json_to_tables():
 
     migration = import_module("apps.catalog.migrations.0007_loupe_relational")
     assert callable(migration.copy_json_to_tables)
+
+
+def test_loupe_admin_fields_take_plain_numbers_and_add_units():
+    from django import forms
+
+    from .admin_fields import CharacteristicsField, NumberField, RangeField
+
+    zoom = NumberField("×", glue="")
+    assert zoom.clean("2,8") == "2.8×" and zoom.clean("3.0") == "3×" and zoom.prepare_value("2.8×") == "2.8"
+    assert NumberField("мм").clean("200") == "200 мм"
+    tilt = RangeField("°", single=lambda n, u: f"0–{n}°", allow_fixed=True)
+    assert tilt.clean("0-40") == "0–40°" and tilt.clean("фикс") == "фикс"
+    try:
+        zoom.clean("abc")
+        raise AssertionError("нечисловое увеличение должно отклоняться")
+    except forms.ValidationError:
+        pass
+    chars = CharacteristicsField()
+    data = {"Гарантия": "12 мес", "Оптика": ["Увеличение: 2.8x"]}
+    assert chars.to_python(chars.prepare_value(data)) == data
+
+
+def test_loupe_product_needs_all_parameters(admin_client, eur_product):
+    from .admin import ProductForm
+
+    form = ProductForm(instance=eur_product, data={
+        "name": "L", "brand": eur_product.brand_id, "category": eur_product.category_id, "price": "1",
+        "currency": "RUB", "stock_qty": "1", "is_loupe": "on", "is_active": "on", "priority": "0", "slug": "l",
+    })
+    assert not form.is_valid()
+    assert {"loupe_kind", "loupe_depth", "loupe_weight", "loupe_tilt", "loupe_vertical", "loupe_optics",
+            "loupe_mount"} <= set(form.errors)
