@@ -147,3 +147,60 @@ def test_loupe_product_needs_all_parameters(admin_client, eur_product):
     assert not form.is_valid()
     assert {"loupe_kind", "loupe_depth", "loupe_weight", "loupe_tilt", "loupe_vertical", "loupe_optics",
             "loupe_mount"} <= set(form.errors)
+
+
+def content_blocks_formset(product, rf, admin_user, **block):
+    """Формсет блоков контента так, как его присылает браузер: тип без пустого варианта всегда «hero»."""
+    from django.contrib.admin.sites import site
+
+    from .admin import ProductContentBlockInline
+
+    request = rf.post("/")
+    request.user = admin_user
+    data = {
+        "content_blocks-TOTAL_FORMS": "1", "content_blocks-INITIAL_FORMS": "0",
+        "content_blocks-MIN_NUM_FORMS": "0", "content_blocks-MAX_NUM_FORMS": "1000",
+        "content_blocks-0-block_type": "hero", "content_blocks-0-sort_order": "0",
+        "content_blocks-0-data": "[]", "initial-content_blocks-0-data": "[]",
+        **{f"content_blocks-0-{key}": value for key, value in block.items()},
+    }
+    formset_class = ProductContentBlockInline(Product, site).get_formset(request, product)
+    return formset_class(data=data, files={}, instance=product, prefix="content_blocks")
+
+
+def test_untouched_content_block_is_not_saved(eur_product, rf, admin_user):
+    formset = content_blocks_formset(eur_product, rf, admin_user)
+    assert formset.is_valid(), formset.errors
+    formset.save()
+    assert not eur_product.content_blocks.exists()
+
+
+def test_filled_content_block_is_saved(eur_product, rf, admin_user):
+    formset = content_blocks_formset(eur_product, rf, admin_user, block_type="tech", title="Подбор оптики")
+    assert formset.is_valid(), formset.errors
+    formset.save()
+    assert list(eur_product.content_blocks.values_list("block_type", "title")) == [("tech", "Подбор оптики")]
+
+
+def test_product_admin_has_no_blank_content_block(admin_client, eur_product):
+    page = admin_client.get(f"/admin/catalog/product/{eur_product.pk}/change/").content.decode()
+    assert 'name="content_blocks-TOTAL_FORMS" value="0"' in page
+
+
+def test_migration_deletes_only_empty_content_blocks(eur_product):
+    from importlib import import_module
+
+    from django.apps import apps
+
+    from .models import ProductContentBlock
+
+    ProductContentBlock.objects.create(product=eur_product, block_type="hero")
+    ProductContentBlock.objects.create(product=eur_product, block_type="hero", sort_order=3)
+    kept = [
+        ProductContentBlock.objects.create(product=eur_product, block_type="tech", title="Подбор оптики"),
+        ProductContentBlock.objects.create(product=eur_product, block_type="text", body="Текст"),
+        ProductContentBlock.objects.create(product=eur_product, block_type="specs", data=[{"label": "Вес", "value": "50 г"}]),
+        ProductContentBlock.objects.create(product=eur_product, block_type="text", video_url="https://example.com/v"),
+    ]
+    import_module("apps.catalog.migrations.0014_delete_empty_content_blocks").delete_empty_blocks(apps, None)
+    assert set(eur_product.content_blocks.values_list("pk", flat=True)) == {block.pk for block in kept}

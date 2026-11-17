@@ -159,9 +159,23 @@ class LoupeFrameInline(TabularInline):
     verbose_name_plural = "Бинокулярная лупа: оправы (если у лупы они бывают разные; нет — оставьте пустым)"
 
 
+class ProductContentBlockForm(forms.ModelForm):
+    CONTENT_FIELDS = ("title", "subtitle", "body", "image", "video_url", "data")
+
+    def has_changed(self):
+        # У «Типа блока» в Unfold нет пустого варианта: браузер всегда присылает «Hero», и Django
+        # считал нетронутый блок заполненным — каждое сохранение товара добавляло пустой блок.
+        # Новый блок без содержимого не сохраняем.
+        if self.instance.pk is None and not set(self.CONTENT_FIELDS) & set(self.changed_data):
+            return False
+        return super().has_changed()
+
+
 class ProductContentBlockInline(StackedInline):
     model = ProductContentBlock
-    extra = 1
+    form = ProductContentBlockForm
+    # Блоки добавляются кнопкой «Добавить ещё», заготовка по умолчанию не нужна
+    extra = 0
     fields = [
         "block_type",
         "sort_order",

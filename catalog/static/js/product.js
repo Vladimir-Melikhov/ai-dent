@@ -209,6 +209,9 @@ function renderBlock(block) {
   const video = videoHTML(block);
   const img = imageHTML(block);
 
+  // Пустой блок (ни заголовка, ни текста, ни картинки, ни видео, ни списка) — пустая стеклянная полоса, не выводим
+  if (!head && !body && !video && !hasImage && !items.length) return "";
+
   if (type === "features") {
     const content = `${head}${body}${featsHTML(items)}${video}`;
     if (hasImage) {
