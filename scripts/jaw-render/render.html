@@ -1,0 +1,70 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>jaw render</title>
+<!-- Локальный инструмент, не страница сайта: three.js берём с CDN -->
+<script type="importmap">
+{"imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.min.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+}}
+</script>
+<script type="module">
+// Рендер снимка челюсти для блока «Как это выглядит» (catalog/static/img/jaw.webp).
+// Параметры: ?px=2800&span=36&yaw=35&dx=8&pitch=6
+//   px — размер кадра в пикселях; span — поперечник кадра в мм модели (= JAW_SPAN в product.js);
+//   yaw — поворот вбок, °; dx — сдвиг центра кадра вбок, мм (8 ≈ клык); pitch — взгляд сверху, °.
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+
+const q = new URLSearchParams(location.search);
+const num = (k, d) => Number(q.get(k) ?? d);
+const PX = num("px", 2800);
+const SPAN = num("span", 36);
+const YAW = THREE.MathUtils.degToRad(num("yaw", 35));
+const DX = num("dx", 8);
+const PITCH = THREE.MathUtils.degToRad(num("pitch", 6));
+const VFOV = 4; // узкий угол — почти без перспективы, поэтому масштабирование снимка на сайте честное
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1);
+renderer.setSize(PX, PX, false);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.15;
+document.body.append(renderer.domElement);
+
+const gltf = await new GLTFLoader().loadAsync("./jaw.glb");
+const model = gltf.scene;
+model.scale.setScalar(1000); // метры glTF → мм
+model.traverse((o) => {
+  if (!o.isMesh) return;
+  const enamel = o.material.name === "enamel";
+  o.material = new THREE.MeshPhysicalMaterial({
+    color: o.material.color,
+    roughness: enamel ? 0.3 : 0.5,
+    clearcoat: enamel ? 0.6 : 0.35, // влажный блеск
+    clearcoatRoughness: 0.25,
+    side: THREE.DoubleSide,
+  });
+});
+const scene = new THREE.Scene();
+scene.add(model);
+model.updateMatrixWorld(true);
+const box = new THREE.Box3().setFromObject(model);
+const c = box.getCenter(new THREE.Vector3());
+const target = new THREE.Vector3(c.x + DX, c.y, box.max.z - 3); // передние зубы по линии смыкания
+
+const camera = new THREE.PerspectiveCamera(VFOV, 1, 10, 5000);
+scene.add(camera);
+scene.add(new THREE.HemisphereLight(0xffffff, 0xb9a6a6, 1.1));
+const head = new THREE.DirectionalLight(0xffffff, 1.6); // «налобный» свет от камеры
+head.position.set(0.15, 0.35, 1);
+head.target.position.set(0, 0, -1);
+camera.add(head, head.target);
+
+const dist = SPAN / 2 / Math.tan(THREE.MathUtils.degToRad(VFOV / 2));
+const dir = new THREE.Vector3(Math.cos(PITCH) * Math.sin(YAW), Math.sin(PITCH), Math.cos(PITCH) * Math.cos(YAW));
+camera.position.copy(target).addScaledVector(dir, dist);
+camera.lookAt(target);
+renderer.render(scene, camera);
+window.__png = renderer.domElement.toDataURL("image/png");
+</script>

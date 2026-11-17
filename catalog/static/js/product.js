@@ -338,6 +338,14 @@ function fieldNumber(field) {
   return nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : null;
 }
 
+/* Снимок челюсти jaw.webp — рендер 3D-модели с поворотом 35° вбок, центр у клыка, кадр JAW_SPAN мм модели
+   (единица ≈ 1 мм, передний зуб модели ≈ 6 мм). Охват круга = SPAN_BASE + SPAN_PER_FIELD × поле обзора:
+   при ~3× (поле ~110 мм) в круге 3–4 передних зуба, как видит врач.
+   Калибровка и перерендер снимка — docs/калибровка-увеличений.pdf, scripts/jaw-render/ */
+const JAW_SPAN = 36;
+const SPAN_BASE = 0;
+const SPAN_PER_FIELD = 0.2;
+
 function renderLoupeDemo(product) {
   const demo = product.loupe_showcase;
   if (!demo || !demo.brands || !demo.brands.length) return "";
@@ -352,7 +360,7 @@ function renderLoupeDemo(product) {
       <div class="ld__models"></div>
       <div class="ld__zooms"></div>
       <div class="ld__stage">
-        <div class="ld__lens"><img class="ld__tooth" src="/static/img/teeth.webp" alt=""></div>
+        <div class="ld__lens"><img class="ld__jaw" src="/static/img/jaw.webp" alt="" loading="lazy"></div>
         <div class="ld__info"></div>
       </div>
     </div>
@@ -368,9 +376,6 @@ function initLoupeDemo(root, product) {
   const own = brands.findIndex((b) => b.loupes.some((l) => l.slug === product.slug));
   const state = { brand: Math.max(own, 0), model: 0, zoom: 0 };
   if (own >= 0) state.model = brands[own].loupes.findIndex((l) => l.slug === product.slug);
-  const all = brands.flatMap((b) => b.loupes.flatMap((l) => l.zooms));
-  const maxZoom = Math.max(...all.map((z) => zoomNumber(z.zoom)));
-  const maxField = Math.max(0, ...all.map((z) => fieldNumber(z.field) || 0));
 
   const btn = (label, active, i) =>
     `<button type="button" class="ld__btn${active ? " is-active" : ""}" data-i="${i}">${escapeHTML(label)}</button>`;
@@ -383,10 +388,10 @@ function initLoupeDemo(root, product) {
     box.querySelector(".ld__models").innerHTML =
       brand.loupes.length > 1 ? brand.loupes.map((l, i) => btn(l.name, i === state.model, i)).join("") : "";
     box.querySelector(".ld__zooms").innerHTML = loupe.zooms.map((z, i) => btn(z.zoom, i === state.zoom, i)).join("");
-    // Масштаб зуба — по полю обзора: чем оно меньше, тем крупнее видна деталь. Увеличение — только запасной путь
-    const fov = fieldNumber(zoom.field);
-    const scale = fov && maxField ? 0.7 * (maxField / fov) : 0.55 + (zoomNumber(zoom.zoom) / maxZoom) * 1.9;
-    box.querySelector(".ld__tooth").style.transform = `scale(${Math.min(scale, 3.2).toFixed(2)})`;
+    // Охват круга — по полю обзора (нет поля — оценка по кратности: ≈ 330 мм / увеличение, 3× → 110 мм)
+    const field = fieldNumber(zoom.field) || 330 / zoomNumber(zoom.zoom);
+    const scale = Math.max(1, JAW_SPAN / Math.max(1, SPAN_BASE + field * SPAN_PER_FIELD));
+    box.querySelector(".ld__jaw").style.transform = `scale(${scale.toFixed(3)})`;
     box.querySelector(".ld__info").innerHTML = `
       <a class="ld__name" href="/product/${encodeURIComponent(loupe.slug)}/">${escapeHTML(loupe.name)} →</a>
       <div class="ld__row"><span>Увеличение</span><b>${escapeHTML(zoom.zoom)}</b></div>
