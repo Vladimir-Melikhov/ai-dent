@@ -979,13 +979,144 @@ body:has(.product-page) {
     margin-right: 0 !important;
 }
 
+.gb-two__img {
+    position: relative;
+    cursor: zoom-in;
+}
+
+/* Значок «открыть крупно»: на компьютере — при наведении, на телефоне виден всегда */
+.gb-zoom-ic {
+    position: absolute;
+    right: 8px;
+    bottom: 8px;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.88) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230f1419' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7'/%3E%3C/svg%3E") center / 14px no-repeat;
+    box-shadow: 0 2px 8px rgba(15, 20, 25, 0.15);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    pointer-events: none;
+}
+
+.gb-two__img:hover .gb-zoom-ic,
+.gb-two__img:focus-visible .gb-zoom-ic {
+    opacity: 1;
+}
+
 @media (max-width: 768px) {
     .gb-two {
         grid-template-columns: 1fr !important;
+        gap: 18px !important;
     }
+
+    /* Картинка под текстом в своих пропорциях и не выше 180px: логотип не раздувается на всю ширину,
+       схему открывают крупно нажатием */
+    .gb-two__img {
+        display: block !important;
+        justify-self: start;
+        width: fit-content !important;
+        max-width: 100%;
+    }
+
     .gb-two__img img {
-        max-height: 360px !important;
+        width: auto !important;
+        max-width: 100% !important;
+        max-height: 180px !important;
+        margin: 0 !important;
+        border-radius: 12px !important;
     }
+
+    .gb-zoom-ic {
+        opacity: 1;
+        right: 6px;
+        bottom: 6px;
+        width: 28px;
+        height: 28px;
+    }
+}
+
+/* ===== Картинка крупно (окно просмотра) ===== */
+html.img-viewer-open {
+    overflow: hidden;
+}
+
+.img-viewer {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: rgba(10, 14, 18, 0.88);
+}
+
+.img-viewer__scroll {
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    padding: 64px 16px 24px;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* margin: auto, а не центрирование флексом — иначе у увеличенной картинки не прокрутить левый край */
+.img-viewer__scroll img {
+    display: block;
+    margin: auto;
+    max-width: 100%;
+    max-height: 100%;
+    flex-shrink: 0;
+    object-fit: contain;
+    background: #fff;
+    border-radius: 12px;
+    cursor: zoom-in;
+}
+
+.img-viewer.is-zoomed .img-viewer__scroll img {
+    max-width: none;
+    max-height: none;
+    min-width: 160%;
+    cursor: zoom-out;
+}
+
+.img-viewer__close {
+    position: fixed;
+    top: 14px;
+    right: 14px;
+    width: 40px;
+    height: 40px;
+    border: 0;
+    border-radius: 50%;
+    background: #fff;
+    color: #0f1419;
+    font-size: 26px;
+    line-height: 1;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+
+/* ===== Описание товара: «Читать полностью» ===== */
+.product-hero__description.is-open {
+    display: block;
+    -webkit-line-clamp: unset;
+    overflow: visible;
+}
+
+.product-hero__more {
+    margin-top: 6px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: #0f1419;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 650;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+}
+
+.product-hero__more[hidden] {
+    display: none;
 }
 
 /* ============================================================
@@ -1009,7 +1140,7 @@ body:has(.product-page) {
     }
 
     .product-hero__visual {
-        max-width: 260px !important;
+        max-width: min(320px, 100%) !important;
         aspect-ratio: 1 / 1 !important;
         margin: 0 auto;
     }
@@ -1105,4 +1236,6 @@ body:has(.product-page) {
 .ld__name:hover { border-bottom-color: var(--p-text); }
 .ld__row { display: flex; justify-content: space-between; gap: 16px; padding: 8px 0; border-bottom: 1px solid rgba(15, 20, 25, 0.1); font-size: 14px; }
 .ld__row span { color: var(--p-muted); }
+/* Один бренд или одна модель — строка выбора не нужна */
+.ld__brands:empty, .ld__models:empty { display: none; }
 .ld__note { margin: 14px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--p-muted); }

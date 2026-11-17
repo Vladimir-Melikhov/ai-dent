@@ -1059,6 +1059,14 @@ def test_product_details_keep_site_block_whole():
     assert details({}) == {} and details(None) == {}
 
 
+def test_product_details_take_list_from_any_content_block():
+    from types import SimpleNamespace as NS
+
+    blocks = [NS(block_type="text", data=[]), NS(block_type="text", data=[{"label": "Вес", "value": "44 г"}])]
+    product = NS(characteristics={}, content_blocks=NS(all=lambda: blocks))
+    assert services.product_details(product) == {"groups": [["Вес", ["44 г"]]]}
+
+
 def test_long_main_block_flows_to_next_page(client, microscope, settings, tmp_path):
     settings.MEDIA_ROOT = tmp_path
     microscope.characteristics = {f"Группа {i}": [f"Длинный пункт номер {j} с пояснением " * 3 for j in range(8)] for i in range(14)}

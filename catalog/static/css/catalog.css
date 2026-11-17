@@ -1330,8 +1330,16 @@
     grid-column: 1 / -1;
   }
 
+  /* «Наличие» — отдельной строкой: подпись слева, переключатель справа */
   .catalog-stock {
-    display: none;
+    grid-column: 1 / -1;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .catalog-stock__row {
+    height: auto;
   }
 
   .catalog-filter__label {

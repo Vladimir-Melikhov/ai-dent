@@ -87,37 +87,6 @@ function normalizeList(data) {
   return [];
 }
 
-function blockTypeKey(type) {
-  const t = String(type ?? "")
-    .toLowerCase()
-    .trim();
-  if (
-    [
-      "specs",
-      "spec",
-      "characteristics",
-      "characteristic",
-      "характеристики",
-      "характеристика",
-    ].includes(t)
-  ) {
-    return "specs";
-  }
-  if (["features", "feature", "фичи", "фича", "преимущества"].includes(t)) {
-    return "features";
-  }
-  if (["tech", "technology", "технологии", "технология"].includes(t)) {
-    return "tech";
-  }
-  if (["brand", "бренд", "о бренде"].includes(t)) {
-    return "brand";
-  }
-  if (["text", "текст", "описание"].includes(t)) {
-    return "text";
-  }
-  return t || "text";
-}
-
 function headHTML(block) {
   if (!block.title && !block.subtitle) return "";
   return `
@@ -147,8 +116,9 @@ function imageHTML(block, alt) {
   const img = getImage(block.image);
   if (!img) return "";
   return `
-    <div class="gb-two__img">
+    <div class="gb-two__img" data-zoom="${img}" role="button" tabindex="0" aria-label="Открыть картинку крупно">
       <img src="${img}" alt="${escapeHTML(alt || block.title || "")}" loading="lazy">
+      <span class="gb-zoom-ic" aria-hidden="true"></span>
     </div>
   `;
 }
@@ -198,81 +168,28 @@ function wrapGlass(inner, extraClass = "") {
   `;
 }
 
+/* Все блоки выглядят одинаково: тип блока — только подпись в админке.
+   Текст (заголовок, текст, список, видео) слева, картинка справа; на телефоне картинка под текстом. */
 function renderBlock(block) {
   if (!block) return "";
 
-  const type = blockTypeKey(block.block_type);
   const items = normalizeList(block.data);
-  const hasImage = Boolean(getImage(block.image));
   const head = headHTML(block);
   const body = bodyHTML(block);
   const video = videoHTML(block);
   const img = imageHTML(block);
 
   // Пустой блок (ни заголовка, ни текста, ни картинки, ни видео, ни списка) — пустая стеклянная полоса, не выводим
-  if (!head && !body && !video && !hasImage && !items.length) return "";
+  if (!head && !body && !video && !img && !items.length) return "";
 
-  if (type === "features") {
-    const content = `${head}${body}${featsHTML(items)}${video}`;
-    if (hasImage) {
-      return wrapGlass(`
-        <div class="gb-two">
-          <div class="gb-two__text">${content}</div>
-          ${img}
-        </div>
-      `);
-    }
-    return wrapGlass(content);
-  }
-
-  if (type === "specs") {
-    const content = `${head}${body}${rowsHTML(items)}${video}`;
-    if (hasImage) {
-      return wrapGlass(`
-        <div class="gb-two">
-          <div class="gb-two__text">${content}</div>
-          ${img}
-        </div>
-      `);
-    }
-    return wrapGlass(content);
-  }
-
-  if (type === "tech") {
-    return wrapGlass(`
-      <div class="gb-two">
-        <div class="gb-two__text">
-          ${head}${body}${video}
-        </div>
-        ${img}
-      </div>
-    `);
-  }
-
-  if (type === "brand") {
-    return wrapGlass(
-      `
-      <div class="gb-two">
-        <div class="gb-two__text">
-          ${head}${body}
-        </div>
-        ${img}
-      </div>
-    `,
-      "gb--brand"
-    );
-  }
-
-  const content = `${head}${body}${items.length ? rowsHTML(items) : ""}${video}`;
-  if (hasImage) {
-    return wrapGlass(`
-      <div class="gb-two">
-        <div class="gb-two__text">${content}</div>
-        ${img}
-      </div>
-    `);
-  }
-  return wrapGlass(content);
+  const content = `${head}${body}${rowsHTML(items)}${video}`;
+  if (!img) return wrapGlass(content);
+  return wrapGlass(`
+    <div class="gb-two">
+      <div class="gb-two__text">${content}</div>
+      ${img}
+    </div>
+  `);
 }
 
 function renderContentBlocks(blocks) {
@@ -387,7 +304,8 @@ function initLoupeDemo(root, product) {
     const brand = brands[state.brand];
     const loupe = brand.loupes[state.model];
     const zoom = loupe.zooms[state.zoom];
-    box.querySelector(".ld__brands").innerHTML = brands.map((b, i) => btn(b.name, i === state.brand, i)).join("");
+    box.querySelector(".ld__brands").innerHTML =
+      brands.length > 1 ? brands.map((b, i) => btn(b.name, i === state.brand, i)).join("") : "";
     box.querySelector(".ld__models").innerHTML =
       brand.loupes.length > 1 ? brand.loupes.map((l, i) => btn(l.name, i === state.model, i)).join("") : "";
     box.querySelector(".ld__zooms").innerHTML = loupe.zooms.map((z, i) => btn(z.zoom, i === state.zoom, i)).join("");
@@ -413,6 +331,70 @@ function initLoupeDemo(root, product) {
     draw();
   });
   draw();
+}
+
+/* ---- Картинка блока крупно: схему на телефоне можно рассмотреть ----
+   Нажатие на картинку в окне — увеличить до исходного размера и двигать пальцем, ещё раз — обратно. */
+function openImageViewer(src, alt) {
+  const viewer = document.createElement("div");
+  viewer.className = "img-viewer";
+  viewer.innerHTML = `
+    <div class="img-viewer__scroll"><img src="${src}" alt="${escapeHTML(alt || "")}"></div>
+    <button type="button" class="img-viewer__close" aria-label="Закрыть">×</button>`;
+  const scroll = viewer.querySelector(".img-viewer__scroll");
+  const close = () => {
+    viewer.remove();
+    document.documentElement.classList.remove("img-viewer-open");
+    document.removeEventListener("keydown", onKey);
+  };
+  const onKey = (e) => { if (e.key === "Escape") close(); };
+  viewer.addEventListener("click", (e) => {
+    if (e.target.tagName !== "IMG") { close(); return; }
+    const zoomed = viewer.classList.toggle("is-zoomed");
+    if (zoomed) {
+      scroll.scrollLeft = (scroll.scrollWidth - scroll.clientWidth) / 2;
+      scroll.scrollTop = (scroll.scrollHeight - scroll.clientHeight) / 2;
+    }
+  });
+  document.addEventListener("keydown", onKey);
+  document.documentElement.classList.add("img-viewer-open");
+  document.body.appendChild(viewer);
+  viewer.querySelector(".img-viewer__close").focus();
+}
+
+function initImageZoom(root) {
+  const open = (el) => openImageViewer(el.dataset.zoom, el.querySelector("img")?.alt);
+  root.addEventListener("click", (e) => {
+    const el = e.target.closest("[data-zoom]");
+    if (el) open(el);
+  });
+  root.addEventListener("keydown", (e) => {
+    if ((e.key === "Enter" || e.key === " ") && e.target.matches("[data-zoom]")) {
+      e.preventDefault();
+      open(e.target);
+    }
+  });
+}
+
+/* ---- Длинное описание обрезано на 5 строках: кнопка «Читать полностью» ---- */
+function initDescriptionToggle(root) {
+  const desc = root.querySelector(".product-hero__description");
+  if (!desc) return;
+  const more = document.createElement("button");
+  more.type = "button";
+  more.className = "product-hero__more";
+  more.textContent = "Читать полностью";
+  desc.after(more);
+  const check = () => {
+    more.hidden = !desc.classList.contains("is-open") && desc.scrollHeight <= desc.clientHeight + 2;
+  };
+  more.addEventListener("click", () => {
+    const opened = desc.classList.toggle("is-open");
+    more.textContent = opened ? "Свернуть" : "Читать полностью";
+  });
+  check();
+  if (document.fonts) document.fonts.ready.then(check);
+  window.addEventListener("resize", check);
 }
 
 function renderProduct(product) {
@@ -521,6 +503,8 @@ function renderProduct(product) {
   `;
 
   initLoupeDemo(root, product);
+  initImageZoom(root);
+  initDescriptionToggle(root);
 
   const mainImg = document.getElementById("product-main-image");
   const thumbs = root.querySelectorAll(".product-thumb");

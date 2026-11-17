@@ -150,7 +150,7 @@ def test_loupe_product_needs_all_parameters(admin_client, eur_product):
 
 
 def content_blocks_formset(product, rf, admin_user, **block):
-    """Формсет блоков контента так, как его присылает браузер: тип без пустого варианта всегда «hero»."""
+    """Формсет блоков контента так, как его присылает браузер: тип без пустого варианта всегда заполнен."""
     from django.contrib.admin.sites import site
 
     from .admin import ProductContentBlockInline
@@ -160,7 +160,7 @@ def content_blocks_formset(product, rf, admin_user, **block):
     data = {
         "content_blocks-TOTAL_FORMS": "1", "content_blocks-INITIAL_FORMS": "0",
         "content_blocks-MIN_NUM_FORMS": "0", "content_blocks-MAX_NUM_FORMS": "1000",
-        "content_blocks-0-block_type": "hero", "content_blocks-0-sort_order": "0",
+        "content_blocks-0-block_type": "text", "content_blocks-0-sort_order": "0",
         "content_blocks-0-data": "[]", "initial-content_blocks-0-data": "[]",
         **{f"content_blocks-0-{key}": value for key, value in block.items()},
     }
@@ -176,10 +176,10 @@ def test_untouched_content_block_is_not_saved(eur_product, rf, admin_user):
 
 
 def test_filled_content_block_is_saved(eur_product, rf, admin_user):
-    formset = content_blocks_formset(eur_product, rf, admin_user, block_type="tech", title="Подбор оптики")
+    formset = content_blocks_formset(eur_product, rf, admin_user, block_type="fitting", title="Подбор оптики")
     assert formset.is_valid(), formset.errors
     formset.save()
-    assert list(eur_product.content_blocks.values_list("block_type", "title")) == [("tech", "Подбор оптики")]
+    assert list(eur_product.content_blocks.values_list("block_type", "title")) == [("fitting", "Подбор оптики")]
 
 
 def test_product_admin_has_no_blank_content_block(admin_client, eur_product):
@@ -194,13 +194,37 @@ def test_migration_deletes_only_empty_content_blocks(eur_product):
 
     from .models import ProductContentBlock
 
-    ProductContentBlock.objects.create(product=eur_product, block_type="hero")
-    ProductContentBlock.objects.create(product=eur_product, block_type="hero", sort_order=3)
+    ProductContentBlock.objects.create(product=eur_product, block_type="text")
+    ProductContentBlock.objects.create(product=eur_product, block_type="text", sort_order=3)
     kept = [
-        ProductContentBlock.objects.create(product=eur_product, block_type="tech", title="Подбор оптики"),
+        ProductContentBlock.objects.create(product=eur_product, block_type="fitting", title="Подбор оптики"),
         ProductContentBlock.objects.create(product=eur_product, block_type="text", body="Текст"),
-        ProductContentBlock.objects.create(product=eur_product, block_type="specs", data=[{"label": "Вес", "value": "50 г"}]),
+        ProductContentBlock.objects.create(product=eur_product, block_type="text", data=[{"label": "Вес", "value": "50 г"}]),
         ProductContentBlock.objects.create(product=eur_product, block_type="text", video_url="https://example.com/v"),
     ]
     import_module("apps.catalog.migrations.0014_delete_empty_content_blocks").delete_empty_blocks(apps, None)
     assert set(eur_product.content_blocks.values_list("pk", flat=True)) == {block.pk for block in kept}
+
+
+def test_migration_merges_block_types_into_two(eur_product):
+    from importlib import import_module
+
+    from django.apps import apps
+
+    from .models import ProductContentBlock
+
+    blocks = {
+        old: ProductContentBlock.objects.create(product=eur_product, block_type=old, title=title)
+        for old, title in [("tech", "Подбор оптики"), ("hero", "Варианты крепления"), ("specs", "Вес"),
+                           ("features", ""), ("brand", "Carl Zeiss"), ("text", "Описание")]
+    }
+    import_module("apps.catalog.migrations.0016_content_block_two_types").merge_types(apps, None)
+    types = {old: ProductContentBlock.objects.get(pk=block.pk).block_type for old, block in blocks.items()}
+    assert types == {"tech": "fitting", "hero": "text", "specs": "text", "features": "text", "brand": "text", "text": "text"}
+
+
+def test_new_content_block_defaults_to_description(eur_product):
+    from .models import ProductContentBlock
+
+    block = ProductContentBlock.objects.create(product=eur_product, title="Описание")
+    assert block.block_type == "text" and block.get_block_type_display() == "Описание"

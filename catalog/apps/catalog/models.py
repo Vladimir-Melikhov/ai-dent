@@ -321,15 +321,15 @@ class LoupeIpd(models.Model):
 
 class ProductContentBlock(models.Model):
     class BlockType(models.TextChoices):
-        HERO = "hero", "Hero (шапка)"
-        FEATURES = "features", "Ряд фич"
-        TECH = "tech", "Технологии"
-        SPECS = "specs", "Характеристики"
-        BRAND = "brand", "Блок бренда"
-        TEXT = "text", "Текст"
+        # На сайте все типы выглядят одинаково: тип — только подпись блока в админке
+        TEXT = "text", "Описание"
+        FITTING = "fitting", "Подбор оптики"
 
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="content_blocks", verbose_name="Товар")
-    block_type = models.CharField(max_length=20, choices=BlockType.choices, verbose_name="Тип блока")
+    block_type = models.CharField(
+        max_length=20, choices=BlockType.choices, default=BlockType.TEXT, verbose_name="Тип блока",
+        help_text="Только подпись блока в админке, на сайте все блоки выглядят одинаково.",
+    )
     title = models.CharField(max_length=255, blank=True, verbose_name="Заголовок")
     subtitle = models.CharField(max_length=255, blank=True, verbose_name="Подзаголовок")
     body = models.TextField(blank=True, verbose_name="Текст")

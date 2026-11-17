@@ -158,12 +158,10 @@ def _flatten(characteristics) -> list[list]:
 
 
 def product_details(product: Product) -> dict:
-    """Группы описания для КП; нет характеристик — строки блоков «Характеристики» и «Ряд фич»."""
+    """Группы описания для КП; нет характеристик — строки списков из блоков контента."""
     groups = _flatten(product.characteristics)
     if not groups:
         for block in product.content_blocks:
-            if block.block_type not in ("specs", "features"):
-                continue
             for item in block.data if isinstance(block.data, list) else []:
                 if isinstance(item, dict):
                     label = str(item.get("label") or item.get("title") or item.get("name") or "").strip()

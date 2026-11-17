@@ -741,12 +741,10 @@ def _flatten(characteristics):
 def product_details(product) -> dict:
     """Блок «Главное о товаре» для КП целиком, как на сайте: группы с названием и списком пунктов.
 
-    Нет характеристик — берутся строки блоков контента «Характеристики» и «Ряд фич». Пусто — блока у товара не будет."""
+    Нет характеристик — берутся строки списков из блоков контента. Пусто — блока у товара не будет."""
     groups = _flatten(product.characteristics)
     if not groups:
         for block in product.content_blocks.all():
-            if block.block_type not in ("specs", "features"):
-                continue
             for item in block.data if isinstance(block.data, list) else []:
                 if isinstance(item, dict):
                     label = str(item.get("label") or item.get("title") or item.get("name") or "").strip()
