@@ -332,6 +332,12 @@ function zoomNumber(zoom) {
   return m ? parseFloat(m[0]) : 1;
 }
 
+/* Поле обзора в мм: у диапазона «120–130 мм» берём середину; нет значения — null */
+function fieldNumber(field) {
+  const nums = (String(field || "").replace(/,/g, ".").match(/\d+(?:\.\d+)?/g) || []).map(parseFloat);
+  return nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : null;
+}
+
 function renderLoupeDemo(product) {
   const demo = product.loupe_showcase;
   if (!demo || !demo.brands || !demo.brands.length) return "";
@@ -362,7 +368,9 @@ function initLoupeDemo(root, product) {
   const own = brands.findIndex((b) => b.loupes.some((l) => l.slug === product.slug));
   const state = { brand: Math.max(own, 0), model: 0, zoom: 0 };
   if (own >= 0) state.model = brands[own].loupes.findIndex((l) => l.slug === product.slug);
-  const maxZoom = Math.max(...brands.flatMap((b) => b.loupes.flatMap((l) => l.zooms.map((z) => zoomNumber(z.zoom)))));
+  const all = brands.flatMap((b) => b.loupes.flatMap((l) => l.zooms));
+  const maxZoom = Math.max(...all.map((z) => zoomNumber(z.zoom)));
+  const maxField = Math.max(0, ...all.map((z) => fieldNumber(z.field) || 0));
 
   const btn = (label, active, i) =>
     `<button type="button" class="ld__btn${active ? " is-active" : ""}" data-i="${i}">${escapeHTML(label)}</button>`;
@@ -375,13 +383,15 @@ function initLoupeDemo(root, product) {
     box.querySelector(".ld__models").innerHTML =
       brand.loupes.length > 1 ? brand.loupes.map((l, i) => btn(l.name, i === state.model, i)).join("") : "";
     box.querySelector(".ld__zooms").innerHTML = loupe.zooms.map((z, i) => btn(z.zoom, i === state.zoom, i)).join("");
-    const n = zoomNumber(zoom.zoom);
-    box.querySelector(".ld__tooth").style.transform = `scale(${(0.55 + (n / maxZoom) * 1.9).toFixed(2)})`;
+    // Масштаб зуба — по полю обзора: чем оно меньше, тем крупнее видна деталь. Увеличение — только запасной путь
+    const fov = fieldNumber(zoom.field);
+    const scale = fov && maxField ? 0.7 * (maxField / fov) : 0.55 + (zoomNumber(zoom.zoom) / maxZoom) * 1.9;
+    box.querySelector(".ld__tooth").style.transform = `scale(${Math.min(scale, 3.2).toFixed(2)})`;
     box.querySelector(".ld__info").innerHTML = `
       <div class="ld__name">${escapeHTML(loupe.name)}</div>
       <div class="ld__row"><span>Увеличение</span><b>${escapeHTML(zoom.zoom)}</b></div>
       ${zoom.field ? `<div class="ld__row"><span>Поле обзора</span><b>${escapeHTML(zoom.field)}</b></div>` : ""}
-      <p class="ld__note">Схематично: чем выше увеличение, тем крупнее деталь и уже поле обзора.</p>`;
+      <p class="ld__note">Схематично: масштаб зуба рассчитан по полю обзора.</p>`;
   }
 
   box.addEventListener("click", (e) => {
