@@ -269,3 +269,17 @@ def test_loupe_comparison_takes_fixed_rows_from_loupe_fields():
     more = {r["name"]: r["values"] for r in view["more"]}
     assert more["Угол наклона"] == ["фикс", "0–40°"]
     assert "мусор" not in str(view)
+
+
+def test_loupe_demo_groups_all_loupes_by_brand(catalog):
+    from app.routers.catalog import loupe_demo
+
+    async def go():
+        async with async_session_factory() as session:
+            return await loupe_demo(session)
+
+    assert run_async(go()) is None  # лупы не заведены — блока нет
+    make_loupe(catalog["loupe"])
+    demo = run_async(go())
+    loupes = [l for b in demo.brands for l in b.loupes]
+    assert [l.slug for l in loupes] and [z.zoom for z in loupes[0].zooms] == ["2.5×", "3.5×"]

@@ -61,12 +61,35 @@ class ProductListItemOut(BaseModel):
     primary_image_path: str | None = None
 
 
+class LoupeZoomOut(BaseModel):
+    zoom: str
+    field: str
+
+
+class LoupeModelOut(BaseModel):
+    name: str
+    slug: str
+    zooms: list[LoupeZoomOut]
+
+
+class LoupeBrandOut(BaseModel):
+    name: str
+    slug: str
+    loupes: list[LoupeModelOut]
+
+
+class LoupeDemoOut(BaseModel):
+    """Блок «Демонстрация увеличений»: все бренды, у которых есть бинокулярные лупы."""
+    brands: list[LoupeBrandOut]
+
+
 class ProductDetailOut(ProductListItemOut):
     description: str
     characteristics: dict
     images: list[ProductImageOut]
     options: list[ProductOptionOut]
     content_blocks: list[ContentBlockOut] = []
+    loupe_demo: LoupeDemoOut | None = None
 
 
 class ProductPageOut(BaseModel):

@@ -9,7 +9,7 @@ from sqlalchemy.orm import selectinload
 from ..config import get_settings
 from ..db.engine import get_session
 from ..db.models import Brand, Category, Product
-from ..schemas.catalog import BrandOut, CategoryOut, ProductDetailOut, ProductListItemOut, ProductPageOut
+from ..schemas.catalog import LoupeDemoOut, BrandOut, CategoryOut, ProductDetailOut, ProductListItemOut, ProductPageOut
 
 router = APIRouter(prefix="/api/catalog", tags=["catalog"])
 
@@ -109,7 +109,27 @@ async def get_product(slug: str, session: AsyncSession = Depends(get_session)):
     product = (await session.execute(stmt)).scalar_one_or_none()
     if product is None:
         raise HTTPException(status_code=404, detail="Товар не найден")
-    return ProductDetailOut.model_validate(product)
+    out = ProductDetailOut.model_validate(product)
+    if product.is_loupe and product.loupe_demo:
+        out.loupe_demo = await loupe_demo(session)
+    return out
+
+
+async def loupe_demo(session: AsyncSession) -> LoupeDemoOut | None:
+    """Один блок на все лупы: бренды, у которых есть активные бинокулярные лупы, с их увеличениями."""
+    loupes = (await session.execute(
+        select(Product).where(Product.is_loupe.is_(True), Product.is_active.is_(True))
+        .options(selectinload(Product.brand), selectinload(Product.loupe_options))
+        .order_by(Product.priority.desc(), Product.name.asc())
+    )).scalars().all()
+    brands: dict[int, dict] = {}
+    for p in loupes:
+        if not p.loupe_options:
+            continue
+        brand = brands.setdefault(p.brand.id, {"name": p.brand.name, "slug": p.brand.slug, "loupes": []})
+        brand["loupes"].append({"name": p.name, "slug": p.slug,
+                                "zooms": [{"zoom": o.zoom, "field": o.field_of_view} for o in p.loupe_options]})
+    return LoupeDemoOut(brands=list(brands.values())) if brands else None
 
 
 @router.get("/categories", response_model=list[CategoryOut])

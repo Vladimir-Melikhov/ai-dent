@@ -10,7 +10,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function sync() {
     const on = box.checked;
-    ["kind", "depth", "weight", "tilt", "vertical", "optics", "mount"].forEach(n => show(row("loupe_" + n), on));
+    ["kind", "demo", "depth", "weight", "tilt", "vertical", "optics", "mount"].forEach(n => show(row("loupe_" + n), on));
     show(group("loupe_options"), on);
     show(group("loupe_distances"), on);
     show(group("loupe_frames"), on);

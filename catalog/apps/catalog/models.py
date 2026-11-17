@@ -132,6 +132,11 @@ class Product(models.Model):
     loupe_kind = models.CharField(
         max_length=12, choices=LoupeKind.choices, blank=True, default="", db_default="", verbose_name="Тип лупы"
     )
+    # Блок «Демонстрация увеличений» на странице товара: общий для всех луп, здесь только включается
+    loupe_demo = models.BooleanField(
+        default=False, db_default=False, verbose_name="Показывать демонстрацию увеличений",
+        help_text="На странице товара появится блок: бренды с лупами и их увеличения на макете зуба.",
+    )
     # Параметры лупы для сравнения в чате: при галочке обязательны (у фиксированных пишем «фикс»)
     loupe_depth = models.CharField(max_length=40, blank=True, default="", db_default="", verbose_name="Глубина фокуса",
                                    help_text="Например: 200 мм")

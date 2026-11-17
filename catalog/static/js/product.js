@@ -326,6 +326,77 @@ function renderProductCharacteristics(characteristics) {
   );
 }
 
+/* ---- Демонстрация увеличений: общий блок на все лупы, включается галочкой у товара ---- */
+function zoomNumber(zoom) {
+  const m = String(zoom).replace(",", ".").match(/\d+(?:\.\d+)?/);
+  return m ? parseFloat(m[0]) : 1;
+}
+
+function renderLoupeDemo(product) {
+  const demo = product.loupe_demo;
+  if (!demo || !demo.brands || !demo.brands.length) return "";
+  return wrapGlass(
+    `
+    <div class="gb-head">
+      <span class="gb-eyebrow">Увеличения</span>
+      <h2 class="gb-title" style="font-style: italic; font-weight: 500; font-size: 2.1rem; letter-spacing: -0.02em; line-height: 1.15;">Как это выглядит</h2>
+    </div>
+    <div class="ld">
+      <div class="ld__brands"></div>
+      <div class="ld__models"></div>
+      <div class="ld__zooms"></div>
+      <div class="ld__stage">
+        <div class="ld__lens"><img class="ld__tooth" src="/static/img/teeth.webp" alt=""></div>
+        <div class="ld__info"></div>
+      </div>
+    </div>
+  `,
+    "gb--demo"
+  );
+}
+
+function initLoupeDemo(root, product) {
+  const box = root.querySelector(".ld");
+  if (!box) return;
+  const brands = product.loupe_demo.brands;
+  const own = brands.findIndex((b) => b.loupes.some((l) => l.slug === product.slug));
+  const state = { brand: Math.max(own, 0), model: 0, zoom: 0 };
+  if (own >= 0) state.model = brands[own].loupes.findIndex((l) => l.slug === product.slug);
+  const maxZoom = Math.max(...brands.flatMap((b) => b.loupes.flatMap((l) => l.zooms.map((z) => zoomNumber(z.zoom)))));
+
+  const btn = (label, active, i) =>
+    `<button type="button" class="ld__btn${active ? " is-active" : ""}" data-i="${i}">${escapeHTML(label)}</button>`;
+
+  function draw() {
+    const brand = brands[state.brand];
+    const loupe = brand.loupes[state.model];
+    const zoom = loupe.zooms[state.zoom];
+    box.querySelector(".ld__brands").innerHTML = brands.map((b, i) => btn(b.name, i === state.brand, i)).join("");
+    box.querySelector(".ld__models").innerHTML =
+      brand.loupes.length > 1 ? brand.loupes.map((l, i) => btn(l.name, i === state.model, i)).join("") : "";
+    box.querySelector(".ld__zooms").innerHTML = loupe.zooms.map((z, i) => btn(z.zoom, i === state.zoom, i)).join("");
+    const n = zoomNumber(zoom.zoom);
+    box.querySelector(".ld__tooth").style.transform = `scale(${(0.55 + (n / maxZoom) * 1.9).toFixed(2)})`;
+    box.querySelector(".ld__info").innerHTML = `
+      <div class="ld__name">${escapeHTML(loupe.name)}</div>
+      <div class="ld__row"><span>Увеличение</span><b>${escapeHTML(zoom.zoom)}</b></div>
+      ${zoom.field ? `<div class="ld__row"><span>Поле обзора</span><b>${escapeHTML(zoom.field)}</b></div>` : ""}
+      <p class="ld__note">Схематично: чем выше увеличение, тем крупнее деталь и уже поле обзора.</p>`;
+  }
+
+  box.addEventListener("click", (e) => {
+    const b = e.target.closest(".ld__btn");
+    if (!b) return;
+    const i = Number(b.dataset.i);
+    const group = b.parentElement.classList;
+    if (group.contains("ld__brands")) { state.brand = i; state.model = 0; state.zoom = 0; }
+    else if (group.contains("ld__models")) { state.model = i; state.zoom = 0; }
+    else state.zoom = i;
+    draw();
+  });
+  draw();
+}
+
 function renderProduct(product) {
   const root = document.getElementById("product-root");
   if (!root) return;
@@ -344,6 +415,9 @@ function renderProduct(product) {
 
   const fromBlocks = renderContentBlocks(product.content_blocks);
   if (fromBlocks) parts.push(fromBlocks);
+
+  const fromDemo = renderLoupeDemo(product);
+  if (fromDemo) parts.push(fromDemo);
 
   const blocksHtml = parts.length
     ? `<div class="gb-wrap">${parts.join("")}</div>`
@@ -427,6 +501,8 @@ function renderProduct(product) {
 
     ${blocksHtml}
   `;
+
+  initLoupeDemo(root, product);
 
   const mainImg = document.getElementById("product-main-image");
   const thumbs = root.querySelectorAll(".product-thumb");
