@@ -354,22 +354,26 @@ def loupe() -> Product:
 
 
 def submit_order(visitor: Visitor, **fields):
-    body = {**LEGAL, "comment": f"{MARK} заказ из приёмки", "cart_version": visitor.cart()["version"], **fields}
+    cart = visitor.cart()
+    # Лупа с вариантами увеличения: в форме чата клиент выбирает параметры или отмечает «уточнит менеджер» —
+    # приёмка отмечает второе, как клиент, который не знает своих параметров
+    ids = [item.get("product_id") for item in cart.get("items", [])]
+    loupe = {str(p.pk): {"later": True} for p in Product.objects.filter(pk__in=ids) if p.loupe_data()}
+    body = {**LEGAL, "comment": f"{MARK} заказ из приёмки", "cart_version": cart["version"], "loupe": loupe, **fields}
     return visitor.post("/chat/order/", body)
 
 
 # --- диалоги
 
 
-@dialog(1, "«Какой микроскоп лучше?» → уточнения → 2–3 карточки и сравнение",
-        "Автоматически: вызваны show_products и show_comparison. Содержание — вручную")
+@dialog(1, "«Какой микроскоп лучше?» → уточнения → 2–3 модели таблицей сравнения",
+        "Автоматически: вызван show_comparison (карточки к таблице не нужны). Содержание — вручную")
 def d1(run: Run, r: Result):
     v = run.visitor()
     v.say("Какой микроскоп лучше выбрать?")
     v.say("Работаю в эндодонтии, нужна камера для записи, бюджет до двух миллионов. "
           "Покажите 2–3 подходящих варианта и сравните их.")
     run.attach(r, v)
-    r.check("show_products вызван", v.called("show_products"))
     r.check("show_comparison вызван", v.called("show_comparison"))
     r.manual.append("Агент задал уточняющие вопросы; варианты и текст сравнения соответствуют базе знаний")
 

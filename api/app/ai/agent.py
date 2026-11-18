@@ -42,7 +42,9 @@ def neutralize_markers(text: str) -> str:
     for marker in (FORM_SUBMITTED, EVENT_PREFIX):
         text = text.replace(marker, marker.strip("[]"))
     return text
-ROUNDS_EXHAUSTED = "Не получилось довести ответ до конца — переформулируйте, пожалуйста, вопрос."
+# Последняя строка — кнопка под ответом (chat-text.js: splitReplies)
+ROUNDS_EXHAUSTED = ("Не получилось довести ответ до конца — переформулируйте, пожалуйста, вопрос "
+                    "или передайте его менеджеру.\n[[Связаться с менеджером]]")
 
 
 class TurnAborted(Exception):

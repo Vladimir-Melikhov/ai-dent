@@ -34,6 +34,7 @@ def last_shown(body: dict) -> list[int]:
     """id товаров из последнего показа карточек — чтобы «сравни» и «в корзину» работали без уточнений."""
     calls = {}
     shown: list[int] = []
+    query = ""  # последний поиск: «положите его» — про товар, который клиент назвал
     for message in body["messages"]:
         content = message.get("content")
         if not isinstance(content, list):
@@ -41,15 +42,20 @@ def last_shown(body: dict) -> list[int]:
         for block in content:
             if block.get("type") == "tool_use":
                 calls[block["id"]] = block["name"]
-            if block.get("type") == "tool_result" and calls.get(block["tool_use_id"]) in ("show_products", "search_products"):
+                if block["name"] == "search_products":
+                    query = str((block.get("input") or {}).get("query") or "").lower()
+            if block.get("type") == "tool_result" and calls.get(block["tool_use_id"]) in (
+                    "show_products", "search_products", "show_comparison"):
                 try:
                     data = json.loads(block["content"])
                 except (TypeError, ValueError):
                     continue
                 items = data.get("shown") or data.get("products") or []
                 if items:
-                    # Лупы с настройкой — первыми: «оформи» относится к тому, что показали выбором
-                    shown = [p["id"] for p in sorted(items, key=lambda p: not p.get("loupe_options"))]
+                    # Первым — товар, больше всего совпавший с запросом клиента; при равенстве — лупа с настройкой
+                    words = set(re.findall(r"\w+", query))
+                    match = lambda p: len(words & set(re.findall(r"\w+", p["name"].lower())))
+                    shown = [p["id"] for p in sorted(items, key=lambda p: (-match(p), not p.get("loupe_options")))]
     return shown
 
 
@@ -64,21 +70,23 @@ def answer_after_tool(name: str, result) -> Reply:
         if len(products) == 1 and with_loupe:
             return Reply(blocks=[thinking(), tool_use("show_loupe", {"product_id": with_loupe[0]["id"]})],
                          stop_reason="tool_use")
+        loupes = [p for p in products if "луп" in p["name"].lower()]
+        if len(loupes) >= 2:
+            # Обзор луп: 2–3 модели — сразу таблица сравнения, карточки к ней не нужны
+            return Reply(blocks=[thinking(), tool_use("show_comparison", {"product_ids": [p["id"] for p in loupes[:3]]})],
+                         stop_reason="tool_use")
         return Reply(blocks=[thinking(), tool_use("show_products", {"product_ids": [p["id"] for p in products[:3]]})],
                      stop_reason="tool_use")
     if name == "show_products":
-        shown_items = result.get("shown", [])
-        if len(shown_items) >= 2 and all("луп" in p["name"].lower() for p in shown_items):
-            # Обзор луп: карточки → сравнение → текст (так же велит подсказка)
-            return Reply(blocks=[thinking(), tool_use("show_comparison", {"product_ids": [p["id"] for p in shown_items[:3]]})],
-                         stop_reason="tool_use")
         lines = [f"- **{p['name']}** — {rub(p['price_rub'])}, {p['availability']}" for p in result.get("shown", [])]
         return Reply(blocks=[thinking(), text(
-            "Подобрал варианты:\n" + "\n".join(lines) + "\n\nМогу сравнить их или положить нужный в корзину.")])
+            "Подобрал варианты:\n" + "\n".join(lines) + "\n\nМогу сравнить их или положить нужный в корзину."
+            "\n[[Сравнить | Положить в корзину]]")])
     if name == "show_loupe":
         return Reply(blocks=[thinking(), text(
             "Переключайте увеличение — рабочее расстояние и поле обзора меняются. "
-            "Для кого подбираете: терапевт, хирург, ортопед? Подскажу, какое увеличение взять.")])
+            "Для кого подбираете: терапевт, хирург, ортопед? Подскажу, какое увеличение взять."
+            "\n[[Для терапевта | Для хирурга | Оформить заказ]]")])
     if name == "show_comparison":
         products = result.get("products", [])
         rows = result.get("rows", [])
@@ -88,8 +96,9 @@ def answer_after_tool(name: str, result) -> Reply:
         parts = [f"Самая доступная — **{cheapest['name']}**, {rub(cheapest['price_rub'])}."]
         if richest["id"] != cheapest["id"] and max(known) > min(known):
             parts.append(f"Подробнее всего описана **{richest['name']}**: по ней в каталоге больше всего заявленных параметров.")
-        parts.append("Подскажите, кто будет работать (терапевт, хирург, ортопед) и сколько часов в день, — назову одну модель.")
-        return Reply(blocks=[thinking(), text(" ".join(parts))])
+        parts.append("Кто будет работать — терапевт, хирург или ортопед?")
+        buttons = f"\n[[Положить {cheapest['name'].split()[-2]} в корзину | Получить КП | Я терапевт]]"
+        return Reply(blocks=[thinking(), text(" ".join(parts) + buttons)])
     if name == "catalog_overview":
         names = ", ".join(c["name"] for c in result.get("categories", []) if c["products"])
         return Reply(blocks=[thinking(), text(f"В каталоге есть: {names}. Что подбираем?")])
@@ -101,11 +110,12 @@ def answer_after_tool(name: str, result) -> Reply:
         if any(i.get("availability") == "под заказ" for i in items):
             warn = "\n\nЧасть товаров под заказ — срок поставки уточнит менеджер, ориентировочно по базе знаний."
         return Reply(blocks=[thinking(), text(
-            f"{intro}\n" + ("\n".join(lines) or "- пусто") + f"\n\nИтого: {rub(result.get('total_rub'))}.{warn}")])
+            f"{intro}\n" + ("\n".join(lines) or "- пусто") + f"\n\nИтого: {rub(result.get('total_rub'))}.{warn}"
+            + ("\n[[Получить КП | Оформить заказ]]" if items else ""))])
     if name == "create_quote":
         return Reply(blocks=[thinking(), text(
             f"КП № {result.get('number')} готово: итог {rub(result.get('total_rub'))}, действует до {result.get('valid_until')}. "
-            "Скачать можно кнопкой в карточке выше.")])
+            "Скачать можно кнопкой в карточке выше.\n[[Оформить заказ | Связаться с менеджером]]")])
     if name == "open_order_form":
         return Reply(blocks=[thinking(), text("Открыл форму оформления — заполните данные покупателя, состав заказа уже в ней.")])
     if name == "open_lead_form":
@@ -171,7 +181,7 @@ def decide(body: dict) -> Reply:
         return Reply(blocks=[thinking(), text("Секунду, посмотрю."), tool_use(name, payload)], stop_reason="tool_use")
 
     if "сравн" in low and "show_comparison" in available and len(shown) >= 2:
-        return call("show_comparison", {"product_ids": shown[:3], "pick": {"product_id": shown[min(2, len(shown) - 1)], "label": "Для терапевта"}})
+        return call("show_comparison", {"product_ids": shown[:3]})
     if any(w in low for w in ("скидк", "лизинг", "ремонт", "менеджер")) and "open_lead_form" in available:
         return call("open_lead_form", {"topic": said[:200]})
     if ("кп" in low.split() or "коммерческ" in low) and "create_quote" in available:

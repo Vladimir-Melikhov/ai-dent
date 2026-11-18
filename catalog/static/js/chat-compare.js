@@ -1,8 +1,9 @@
 // Сравнение товаров в чате — таблица: слева подписи параметров, в колонках товары (название, бренд · страна, фото).
 // Товар с меткой из админки («Хит») — серой колонкой с плашкой сверху; пометку ИИ («Для терапевта») не выводим —
 // свою рекомендацию он объясняет текстом. Первая строка — цена; остальные отличия и общее у всех — под кнопкой
-// «Все характеристики». Разметка собирается строками (их проверяют тесты в catalog/tests_js), DOM — в renderComparison.
-import { escapeHTML, formatPrice, imageUrl, trimImageMargins } from "./api.js";
+// «Все характеристики». Последняя строка — кнопки «В корзину»: отдельные карточки к таблице не нужны.
+// Разметка собирается строками (их проверяют тесты в catalog/tests_js), DOM — в renderComparison.
+import { bindCartButtons, escapeHTML, formatPrice, imageUrl, trimImageMargins } from "./api.js";
 
 // Характеристики в каталоге бывают строками, списками и словарями
 export function formatValue(value) {
@@ -70,13 +71,19 @@ export function rowsHTML(table, expanded = false) {
   });
   const rows = [priceRow, ...table.rows.map(asRow), ...(expanded ? extraRows(table).map(asRow) : [])];
   const back = `<div class="chat-compare__box js-row" style="grid-row:2 / span ${rows.length}"></div>`
-    + (hit >= 0 ? `<div class="chat-compare__hl js-row" style="grid-column:${hit + 2};grid-row:1 / span ${rows.length + 1}"></div>` : "");
+    + (hit >= 0 ? `<div class="chat-compare__hl js-row" style="grid-column:${hit + 2};grid-row:1 / span ${rows.length + 2}"></div>` : "");
+  // Под таблицей — «В корзину» у каждого товара с ценой (кнопку обслуживает api.js, как в карточках)
+  const buyRow = rows.length + 2;
+  const buy = products.map((p, i) => `<div class="chat-compare__buy js-row" style="grid-column:${i + 2};grid-row:${buyRow}">${
+    p.price_rub != null && p.id != null
+      ? `<button type="button" class="product-card__cart chat-compare__cart" data-product-id="${Number(p.id)}">В корзину</button>`
+      : ""}</div>`).join("");
   const cells = rows.map((r, ri) => {
     const at = `grid-row:${ri + 2}`;
     const top = ri === 0 ? " is-top" : "";
     return `<div class="chat-compare__label js-row${top}" style="${at}">${escapeHTML(r.name)}</div>`
       + r.cells.map((c, ci) => `<div class="chat-compare__val js-row${top}" style="grid-column:${ci + 2};${at}">${c}</div>`).join("");
-  }).join("");
+  }).join("") + buy;
   return { back, cells };
 }
 
@@ -113,6 +120,7 @@ export function renderComparison(table) {
     grid.insertAdjacentHTML("afterbegin", back);
     grid.insertAdjacentHTML("beforeend", cells);
     button.textContent = moreLabel(table, expanded);
+    bindCartButtons(); // кнопки «В корзину» перерисованы вместе со строками
   });
   trimImageMargins(el.querySelectorAll(".chat-compare__photo img"));
   return el;

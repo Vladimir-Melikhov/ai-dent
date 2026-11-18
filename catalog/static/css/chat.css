@@ -564,7 +564,9 @@
     color: #a3adb6;
   }
   
-  .chat-cards .product-card__cart {
+  .chat-cards .product-card__cart,
+  .chat-compare .product-card__cart,
+  .chat-loupe .product-card__cart {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -578,18 +580,26 @@
     cursor: pointer;
   }
   
-  .chat-cards .product-card__cart:hover {
+  .chat-cards .product-card__cart:hover,
+  .chat-compare .product-card__cart:hover,
+  .chat-loupe .product-card__cart:hover {
     background: #1c252e;
   }
   
-  .chat-cards .product-card__cart.is-in-cart {
+  .chat-cards .product-card__cart.is-in-cart,
+  .chat-compare .product-card__cart.is-in-cart,
+  .chat-loupe .product-card__cart.is-in-cart {
     background: #eef1f4;
     color: #17222c;
     padding: 0;
   }
   
   .chat-cards .product-card__cart-minus,
-  .chat-cards .product-card__cart-plus {
+  .chat-cards .product-card__cart-plus,
+  .chat-compare .product-card__cart-minus,
+  .chat-compare .product-card__cart-plus,
+  .chat-loupe .product-card__cart-minus,
+  .chat-loupe .product-card__cart-plus {
     flex: 0 0 36px;
     height: 100%;
     display: flex;
@@ -599,7 +609,9 @@
     cursor: pointer;
   }
   
-  .chat-cards .product-card__cart-quantity {
+  .chat-cards .product-card__cart-quantity,
+  .chat-compare .product-card__cart-quantity,
+  .chat-loupe .product-card__cart-quantity {
     flex: 1;
     text-align: center;
     font-size: 13px;
@@ -733,6 +745,11 @@
   .chat-compare__val small { font-size: 11px; font-weight: 500; color: var(--muted); }
   .chat-compare__val .is-none { font-weight: 400; color: var(--muted); }
 
+  /* «В корзину» под таблицей — у каждого товара */
+  .chat-compare__buy { position: relative; z-index: 2; min-width: 0; padding: 10px 4px 2px; }
+  .chat-compare .product-card__cart,
+  .chat-loupe .product-card__cart { height: 34px; border-radius: 10px; overflow: hidden; }
+
   .chat-compare__more {
     margin-top: 8px;
     padding: 4px 0;
@@ -760,6 +777,36 @@
   }
 
   .chat--inline .chat-compare { max-width: 820px; }
+
+  /* Кнопки следующего шага под ответом консультанта: нажатие отправляет текст кнопки как реплику клиента */
+  .chat-replies {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-self: flex-start;
+    max-width: 100%;
+  }
+
+  .chat-reply {
+    padding: 8px 14px;
+    border: 1px solid var(--text);
+    border-radius: var(--radius-pill);
+    background: #fff;
+    color: var(--text);
+    font: 600 13px/1.25 var(--font);
+    text-align: left;
+    cursor: pointer;
+    transition: background .15s ease, color .15s ease;
+  }
+
+  .chat-reply:hover,
+  .chat-reply:focus-visible {
+    background: var(--text);
+    color: #fff;
+  }
+
+  .chat-loupe .product-card__cart { margin-top: 14px; }
+  .chat-loupe__hint { margin-top: 6px; font-size: 12px; color: var(--muted); }
 
   .chat-loupe {
     padding: 12px 14px;

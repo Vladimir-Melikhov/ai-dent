@@ -146,7 +146,6 @@ KEY_WORDS = ("увеличен", "поле обзор", "глубин", "вес"
 COMPARE_SAME = 4  # общих характеристик в блоке «Одинаково у всех»
 MAX_FACT_LEN = 40  # длиннее — это маркетинговая фраза, а не характеристика
 MAX_LABEL_LEN = 24
-MAX_PICK_LEN = 28  # пометка на карточке: «Для терапевта»
 CATEGORY_PREFIX = re.compile(r"^бинокуляр\w*\s+луп\w*\s+", re.IGNORECASE)
 HIDDEN_WORDS = ("рабоч",)  # рабочее расстояние зависит от посадки: в сравнение не выносим
 
@@ -287,7 +286,7 @@ def loupe_specs(product: Product) -> dict[str, str]:
     return specs
 
 
-def comparison_view(products: list[Product], pick: dict | None = None) -> dict:
+def comparison_view(products: list[Product]) -> dict:
     """Сравнение для чата: карточки рядом — цена, пометка «кому подходит», 3 главных параметра.
     Остальные отличия — под кнопкой, общее — блоком «Одинаково у всех» (название и значение отдельно)."""
     all_loupes = all(getattr(p, "is_loupe", False) for p in products)
@@ -356,7 +355,6 @@ def comparison_view(products: list[Product], pick: dict | None = None) -> dict:
     for item in view["products"]:
         item["full_name"] = item["name"]
         item["name"] = short(CATEGORY_PREFIX.sub("", item["name"]) or item["name"], 40)
-        item["pick"] = pick["label"] if pick and pick.get("product_id") == item["id"] else ""
         item["cheapest"] = cheapest is not None and item["price_rub"] == cheapest
         item["badge"] = badges.get(item["id"], "")
         item["image"] = images.get(item["id"])
@@ -397,7 +395,7 @@ async def hydrate_widget(session: AsyncSession, widget: dict) -> dict | None:
         return {"widget": kind, "products": cards} if cards else None
     if kind == "comparison":
         products = await active_products(session, ids)
-        table = comparison_view(products, widget.get("pick"))
+        table = comparison_view(products)  # пометку ИИ (pick) в старых диалогах не показываем
         return {"widget": kind, "table": table} if len(products) >= 2 else None
     if kind == "loupe":
         products = await active_products(session, ids)
@@ -575,14 +573,8 @@ class ShowArgs(Args):
     product_ids: list[int] = Field(min_length=1, max_length=4)
 
 
-class ComparePick(Args):
-    product_id: int
-    label: str = Field(max_length=MAX_PICK_LEN)
-
-
 class CompareArgs(Args):
     product_ids: list[int] = Field(min_length=2, max_length=3)
-    pick: ComparePick | None = None
 
 
 async def run_show(ctx: ToolContext, args: ShowArgs) -> ToolOutput:
@@ -624,9 +616,7 @@ async def run_compare(ctx: ToolContext, args: CompareArgs) -> ToolOutput:
         raise ToolError(f"сравнивать можно только товары одной категории каталога, а здесь разные: {names}. "
                         "Таблицу не показывай — объясни текстом, чем эти товары отличаются по назначению")
     shown = [p.id for p in products]
-    pick = {"product_id": args.pick.product_id, "label": args.pick.label.strip()} if (
-        args.pick and args.pick.product_id in shown and args.pick.label.strip()) else None
-    return ToolOutput(comparison_table(products), widget={"widget": "comparison", "product_ids": shown, "pick": pick})
+    return ToolOutput(comparison_table(products), widget={"widget": "comparison", "product_ids": shown})
 
 
 class LoupeArgs(Args):
@@ -764,7 +754,7 @@ TOOLS: list[Tool] = [
         name="show_products",
         description=(
             "Показать клиенту в чате карточки товаров (от 1 до 4) с кнопками «Подробнее» и «В корзину». "
-            "Возвращает актуальные цены."
+            "Для выбора из 2–3 моделей — show_comparison. Возвращает актуальные цены."
         ),
         args=ShowArgs, schema=obj({"product_ids": INT_LIST}, ["product_ids"]),
         run=run_show, status="preparing",
@@ -772,21 +762,18 @@ TOOLS: list[Tool] = [
     Tool(
         name="show_comparison",
         description=(
-            "Показать клиенту сравнение 2–3 товаров одной категории каталога: цена, бренд и страна, главные "
-            "параметры рядом. Товары разных категорий не сравнивай — объясни разницу текстом. В pick — "
-            "пометка на одной карточке под задачу клиента (label до 28 символов, например «Для терапевта»): только "
-            "когда задача известна и есть основание в базе знаний или каталоге. "
-            "Текст сравнения пишешь сам."
+            "Показать клиенту таблицу сравнения 2–3 товаров одной категории каталога: фото, цена, бренд и страна, "
+            "главные параметры и кнопки «В корзину» — вместо карточек. Товары разных категорий не сравнивай — "
+            "объясни разницу текстом. Текст сравнения пишешь сам."
         ),
-        args=CompareArgs, schema=obj({"product_ids": INT_LIST, "pick": obj(
-            {"product_id": {"type": "integer"}, "label": {"type": "string"}}, ["product_id", "label"])}, ["product_ids"]),
+        args=CompareArgs, schema=obj({"product_ids": INT_LIST}, ["product_ids"]),
         run=run_compare, status="preparing",
     ),
     Tool(
         name="show_loupe",
         description=(
-            "Показать клиенту бинокулярную лупу: выбор увеличения (от него зависит поле обзора) и выбор рабочего "
-            "расстояния (от увеличения не зависит). "
+            "Показать клиенту бинокулярную лупу: выбор увеличения (от него зависит поле обзора), выбор рабочего "
+            "расстояния (от увеличения не зависит) и кнопку «В корзину»; выбранное подставится в форму заказа. "
             "Только для луп с данными о вариантах увеличения; для одной лупы, вместо карточки. Текст пишешь сам."
         ),
         args=LoupeArgs, schema=obj({"product_id": {"type": "integer"}}, ["product_id"]),

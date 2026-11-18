@@ -5,7 +5,7 @@ import { test } from "node:test";
 // Модули витрины рассчитаны на браузер: подставляем то, что они читают при загрузке
 globalThis.window = {};
 globalThis.location = { origin: "https://ai-dent.ru" };
-const { renderText, safeHref } = await import("../static/js/chat-text.js");
+const { renderText, safeHref, splitReplies } = await import("../static/js/chat-text.js");
 
 test("теги из ответа модели не становятся разметкой", () => {
   for (const attack of [
@@ -57,4 +57,22 @@ test("нумерация продолжается после пустой стр
     renderText("### Шаги\n1. первое\n\n2. второе"),
     '<p><strong>Шаги</strong></p><ol><li>первое</li></ol><ol start="2"><li>второе</li></ol>',
   );
+});
+
+test("кнопки следующего шага: последняя строка [[…|…]] — кнопки, а не текст", () => {
+  const { text, replies } = splitReplies("Берите SLF.\n[[Положить SLF в корзину | Получить КП | Оформить заказ]]");
+  assert.equal(text, "Берите SLF.");
+  assert.deepEqual(replies, ["Положить SLF в корзину", "Получить КП", "Оформить заказ"]);
+});
+
+test("кнопки: недописанная строка при печати скрыта, повторы и пустые убраны, не больше трёх", () => {
+  assert.deepEqual(splitReplies("Берите SLF.\n[[Положить SL"), { text: "Берите SLF.", replies: [] });
+  assert.deepEqual(splitReplies("Ок.\n[[А | А |  | Б | В | Г]]").replies, ["А", "Б", "В"]);
+  assert.deepEqual(splitReplies("Ок.\n[[" + "очень длинная кнопка ".repeat(3) + "]]").replies, []);
+});
+
+test("кнопки: скобки посреди текста и ответ без кнопок не трогаются", () => {
+  const plain = "Модель [[SLF]] в наличии.\nЕщё строка";
+  assert.deepEqual(splitReplies(plain), { text: plain, replies: [] });
+  assert.deepEqual(splitReplies("Просто ответ"), { text: "Просто ответ", replies: [] });
 });

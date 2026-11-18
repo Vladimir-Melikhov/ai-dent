@@ -5,7 +5,7 @@
 
 import { bindCartButtons, escapeHTML, formatPrice, productCard } from "./api.js";
 import { renderComparison } from "./chat-compare.js";
-import { renderText, safeHref } from "./chat-text.js";
+import { renderText, safeHref, splitReplies } from "./chat-text.js";
 import { initShortlist } from "./shortlist.js";
 
 const OPEN_KEY = "ai-dent-chat-open";
@@ -223,6 +223,7 @@ if (root) {
     // Параметры бинокулярных луп: id товара → {zoom, distance, ipd, later}; шаг пройден → открывается форма
     const loupes = {};
     let stepDone = false;
+    let fromBlock = false; // параметры подставлены из блока лупы
     const step = form.querySelector(".chat-order__step");
     const rest = form.querySelector(".chat-order__rest");
 
@@ -266,10 +267,20 @@ if (root) {
       step.hidden = stepDone || !withLoupe.length;
       rest.hidden = !stepDone && withLoupe.length > 0;
       if (step.hidden) return;
+      // Что клиент уже выбрал в блоке лупы — подставляем, только если такие варианты есть у товара
+      withLoupe.forEach(i => {
+        const saved = loupeChoice[i.product_id];
+        if (!saved || loupes[i.product_id]) return;
+        const c = (loupes[i.product_id] = {});
+        if (i.loupe.options.some(o => o.zoom === saved.zoom)) c.zoom = saved.zoom;
+        if (i.loupe.distances.includes(saved.distance)) c.distance = saved.distance;
+        fromBlock = fromBlock || !!c.zoom;
+      });
       const seg = (list, group, label) => `<div class="chat-loupe__label">${label}</div>
         <div class="chat-loupe__seg" data-group="${group}" style="--n:${list.length}">${
           list.map((t, n) => `<button type="button" data-v="${escapeHTML(t)}">${escapeHTML(t)}</button>`).join("")}</div>`;
-      step.innerHTML = `<p class="chat-order__step-title">Для начала выберите параметры</p>` + withLoupe.map(i => `
+      const title = fromBlock ? "Проверьте параметры — выбор из блока лупы уже подставлен" : "Для начала выберите параметры";
+      step.innerHTML = `<p class="chat-order__step-title">${title}</p>` + withLoupe.map(i => `
         <div class="chat-order__loupe" data-pid="${i.product_id}">
           <div class="chat-loupe__name">${escapeHTML(i.name)}</div>
           ${seg(i.loupe.options.map(o => o.zoom), "zoom", "Увеличение")}
@@ -499,6 +510,18 @@ if (root) {
 
   const LOUPE_KINDS = { universal: "Универсальные", individual: "Индивидуальные" };
 
+  // Выбор в блоке лупы подставляется в форму заказа, чтобы не выбирать дважды: id товара → {zoom, distance}.
+  // Хранится до закрытия вкладки — переживает перезагрузку страницы
+  const LOUPE_CHOICE_KEY = "ai-dent-loupe-choice";
+  const loupeChoice = (() => {
+    try { return JSON.parse(sessionStorage.getItem(LOUPE_CHOICE_KEY)) || {}; } catch { return {}; }
+  })();
+
+  function rememberLoupe(productId, values) {
+    loupeChoice[productId] = { ...loupeChoice[productId], ...values };
+    try { sessionStorage.setItem(LOUPE_CHOICE_KEY, JSON.stringify(loupeChoice)); } catch { /* приватный режим */ }
+  }
+
   function numberOf(text) {
     const n = parseFloat(String(text || "").replace(",", "."));
     return Number.isFinite(n) ? n : null;
@@ -536,7 +559,9 @@ if (root) {
         <div class="chat-loupe__label">Поле обзора</div>
         <div class="chat-loupe__track" aria-hidden="true"><u class="chat-loupe__bar"></u></div>
         <div class="chat-loupe__ends"><span>уже</span><span>шире</span></div>
-      </div>` : ""}`;
+      </div>` : ""}
+      ${p.price_rub != null ? `<button type="button" class="product-card__cart chat-loupe__cart" data-product-id="${p.id}">В корзину</button>
+        <div class="chat-loupe__hint">Выбранное увеличение и расстояние подставятся в форму заказа</div>` : ""}`;
     const bar = el.querySelector(".chat-loupe__bar");
     function pick(group, i) {
       el.querySelectorAll(`[data-group="${group}"] button`).forEach((b, n) => b.classList.toggle("is-on", n === i));
@@ -548,10 +573,28 @@ if (root) {
       const width = options.length === 1 ? 60 : Math.max(22, (sizes[i] / widest) * 100);
       bar.style.width = `${width}%`;
     }
-    el.querySelectorAll('[data-group="zoom"] button').forEach(b => b.addEventListener("click", () => selectZoom(Number(b.dataset.i))));
-    el.querySelectorAll('[data-group="distance"] button').forEach(b => b.addEventListener("click", () => pick("distance", Number(b.dataset.i))));
-    pick("distance", 0);
-    selectZoom(options.length - 1);
+    let zoomAt = options.length - 1;
+    let distanceAt = 0;
+    const save = () => rememberLoupe(p.id, { zoom: options[zoomAt].zoom, ...(distances.length ? { distance: distances[distanceAt] } : {}) });
+    el.querySelectorAll('[data-group="zoom"] button').forEach(b => b.addEventListener("click", () => {
+      zoomAt = Number(b.dataset.i);
+      selectZoom(zoomAt);
+      save();
+    }));
+    el.querySelectorAll('[data-group="distance"] button').forEach(b => b.addEventListener("click", () => {
+      distanceAt = Number(b.dataset.i);
+      pick("distance", distanceAt);
+      save();
+    }));
+    // «В корзину» — значит, берёт то, что выбрано сейчас. Перехват на всплытии не сработает: кнопку корзины
+    // обслуживает api.js и останавливает событие, поэтому ловим раньше — на погружении
+    el.addEventListener("click", e => { if (e.target.closest(".chat-loupe__cart")) save(); }, true);
+    // Выбор уже был (в этом блоке или раньше) — показываем его
+    const saved = loupeChoice[p.id] || {};
+    if (options.some(o => o.zoom === saved.zoom)) zoomAt = options.findIndex(o => o.zoom === saved.zoom);
+    if (distances.includes(saved.distance)) distanceAt = distances.indexOf(saved.distance);
+    pick("distance", distanceAt);
+    selectZoom(zoomAt);
     return el;
   }
 
@@ -598,10 +641,11 @@ if (root) {
       el.className = "chat-msg chat-msg--user";
       el.textContent = message.text;
     } else if (message.role === "assistant") {
-      if (!message.text) return;
+      const text = splitReplies(message.text).text;
+      if (!text) return;
       el = document.createElement("div");
       el.className = "chat-msg chat-msg--assistant";
-      el.innerHTML = renderText(message.text);
+      el.innerHTML = renderText(text);
     } else if (message.role === "event") {
       // Заявку и заказ из формы клиент уже видит подтверждёнными — второе подтверждение от события лишнее
       const number = message.event_payload && message.event_payload.number;
@@ -645,10 +689,39 @@ if (root) {
       const widget = m.role === "ui" && m.ui && m.ui.widget;
       append(widget ? { ...m, leadSent: widget === "lead_form" && sent.get(i), orderSent: widget === "order_form" && sent.get(i) } : m);
     });
+    const last = messages[messages.length - 1];
+    if (last && last.role === "assistant") showReplies(splitReplies(last.text).replies);
+  }
+
+  // Кнопки следующего шага — только под последним ответом консультанта; нажатие — как реплика клиента
+  function clearReplies() {
+    feed.querySelectorAll(".chat-replies").forEach(node => node.remove());
+  }
+
+  function showReplies(replies) {
+    clearReplies();
+    if (!replies || !replies.length) return;
+    const row = document.createElement("div");
+    row.className = "chat-replies";
+    replies.forEach(text => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "chat-reply";
+      button.textContent = text;
+      button.addEventListener("click", () => {
+        clearReplies();
+        input.value = text;
+        send();
+      });
+      row.appendChild(button);
+    });
+    feed.appendChild(row);
+    scrollDown();
   }
 
   function sendNow(text) {
     showNotice("");
+    clearReplies();
     lastQuestion = text;
     const id = uuid();
     pending.set(id, text);
@@ -679,6 +752,7 @@ if (root) {
         append({ role: "ui", ui: msg.ui });
         break;
       case "assistant_start": {
+        clearReplies();
         const el = document.createElement("div");
         el.className = "chat-msg chat-msg--assistant chat-msg--streaming";
         feed.appendChild(el);
@@ -691,22 +765,26 @@ if (root) {
       case "assistant_delta":
         if (streaming) {
           streaming.text += msg.text;
-          streaming.el.innerHTML = renderText(streaming.text);
+          streaming.el.innerHTML = renderText(splitReplies(streaming.text).text);
           scrollDown();
         }
         break;
-      case "assistant_end":
+      case "assistant_end": {
+        const { text, replies } = splitReplies(msg.message.text);
         if (streaming) {
           streaming.el.classList.remove("chat-msg--streaming");
-          streaming.el.innerHTML = renderText(msg.message.text);
+          streaming.el.innerHTML = renderText(text);
           streaming.el.dataset.id = msg.message.id;
+          if (!text) streaming.el.remove();
         } else {
           append(msg.message);
         }
         streaming = null;
         setStreaming(false);
         setStatus("");
+        showReplies(replies);
         break;
+      }
       case "assistant_discard":
         // Ответ отменён (остановка, отказ, обрыв) — его текст убирается
         if (streaming) streaming.el.remove();

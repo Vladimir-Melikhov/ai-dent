@@ -72,3 +72,25 @@ export function renderText(text) {
     .map(renderBlock)
     .join("");
 }
+
+
+/* ============================================================
+   Кнопки следующего шага. Модель заканчивает ответ строкой
+   «[[Положить SLF в корзину | Получить КП | Оформить заказ]]» — она не показывается текстом,
+   а становится кнопками под ответом. Пока ответ печатается, недописанная строка тоже скрыта.
+   ============================================================ */
+
+const REPLIES_LINE = /\n?[ \t]*\[\[([^\]\n]*)(?:\]\]|\]?$)[ \t]*$/;
+const MAX_REPLIES = 3;
+const MAX_REPLY_LENGTH = 40;
+
+export function splitReplies(text) {
+  const source = String(text ?? "");
+  const match = source.match(REPLIES_LINE);
+  if (!match) return { text: source, replies: [] };
+  const closed = match[0].trimEnd().endsWith("]]");
+  const replies = closed
+    ? [...new Set(match[1].split("|").map(r => r.trim()).filter(r => r && r.length <= MAX_REPLY_LENGTH))].slice(0, MAX_REPLIES)
+    : [];
+  return { text: source.slice(0, match.index).trimEnd(), replies };
+}

@@ -46,7 +46,7 @@ test("три лупы: заголовок, колонки товаров, пер
 test("«Хит» — плашка и серая колонка у своего товара; без метки — серой колонки нет", () => {
   const html = comparisonHTML(loupes());
   assert.match(html, /chat-compare__badge">Хит</);
-  assert.match(html, /chat-compare__hl js-row" style="grid-column:3;grid-row:1 \/ span 6"/);
+  assert.match(html, /chat-compare__hl js-row" style="grid-column:3;grid-row:1 \/ span 7"/); // до строки «В корзину»
   const plain = comparisonHTML(loupes({ products: loupes().products.map(p => ({ ...p, badge: "" })) }));
   assert.doesNotMatch(plain, /chat-compare__hl|chat-compare__badge/);
 });
@@ -101,4 +101,13 @@ test("теги в названиях и значениях не становят
   }));
   assert.doesNotMatch(html, /<script|<img src=x|<u>|<i>Хит/);
   assert.match(html, /&lt;script&gt;/);
+});
+
+test("под таблицей — «В корзину» у каждого товара с ценой; без цены кнопки нет", () => {
+  const table = loupes();
+  table.products[2] = product({ id: 3, price_rub: null });
+  const html = comparisonHTML(table);
+  const buttons = [...html.matchAll(/class="product-card__cart chat-compare__cart" data-product-id="(\d+)"/g)].map(m => m[1]);
+  assert.deepEqual(buttons, ["1", "2"]);
+  assert.match(html, /chat-compare__buy js-row" style="grid-column:4;grid-row:7"><\/div>/);
 });

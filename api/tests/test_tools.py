@@ -234,7 +234,7 @@ def test_comparison_hides_working_distance():
     assert "Рабочее" not in text and "360" not in text
 
 
-def test_comparison_shortens_names_and_marks_pick():
+def test_comparison_shortens_names():
     from types import SimpleNamespace as N
 
     from app.ai.tools import comparison_view
@@ -244,22 +244,23 @@ def test_comparison_shortens_names_and_marks_pick():
                  characteristics={})
 
     view = comparison_view([product(1, "Бинокулярная лупа TTL XC-View 2.8"), product(2, "Бинокулярные лупы SLT Zumax"),
-                            product(3, "Микроскоп")], {"product_id": 2, "label": "Для терапевта"})
+                            product(3, "Микроскоп")])
     names_ = [p["name"] for p in view["products"]]
     assert names_ == ["TTL XC-View 2.8", "SLT Zumax", "Микроскоп"]
     assert view["title"] == "Сравнение"  # не все товары — лупы, общей категории нет: заголовок общий
     loupes = comparison_view([product(1, "Бинокулярная лупа TTL XC-View 2.8"), product(2, "Бинокулярные лупы SLT Zumax")])
     assert loupes["title"] == "Бинокулярные лупы"
     assert view["products"][0]["full_name"] == "Бинокулярная лупа TTL XC-View 2.8"
-    assert [p["pick"] for p in view["products"]] == ["", "Для терапевта", ""]
 
 
-def test_comparison_pick_must_be_among_shown(catalog):
+def test_comparison_has_no_ai_pick(catalog):
+    """Пометку ИИ («Для терапевта») на таблице не показываем — в инструменте её больше нет."""
+    tool = registry()["show_comparison"]
+    assert "pick" not in tool.definition()["input_schema"]["properties"]
     ids = [catalog["extaro"], catalog["pico"]]
-    ok = run_tool("show_comparison", {"product_ids": ids, "pick": {"product_id": catalog["pico"], "label": "Для терапевта"}})
-    assert ok.widget["pick"] == {"product_id": catalog["pico"], "label": "Для терапевта"}
-    foreign = run_tool("show_comparison", {"product_ids": ids, "pick": {"product_id": 1, "label": "чужой"}})
-    assert foreign.widget["pick"] is None
+    assert run_tool("show_comparison", {"product_ids": ids}).widget == {"widget": "comparison", "product_ids": ids}
+    with pytest.raises(ToolError, match="некорректные аргументы"):
+        run_tool("show_comparison", {"product_ids": ids, "pick": {"product_id": catalog["pico"], "label": "x"}})
 
 
 def test_comparison_shows_badge_from_admin(catalog):
