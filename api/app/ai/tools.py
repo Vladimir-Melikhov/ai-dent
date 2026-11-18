@@ -143,7 +143,7 @@ def comparison_table(products: list[Product]) -> dict:
 
 COMPARE_SHOWN = 4  # главных параметров в карточке; остальные отличия — под кнопкой
 KEY_WORDS = ("увеличен", "поле обзор", "глубин", "вес", "мощност", "освещ", "матриц", "разрешен")
-COMPARE_SAME = 4  # общих характеристик в строке «Одинаково»
+COMPARE_SAME = 4  # общих характеристик в блоке «Одинаково у всех»
 MAX_FACT_LEN = 40  # длиннее — это маркетинговая фраза, а не характеристика
 MAX_LABEL_LEN = 24
 MAX_PICK_LEN = 28  # пометка на карточке: «Для терапевта»
@@ -209,7 +209,7 @@ def loupe_specs(product: Product) -> dict[str, str]:
 
 def comparison_view(products: list[Product], pick: dict | None = None) -> dict:
     """Сравнение для чата: карточки рядом — цена, пометка «кому подходит», 3 главных параметра.
-    Остальные отличия — под кнопкой, общее — одной строкой."""
+    Остальные отличия — под кнопкой, общее — блоком «Одинаково у всех» (название и значение отдельно)."""
     all_loupes = all(getattr(p, "is_loupe", False) for p in products)
     if all_loupes:
         per_product = [loupe_specs(p) for p in products]
@@ -236,7 +236,7 @@ def comparison_view(products: list[Product], pick: dict | None = None) -> dict:
             continue
         if len(set(values)) == 1:
             if values[0] != "—":
-                same.append(f"{row['name']}: {values[0]}")
+                same.append({"name": row["name"], "value": values[0]})
         else:
             different.append(row)
     rows = [{"name": short(k, MAX_LABEL_LEN), "values": [t.get(k, "—") for t in per_product]} for k in key_keys]

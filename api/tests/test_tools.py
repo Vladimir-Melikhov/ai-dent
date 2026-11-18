@@ -109,6 +109,23 @@ def test_comparison_widget_is_compact(catalog):
     assert names_ == ["Увеличение", "Камера", "Вариоскоп"] and view["more"] == [] and view["same"] == []
 
 
+def test_comparison_same_values_come_as_name_and_value(catalog):
+    from app.ai.tools import comparison_view, active_products
+
+    from .conftest import admin_sql
+
+    for key in ("extaro", "pico"):
+        admin_sql("UPDATE catalog_product SET characteristics = characteristics || $1::jsonb WHERE id = $2",
+                  '{"Оптическая система": "Галилеевская"}', catalog[key])
+
+    async def go():
+        async with async_session_factory() as session:
+            return comparison_view(await active_products(session, [catalog["extaro"], catalog["pico"]]))
+
+    # В чате это блок «Одинаково у всех»: подпись и значение раздельно, а не «Оптическая система: Галилеевская»
+    assert run_async(go())["same"] == [{"name": "Оптическая система", "value": "Галилеевская"}]
+
+
 def test_facts_flatten_groups_and_drop_marketing_lines():
     from app.ai.tools import facts
 

@@ -879,6 +879,20 @@
   object-position: center;
 }
 
+/* Каталог: пустые поля вокруг товара обрезает catalog.js — товар целиком, крупно,
+   от верхнего края карточки. До обрезки фото скрыто, чтобы не прыгало */
+.catalog-products .product-card__media img {
+  object-fit: contain;
+  object-position: top center;
+  padding: 0 10px;
+  opacity: 0;
+  transition: opacity .2s ease;
+}
+
+.catalog-products .product-card__media img.is-ready {
+  opacity: 1;
+}
+
 .product-card__badge {
   position: absolute;
   top: 12px;
@@ -1162,12 +1176,6 @@
 
   .catalog-products {
     grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  /* фото товара целиком, без обрезки — как на телефоне */
-  .product-card__media img {
-    object-fit: contain;
-    padding: 10px;
   }
 
   .catalog-products-tools {

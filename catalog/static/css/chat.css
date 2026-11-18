@@ -650,10 +650,9 @@
     line-height: 1.5;
   }
 
-  /* Пометка под задачу — контурная плашка и рамка потолще; «Дешевле» — залитая */
+  /* Пометка под задачу — контурная плашка; «Дешевле» — залитая. Рамкой карточку не выделяем: все товары равны */
   .chat-compare__tag--pick { background: #fff; color: var(--text); box-shadow: inset 0 0 0 1.5px var(--text); }
   .chat-compare__tag--badge { background: #fff; color: var(--text); box-shadow: inset 0 0 0 1.5px var(--text); }
-  .chat-compare__card.is-pick { border-color: var(--text); box-shadow: inset 0 0 0 1px var(--text); }
   .chat-compare__brand b { color: var(--text); font-weight: 800; }
   .chat-compare__k { display: block; margin-top: 9px; font-size: 11px; font-weight: 600; letter-spacing: .02em; text-transform: uppercase; color: var(--text-2, #4a5361); }
   .chat-compare__t { font-size: 14px; font-weight: 700; overflow-wrap: anywhere; }
@@ -677,11 +676,19 @@
     cursor: pointer;
   }
 
+  /* Общее у всех товаров — отдельным блоком под карточками, подписи как у параметров в карточках */
   .chat-compare__same {
-    margin: 6px 0 0;
+    margin: 10px 0 0;
+    padding: 2px 9px 10px;
+    border: 1px solid var(--border-soft);
+    border-radius: 12px;
+  }
+
+  .chat-compare__same-title {
+    margin-top: 8px;
     font-size: 13px;
-    line-height: 1.4;
-    color: var(--text-2, #4a5361);
+    font-weight: 700;
+    color: var(--text);
   }
 
   .chat-loupe {

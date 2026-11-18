@@ -529,7 +529,7 @@ if (root) {
       const tags = (p.badge ? `<span class="chat-compare__tag chat-compare__tag--badge">${escapeHTML(p.badge)}</span>` : "")
         + (p.pick ? `<span class="chat-compare__tag chat-compare__tag--pick">${escapeHTML(p.pick)}</span>` : "")
         + (p.cheapest ? '<span class="chat-compare__tag">Дешевле</span>' : "");
-      return `<div class="chat-compare__card${p.pick ? " is-pick" : ""}">
+      return `<div class="chat-compare__card">
         <div class="chat-compare__tags">${tags}</div>
         <div class="chat-compare__name">${name}</div>
         <div class="chat-compare__brand">${countryLine(p.brand, p.country)}</div>
@@ -537,7 +537,17 @@ if (root) {
         <div class="chat-compare__avail">${escapeHTML(p.availability)}</div>
         ${params}</div>`;
     }).join("");
-    const same = table.same && table.same.length ? `<p class="chat-compare__same">Одинаково: ${table.same.map(escapeHTML).join(" · ")}</p>` : "";
+    // Общее у всех товаров: подпись и значение раздельно, как параметры в карточках
+    // (старый ответ сервера — строка «Название: значение»)
+    const sameRows = (table.same || []).map(s => {
+      if (typeof s !== "string") return s;
+      const i = s.indexOf(": ");
+      return i > 0 ? { name: s.slice(0, i), value: s.slice(i + 2) } : { name: "", value: s };
+    });
+    const same = sameRows.length ? `<div class="chat-compare__same">
+        <div class="chat-compare__same-title">Одинаково у всех</div>
+        ${sameRows.map(s => `<div class="chat-compare__same-row">${s.name ? `<span class="chat-compare__k">${escapeHTML(s.name)}</span>` : ""}<span class="chat-compare__t">${escapeHTML(formatValue(s.value))}</span></div>`).join("")}
+      </div>` : "";
     el.innerHTML = `
       ${table.title ? `<div class="chat-compare__title">${escapeHTML(table.title)}</div>` : ""}
       <div class="chat-compare__grid" style="--r:${5 + table.rows.length * 2}">${cards}</div>
