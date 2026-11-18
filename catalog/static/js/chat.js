@@ -3,7 +3,7 @@
    На главной чат встроен в первый экран (data-mode="inline"), на остальных страницах — панель.
    ============================================================ */
 
-import { bindCartButtons, escapeHTML, formatPrice, productCard } from "./api.js";
+import { bindCartButtons, escapeHTML, formatPrice, imageUrl, productCard, trimImageMargins } from "./api.js";
 import { renderText, safeHref } from "./chat-text.js";
 import { initShortlist } from "./shortlist.js";
 
@@ -503,65 +503,97 @@ if (root) {
     return value == null ? "—" : String(value);
   }
 
-  // Сравнение: карточки рядом — название, бренд и страна с флагом, крупная цена, главные параметры;
-  // остальные отличия под кнопкой
+  // Сравнение — таблица: слева подписи параметров, в колонках товары (название, бренд · страна, фото).
+  // Товар с меткой из админки («Хит») — серой колонкой с плашкой сверху. Первая строка — цена;
+  // остальные отличия и общее у всех — под кнопкой «Все характеристики»
   function countryLine(brand, country) {
     return `${escapeHTML(brand || "")}${country ? ` · <b>${escapeHTML(country)}</b>` : ""}`;
   }
 
-  function compareRows(rows) {
-    return rows.map(r => `
-      <div class="chat-compare__row"><div class="chat-compare__label">${escapeHTML(r.name)}</div>
-      <div class="chat-compare__cols">${r.values.map(v => `<span>${escapeHTML(formatValue(v))}</span>`).join("")}</div></div>`).join("");
+  // Общее у всех — строка таблицы с одинаковым значением в каждой колонке
+  // (старый ответ сервера — строка «Название: значение»)
+  function sameRows(table) {
+    return (table.same || []).map(s => {
+      let name = "";
+      let value = s;
+      if (typeof s === "string") {
+        const i = s.indexOf(": ");
+        if (i > 0) [name, value] = [s.slice(0, i), s.slice(i + 2)];
+      } else ({ name, value } = s);
+      return { name, values: table.products.map(() => value) };
+    });
+  }
+
+  function compareHead(p, i) {
+    const href = p.slug ? `/product/${encodeURIComponent(p.slug)}/` : "";
+    const link = (cls, inner) => href
+      ? `<a class="${cls}" href="${href}" title="${escapeHTML(p.full_name || p.name)}">${inner}</a>`
+      : `<span class="${cls}">${inner}</span>`;
+    return `<div class="chat-compare__head" style="grid-column:${i + 2};grid-row:1">
+      ${p.badge ? `<span class="chat-compare__badge">${escapeHTML(p.badge)}</span>` : ""}
+      <div class="chat-compare__info">
+        ${link("chat-compare__name", escapeHTML(p.name))}
+        <div class="chat-compare__brand">${countryLine(p.brand, p.country)}</div>
+        ${p.pick ? `<div class="chat-compare__pick">${escapeHTML(p.pick)}</div>` : ""}
+      </div>
+      ${link("chat-compare__photo", p.image ? `<img src="${imageUrl(p.image)}" alt="" loading="lazy" decoding="async">` : "")}
+    </div>`;
   }
 
   function renderComparison(table) {
     const el = document.createElement("div");
     el.className = "chat-widget chat-compare";
-    el.style.setProperty("--n", table.products.length);
-    const more = table.more || [];
-    const cards = table.products.map((p, i) => {
-      const name = p.slug ? `<a href="/product/${encodeURIComponent(p.slug)}/" title="${escapeHTML(p.full_name || p.name)}">${escapeHTML(p.name)}</a>` : escapeHTML(p.name);
-      const params = table.rows.map(r => {
-        const v = r.values[i];
-        return `<span class="chat-compare__k">${escapeHTML(r.name)}</span><span class="chat-compare__t${v === "—" ? " is-none" : ""}">${escapeHTML(formatValue(v))}</span>`;
-      }).join("");
-      const tags = (p.badge ? `<span class="chat-compare__tag chat-compare__tag--badge">${escapeHTML(p.badge)}</span>` : "")
-        + (p.pick ? `<span class="chat-compare__tag chat-compare__tag--pick">${escapeHTML(p.pick)}</span>` : "")
-        + (p.cheapest ? '<span class="chat-compare__tag">Дешевле</span>' : "");
-      return `<div class="chat-compare__card">
-        <div class="chat-compare__tags">${tags}</div>
-        <div class="chat-compare__name">${name}</div>
-        <div class="chat-compare__brand">${countryLine(p.brand, p.country)}</div>
-        <div class="chat-compare__price">${p.price_rub != null ? formatPrice(p.price_rub) : "цена по запросу"}</div>
-        <div class="chat-compare__avail">${escapeHTML(p.availability)}</div>
-        ${params}</div>`;
-    }).join("");
-    // Общее у всех товаров: подпись и значение раздельно, как параметры в карточках
-    // (старый ответ сервера — строка «Название: значение»)
-    const sameRows = (table.same || []).map(s => {
-      if (typeof s !== "string") return s;
-      const i = s.indexOf(": ");
-      return i > 0 ? { name: s.slice(0, i), value: s.slice(i + 2) } : { name: "", value: s };
+    const products = table.products;
+    const extra = [...(table.more || []), ...sameRows(table)];
+    const hit = products.findIndex(p => p.badge);
+    const priceRow = {
+      name: "Цена",
+      cells: products.map(p => `<b>${p.price_rub != null ? formatPrice(p.price_rub) : "по запросу"}</b>`
+        + (p.availability && p.availability !== "в наличии" ? `<small>${escapeHTML(p.availability)}</small>` : "")),
+    };
+    const asRow = r => ({
+      name: r.name,
+      cells: r.values.map(v => {
+        const text = formatValue(v);
+        return text === "—" ? '<span class="is-none">—</span>' : escapeHTML(text);
+      }),
     });
-    const same = sameRows.length ? `<div class="chat-compare__same">
-        <div class="chat-compare__same-title">Одинаково у всех</div>
-        ${sameRows.map(s => `<div class="chat-compare__same-row">${s.name ? `<span class="chat-compare__k">${escapeHTML(s.name)}</span>` : ""}<span class="chat-compare__t">${escapeHTML(formatValue(s.value))}</span></div>`).join("")}
-      </div>` : "";
+
     el.innerHTML = `
-      ${table.title ? `<div class="chat-compare__title">${escapeHTML(table.title)}</div>` : ""}
-      <div class="chat-compare__grid" style="--r:${5 + table.rows.length * 2}">${cards}</div>
-      ${more.length ? `<div class="chat-compare__extra" hidden>${compareRows(more)}</div>
-        <button type="button" class="chat-compare__more">Ещё отличия (${more.length})</button>` : ""}
-      ${same}`;
+      <div class="chat-compare__title">${escapeHTML(table.title || "Сравнение")}</div>
+      <div class="chat-compare__sub">Наглядное сравнение ключевых характеристик</div>
+      <div class="chat-compare__scroll">
+        <div class="chat-compare__grid" style="--n:${products.length}">${products.map(compareHead).join("")}</div>
+      </div>
+      ${extra.length ? '<button type="button" class="chat-compare__more"></button>' : ""}`;
+
+    const grid = el.querySelector(".chat-compare__grid");
     const button = el.querySelector(".chat-compare__more");
-    if (button) {
-      button.addEventListener("click", () => {
-        const extra = el.querySelector(".chat-compare__extra");
-        extra.hidden = !extra.hidden;
-        button.textContent = extra.hidden ? `Ещё отличия (${more.length})` : "Свернуть";
-      });
+    let expanded = false;
+
+    // Шапки с фото рисуются один раз, по кнопке перестраиваются только строки
+    function drawRows() {
+      grid.querySelectorAll(".js-row").forEach(node => node.remove());
+      const rows = [priceRow, ...table.rows.map(asRow), ...(expanded ? extra.map(asRow) : [])];
+      const back = `<div class="chat-compare__box js-row" style="grid-row:2 / span ${rows.length}"></div>`
+        + (hit >= 0 ? `<div class="chat-compare__hl js-row" style="grid-column:${hit + 2};grid-row:1 / span ${rows.length + 1}"></div>` : "");
+      const cells = rows.map((r, ri) => {
+        const at = `grid-row:${ri + 2}`;
+        const top = ri === 0 ? " is-top" : "";
+        return `<div class="chat-compare__label js-row${top}" style="${at}">${escapeHTML(r.name)}</div>`
+          + r.cells.map((c, ci) => `<div class="chat-compare__val js-row${top}" style="grid-column:${ci + 2};${at}">${c}</div>`).join("");
+      }).join("");
+      grid.insertAdjacentHTML("afterbegin", back);
+      grid.insertAdjacentHTML("beforeend", cells);
+      if (button) button.textContent = expanded ? "Свернуть" : `Все характеристики (${extra.length})`;
     }
+
+    drawRows();
+    button?.addEventListener("click", () => {
+      expanded = !expanded;
+      drawRows();
+    });
+    trimImageMargins(el.querySelectorAll(".chat-compare__photo img"));
     return el;
   }
 

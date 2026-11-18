@@ -246,16 +246,21 @@ def comparison_view(products: list[Product], pick: dict | None = None) -> dict:
         rows.append(different.pop(0))
     view = comparison_table(products)
     badges = {p.id: getattr(p, "badge", "") for p in products}  # метка из админки: «Хит», «Лучший выбор»
+    images = {p.id: getattr(p, "primary_image_path", None) for p in products}  # фото товара в шапке колонки
     prices = [p["price_rub"] for p in view["products"]]
     cheapest = min(prices) if all(v is not None for v in prices) and len(set(prices)) > 1 else None
-    # Общее «Бинокулярные лупы» — заголовком над блоком, а из названий карточек убирается: место дороже
-    title = "Бинокулярные лупы" if all_loupes or all(CATEGORY_PREFIX.match(p["name"]) for p in view["products"]) else ""
+    # Общее «Бинокулярные лупы» — заголовком над таблицей, а из названий убирается: место дороже.
+    # Иначе заголовок — общая категория товаров или просто «Сравнение»
+    categories = {p.category.name for p in products if getattr(p, "category", None)}
+    title = ("Бинокулярные лупы" if all_loupes or all(CATEGORY_PREFIX.match(p["name"]) for p in view["products"])
+             else categories.pop() if len(categories) == 1 else "Сравнение")
     for item in view["products"]:
         item["full_name"] = item["name"]
         item["name"] = short(CATEGORY_PREFIX.sub("", item["name"]) or item["name"], 40)
         item["pick"] = pick["label"] if pick and pick.get("product_id") == item["id"] else ""
         item["cheapest"] = cheapest is not None and item["price_rub"] == cheapest
         item["badge"] = badges.get(item["id"], "")
+        item["image"] = images.get(item["id"])
     return {
         "title": title,
         "products": view["products"],

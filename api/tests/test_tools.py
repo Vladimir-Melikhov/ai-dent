@@ -122,8 +122,12 @@ def test_comparison_same_values_come_as_name_and_value(catalog):
         async with async_session_factory() as session:
             return comparison_view(await active_products(session, [catalog["extaro"], catalog["pico"]]))
 
-    # В чате это блок «Одинаково у всех»: подпись и значение раздельно, а не «Оптическая система: Галилеевская»
-    assert run_async(go())["same"] == [{"name": "Оптическая система", "value": "Галилеевская"}]
+    view = run_async(go())
+    # Общее у всех — подпись и значение раздельно, а не «Оптическая система: Галилеевская»
+    assert view["same"] == [{"name": "Оптическая система", "value": "Галилеевская"}]
+    # Заголовок таблицы — общая категория; у каждой колонки есть поле фото (у тестовых товаров его нет)
+    assert view["title"] == f"Микроскопы {catalog['tag']}"
+    assert [p["image"] for p in view["products"]] == [None, None]
 
 
 def test_facts_flatten_groups_and_drop_marketing_lines():
@@ -232,7 +236,7 @@ def test_comparison_shortens_names_and_marks_pick():
                             product(3, "Микроскоп")], {"product_id": 2, "label": "Для терапевта"})
     names_ = [p["name"] for p in view["products"]]
     assert names_ == ["TTL XC-View 2.8", "SLT Zumax", "Микроскоп"]
-    assert view["title"] == ""  # не все товары — лупы: заголовка нет
+    assert view["title"] == "Сравнение"  # не все товары — лупы, общей категории нет: заголовок общий
     loupes = comparison_view([product(1, "Бинокулярная лупа TTL XC-View 2.8"), product(2, "Бинокулярные лупы SLT Zumax")])
     assert loupes["title"] == "Бинокулярные лупы"
     assert view["products"][0]["full_name"] == "Бинокулярная лупа TTL XC-View 2.8"

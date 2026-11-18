@@ -4,108 +4,14 @@ import {
   fetchBrands,
   productCard,
   bindCartButtons,
-  escapeHTML
+  escapeHTML,
+  trimImageMargins
 } from "./api.js";
 
 import { initShortlist } from "./shortlist.js";
 
 const state = { page: 1 };
 const categoryNames = new Map();
-
-
-/* ============================================================
-   ФОТО В КАРТОЧКАХ: обрезка пустых полей
-   У загруженных фото вокруг товара большие прозрачные (или белые) поля —
-   товар в карточке выходит мелким. Обрезаем поля в браузере, чтобы товар
-   был крупным и начинался от верхнего края карточки. Результат — по адресу фото.
-   ============================================================ */
-
-const trimmedSrc = new Map();
-
-/* Границы товара на фото в пикселях оригинала; null — полей нет или не удалось */
-function contentBox(img) {
-  const nw = img.naturalWidth;
-  const nh = img.naturalHeight;
-  if (!nw || !nh) return null;
-
-  const k = Math.min(1, 240 / Math.max(nw, nh));
-  const w = Math.max(1, Math.round(nw * k));
-  const h = Math.max(1, Math.round(nh * k));
-  const canvas = document.createElement("canvas");
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext("2d", { willReadFrequently: true });
-  ctx.drawImage(img, 0, 0, w, h);
-  const d = ctx.getImageData(0, 0, w, h).data;
-
-  // Фон — прозрачный, если прозрачен левый верхний угол, иначе цвет этого угла (белый фон у JPG)
-  const clearBg = d[3] < 16;
-  const [r0, g0, b0] = d;
-  const isEmpty = (i) =>
-    d[i + 3] < 16 ||
-    (!clearBg && Math.abs(d[i] - r0) + Math.abs(d[i + 1] - g0) + Math.abs(d[i + 2] - b0) < 30);
-
-  let x0 = w, y0 = h, x1 = -1, y1 = -1;
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      if (isEmpty((y * w + x) * 4)) continue;
-      if (x < x0) x0 = x;
-      if (x > x1) x1 = x;
-      if (y < y0) y0 = y;
-      if (y > y1) y1 = y;
-    }
-  }
-  if (x1 < 0) return null;
-
-  // запас в пиксель уменьшенной копии, чтобы не срезать край товара
-  const sx = Math.max(0, (x0 - 1) / k);
-  const sy = Math.max(0, (y0 - 1) / k);
-  const sw = Math.min(nw, (x1 + 2) / k) - sx;
-  const sh = Math.min(nh, (y1 + 2) / k) - sy;
-  if (sw > nw * 0.96 && sh > nh * 0.96) return null;
-  return { sx, sy, sw, sh };
-}
-
-async function trimmedUrl(img) {
-  const box = contentBox(img);
-  if (!box) return null;
-
-  const k = Math.min(1, 600 / Math.max(box.sw, box.sh));
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.max(1, Math.round(box.sw * k));
-  canvas.height = Math.max(1, Math.round(box.sh * k));
-  canvas
-    .getContext("2d")
-    .drawImage(img, box.sx, box.sy, box.sw, box.sh, 0, 0, canvas.width, canvas.height);
-
-  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/webp", 0.9));
-  return blob ? URL.createObjectURL(blob) : null;
-}
-
-function trimCardImages(root) {
-  root.querySelectorAll(".product-card__media img").forEach((img) => {
-    const show = () => img.classList.add("is-ready");
-
-    const run = () => {
-      const src = img.currentSrc || img.src;
-      if (!trimmedSrc.has(src)) {
-        trimmedSrc.set(src, trimmedUrl(img).catch(() => null));
-      }
-      trimmedSrc.get(src).then((url) => {
-        if (!url) return show();
-        img.addEventListener("load", show, { once: true });
-        img.addEventListener("error", show, { once: true });
-        img.src = url;
-      });
-    };
-
-    if (img.complete && img.naturalWidth) run();
-    else {
-      img.addEventListener("load", run, { once: true });
-      img.addEventListener("error", show, { once: true });
-    }
-  });
-}
 
 function getElement(id) {
   return document.getElementById(id);
@@ -179,7 +85,7 @@ async function load() {
       ? data.items.map(productCard).join("")
       : '<p class="empty">Ничего не найдено</p>';
 
-    trimCardImages(grid);
+    trimImageMargins(grid.querySelectorAll(".product-card__media img"));
 
     if (count) count.textContent = data.total ?? 0;
 
