@@ -211,7 +211,71 @@ def zoom_text(value: str) -> str:
     text = ZOOM_MARK.sub("", re.sub(r"(?<=\d),(?=\d)", ".", value)).strip()
     if not text or not ZOOM_ONLY.fullmatch(text):
         return value
+    text = re.sub(r"\s*/\s*", " / ", re.sub(r"\s*[–—-]\s*", "–", text))  # тире и разделители — как в мм и г
     return ZOOM_NUMBER.sub(lambda m: m.group(0) + "×", text)
+
+
+# --- Единицы в сравнении: «200мм», «0,2 м», «5 см», «60гр», «0-40 град» → «200 мм», «50 мм», «60 г», «0–40°» ---
+
+MEASURE_UNITS = (  # (как пишут, во что приводим, множитель)
+    (r"мм|mm|миллиметр\w*", "мм", 1), (r"см|cm|сантиметр\w*", "мм", 10),
+    (r"кг|kg|килограмм\w*", "кг", 1), (r"гр?\.?|g|gr|грамм\w*", "г", 1),
+    (r"°|град\w*|deg", "°", 1),
+)
+MEASURE_TOKEN = re.compile(r"(?<![А-Яа-яЁёA-Za-z])(" + "|".join(u for u, _, _ in MEASURE_UNITS) + r")(?![А-Яа-яЁёA-Za-z])",
+                           re.IGNORECASE)
+MEASURE_ONLY = re.compile(r"(?:(до|от|около|~|≈)\s*)?\d+(?:\.\d+)?(?:\s*(?:[–—-]|/|;|,)\s*\d+(?:\.\d+)?)*")
+MEASURE_KINDS = (  # подпись строки → единица по умолчанию (для голого числа в сравнении луп)
+    (("поле обзор", "поле зрени", "глубин", "регулировк", "межзрачк", "расстоян"), "мм"),
+    (("вес", "масса"), "г"),
+    (("угол", "наклон"), "°"),
+)
+
+
+def unit_of(key: str) -> str | None:
+    low = key.lower()
+    return next((unit for words, unit in MEASURE_KINDS if any(w in low for w in words)), None)
+
+
+def measure_text(value: str, default_unit: str | None = None) -> str:
+    """Число с единицей одним видом: пробел перед единицей, тире в диапазоне, точка в дробях, см → мм.
+    Слова кроме «до/от/около» или разные единицы в одном значении — оставляем как есть."""
+    if not isinstance(value, str) or value == "—":
+        return value
+    text = re.sub(r"(?<=\d),(?=\d)", ".", value.strip())
+    found = [next((target, k) for pattern, target, k in MEASURE_UNITS if re.fullmatch(pattern, m.group(1), re.IGNORECASE))
+             for m in MEASURE_TOKEN.finditer(text)]
+    if len({unit for unit, _ in found}) > 1 or len({k for _, k in found}) > 1:
+        return value
+    unit, factor = found[0] if found else (default_unit, 1)
+    core = re.sub(r"\s+", " ", MEASURE_TOKEN.sub(" ", text)).strip()
+    span = re.fullmatch(r"от\s*(\d+(?:\.\d+)?)\s*до\s*(\d+(?:\.\d+)?)", core)
+    if span:
+        core = f"{span[1]}–{span[2]}"
+    if not unit or not MEASURE_ONLY.fullmatch(core):
+        return value
+    if unit == "кг" and all(float(n) < 1 for n in re.findall(r"\d+(?:\.\d+)?", core)):
+        unit, factor = "г", 1000  # «0,05 кг» рядом с «50 г» — тоже в граммах
+    if factor != 1:
+        core = re.sub(r"\d+(?:\.\d+)?", lambda m: f"{float(m.group()) * factor:g}", core)
+    core = re.sub(r"\s*[–—-]\s*", "–", core)
+    core = re.sub(r"\s*/\s*", " / ", core)
+    core = re.sub(r"\s*([;,])\s*", r"\1 ", core)
+    core = re.sub(r"^(до|от|около)(?=\d)", r"\1 ", core)
+    return core + unit if unit == "°" else f"{core} {unit}"
+
+
+# Одни и те же параметры луп в характеристиках называют по-разному — в сравнении одна строка
+LOUPE_KEY_NAMES = (
+    (("увеличен",), "Увеличение"), (("поле обзор", "поле зрени"), "Поле обзора"), (("глубин",), "Глубина фокуса"),
+    (("вес", "масса"), "Вес"), (("угол", "наклон"), "Угол наклона"), (("вертикальн",), "Вертикальная регулировка"),
+    (("оптическ",), "Оптическая система"), (("крепл",), "Система крепления"),
+)
+
+
+def loupe_key(key: str) -> str:
+    low = key.lower()
+    return next((name for words, name in LOUPE_KEY_NAMES if any(low.startswith(w) or f" {w}" in low for w in words)), key)
 
 
 def loupe_specs(product: Product) -> dict[str, str]:
@@ -227,24 +291,41 @@ def comparison_view(products: list[Product], pick: dict | None = None) -> dict:
     """Сравнение для чата: карточки рядом — цена, пометка «кому подходит», 3 главных параметра.
     Остальные отличия — под кнопкой, общее — блоком «Одинаково у всех» (название и значение отдельно)."""
     all_loupes = all(getattr(p, "is_loupe", False) for p in products)
-    if all_loupes:
-        per_product = [loupe_specs(p) for p in products]
-    else:
-        per_product = [{k: v for k, v in facts(p.characteristics).items() if not any(w in k.lower() for w in HIDDEN_WORDS)}
-                       for p in products]
-    # Увеличение в админке вводят по-разному («3», «2.5x», «3,0×») — в таблице один вид
-    per_product = [{k: zoom_text(v) if "увеличен" in k.lower() else v for k, v in table.items()} for table in per_product]
-    keys: list[str] = []
+    # Лупы в сравнении: у отмеченных галочкой — только поля лупы из карточки, у остальных — характеристики
+    # с теми же названиями строк. Строки луп идут первыми и показываются всегда
+    loupe_mode = any(getattr(p, "is_loupe", False) for p in products) or all(CATEGORY_PREFIX.match(p.name) for p in products)
+
+    def specs_of(p) -> dict[str, str]:
+        if getattr(p, "is_loupe", False):
+            return loupe_specs(p)
+        table: dict[str, str] = {}
+        for k, v in facts(p.characteristics).items():
+            if not any(w in k.lower() for w in HIDDEN_WORDS):
+                table.setdefault(loupe_key(k) if loupe_mode else k, v)
+        return table
+
+    per_product = [specs_of(p) for p in products]
+    # Значения одним видом: увеличение «3×», длины в мм, вес в г, углы в °; голое число у луп — с единицей
+    def tidy(key: str, value: str) -> str:
+        if "увеличен" in key.lower():
+            return zoom_text(value)
+        unit = unit_of(key)
+        return measure_text(value, unit if loupe_mode else None) if unit else value
+
+    per_product = [{k: tidy(k, v) for k, v in table.items()} for table in per_product]
+    keys: list[str] = [name for name, _ in LOUPE_ROWS] if loupe_mode else []
     for table in per_product:
         for key in table:
             if key not in keys:
                 keys.append(key)
+    if loupe_mode:  # ни у кого нет значения — строки нет (кроме четырёх главных)
+        keys = [k for i, k in enumerate(keys) if i < COMPARE_SHOWN or any(t.get(k, "—") != "—" for t in per_product)]
     # Ключевые параметры показываем всегда, даже если у моделей они совпадают; остальное — только отличия
     def rank(key: str) -> int:
         low = key.lower()
         return next((i for i, word in enumerate(KEY_WORDS) if word in low), len(KEY_WORDS))
 
-    key_keys = (keys[:COMPARE_SHOWN] if all_loupes
+    key_keys = (keys[:COMPARE_SHOWN] if loupe_mode
                 else sorted((k for k in keys if rank(k) < len(KEY_WORDS)), key=rank)[:COMPARE_SHOWN])
     rows, different, same = [], [], []
     for key in keys:

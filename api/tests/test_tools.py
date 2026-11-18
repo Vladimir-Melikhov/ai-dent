@@ -334,3 +334,104 @@ def test_product_page_with_demo_checkbox_does_not_break(catalog):
 
     out = run_async(go())
     assert out.loupe_showcase and out.loupe_showcase.brands[0].loupes[0].zooms
+
+
+# --- Сравнение: все варианты, которые может собрать модель ---
+
+def _product(i, name, chars=None, *, price=None, stock=1, badge="", category="Лупы", **loupe):
+    from types import SimpleNamespace as N
+
+    fields = dict(is_loupe=False, loupe_options=[], loupe_depth="", loupe_weight="", loupe_tilt="", loupe_vertical="",
+                  loupe_optics="", loupe_mount="")
+    fields.update(loupe)
+    return N(id=i, slug=f"s{i}", name=name, brand=N(name="Zumax", country="Китай"), category=N(name=category),
+             price_rub=price, stock_qty=stock, characteristics=chars or {}, badge=badge, **fields)
+
+
+def _opt(zoom, fov=""):
+    from types import SimpleNamespace as N
+
+    return N(zoom=zoom, field_of_view=fov)
+
+
+@pytest.mark.parametrize("value, unit, expected", [
+    ("200мм", None, "200 мм"), ("120-130мм", None, "120–130 мм"), ("120 – 130 мм", None, "120–130 мм"),
+    ("360/420 мм", None, "360 / 420 мм"), ("5 см", None, "50 мм"), ("от 120 до 150 мм", None, "120–150 мм"),
+    ("60гр", None, "60 г"), ("50 g", None, "50 г"), ("60 грамм", None, "60 г"), ("0,05 кг", None, "50 г"),
+    ("120 кг", None, "120 кг"), ("0-40 град", None, "0–40°"), ("до 40 градусов", None, "до 40°"),
+    ("до 6 мм", None, "до 6 мм"), ("140", "мм", "140 мм"), ("60", "г", "60 г"),
+    # голое число без единицы по умолчанию, слова, разные единицы и прочерк — как есть
+    ("140", None, "140"), ("Ø 95 мм", None, "Ø 95 мм"), ("95 мм (при 2.5×)", None, "95 мм (при 2.5×)"),
+    ("2 г / 3 мм", None, "2 г / 3 мм"), ("фикс", "°", "фикс"), ("—", "мм", "—"),
+])
+def test_measure_values_are_shown_one_way(value, unit, expected):
+    from app.ai.tools import measure_text
+
+    assert measure_text(value, unit) == expected
+
+
+def test_loupe_comparison_units_one_way():
+    """Лупы с галочкой: в полях карточки единицы введены как попало — в таблице одним видом."""
+    from app.ai.tools import comparison_view
+
+    view = comparison_view([
+        _product(1, "SLT Zumax", is_loupe=True, loupe_options=[_opt("3", "140")],
+                 loupe_depth="200мм", loupe_weight="44гр", loupe_tilt="0-40 град"),
+        _product(2, "SLF Zumax", is_loupe=True, loupe_options=[_opt("2,5x", "130мм"), _opt("3.5x", "95 мм")],
+                 loupe_depth="15 см", loupe_weight="0,05 кг", loupe_tilt="фикс"),
+    ])
+    rows = {r["name"]: r["values"] for r in view["rows"]}
+    assert rows == {"Увеличение": ["3×", "2.5× / 3.5×"], "Поле обзора": ["140 мм", "95–130 мм"],
+                    "Глубина фокуса": ["200 мм", "150 мм"], "Вес": ["44 г", "50 г"]}
+    assert {r["name"]: r["values"] for r in view["more"]}["Угол наклона"] == ["0–40°", "фикс"]
+
+
+def test_loupe_with_fields_and_loupe_from_characteristics_share_rows():
+    """Лупа с галочкой рядом с лупой, описанной только характеристиками: строки общие, а не «Угол наклона»
+    и «Угол наклона луп» по отдельности; единицы одним видом."""
+    from app.ai.tools import comparison_view
+
+    view = comparison_view([
+        _product(1, "Бинокулярные лупы SLF Zumax", is_loupe=True, loupe_options=[_opt("2.5×", "130 мм")],
+                 loupe_weight="50 г", loupe_tilt="0–40°"),
+        _product(2, "Бинокулярные лупы SLT Zumax", {"Оптика": ["Увеличение: 3,0×", "Угол наклона луп: 0-20 град",
+                                                              "Вес оправы: 60гр", "Поле зрения: 140"],
+                                                   "Гарантия": "12 месяцев"}),
+    ])
+    assert view["title"] == "Бинокулярные лупы"
+    rows = {r["name"]: r["values"] for r in view["rows"]}
+    assert rows == {"Увеличение": ["2.5×", "3.0×"], "Поле обзора": ["130 мм", "140 мм"],
+                    "Глубина фокуса": ["—", "—"], "Вес": ["50 г", "60 г"]}
+    more = {r["name"]: r["values"] for r in view["more"]}
+    assert more["Угол наклона"] == ["0–40°", "0–20°"] and "Угол наклона луп" not in str(view)
+    assert more["Гарантия"] == ["—", "12 месяцев"]
+
+
+def test_microscopes_compare_by_characteristics_without_guessing_units():
+    """Не лупы: строки по ключевым словам, единицы приводятся, но голое число без единицы не дописываем."""
+    from app.ai.tools import comparison_view
+
+    view = comparison_view([
+        _product(1, "Микроскоп EXTARO 300", {"Увеличение": "4-25x", "Вес": "120", "Освещение": "LED"}, category="Микроскопы"),
+        _product(2, "Микроскоп OPMI Pico", {"Увеличение": "4–25×", "Вес": "95кг", "Освещение": "галоген"},
+                 category="Микроскопы"),
+    ])
+    rows = {r["name"]: r["values"] for r in view["rows"]}
+    assert view["title"] == "Микроскопы"
+    assert rows["Увеличение"] == ["4–25×", "4–25×"] and rows["Вес"] == ["120", "95 кг"]
+
+
+def test_comparison_of_different_categories_and_three_products():
+    """Разные категории, три товара: без цены, под заказ, с меткой «Хит», без фото — всё доходит до таблицы."""
+    from app.ai.tools import comparison_view
+
+    view = comparison_view([
+        _product(1, "Микроскоп EXTARO 300", {"Увеличение": "4-25x"}, price=1983000, category="Микроскопы", badge="Хит"),
+        _product(2, "Бинокулярные лупы SLF Zumax", {"Увеличение": "2.5x"}, price=None),
+        _product(3, "Турбинный наконечник", {"Подключение": "Midwest"}, price=9300, stock=0, category="Наконечники"),
+    ])
+    assert view["title"] == "Сравнение"
+    assert [p["price_rub"] for p in view["products"]] == [1983000, None, 9300]
+    assert [p["availability"] for p in view["products"]] == ["в наличии", "в наличии", "под заказ"]
+    assert [p["badge"] for p in view["products"]] == ["Хит", "", ""] and [p["image"] for p in view["products"]] == [None] * 3
+    assert {r["name"]: r["values"] for r in view["rows"]}["Увеличение"] == ["4–25×", "2.5×", "—"]
