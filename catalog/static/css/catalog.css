@@ -1164,6 +1164,12 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  /* фото товара целиком, без обрезки — как на телефоне */
+  .product-card__media img {
+    object-fit: contain;
+    padding: 10px;
+  }
+
   .catalog-products-tools {
     gap: 6px;
   }

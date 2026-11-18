@@ -819,9 +819,12 @@ body:has(.product-page) {
 
     .product-hero__content {
         padding-left: 0;
+        order: 2;
     }
 
+    /* в одну колонку фото идёт первым, потом название, цена и блоки */
     .product-hero__visual-wrap {
+        order: -1;
         flex-direction: column;
         margin-top: 16px;
         align-items: flex-start;

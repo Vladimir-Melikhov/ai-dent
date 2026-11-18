@@ -178,6 +178,8 @@
     .header__nav { display: none; }
     .header__logo img { height: 26px; }
     .header__user { display: none; }
+    /* меню скрыто — «Войти» и кнопку меню прижимаем вправо, как на телефоне */
+    .header__actions { margin-left: auto; }
   }
   /* ============================================================
      HERO, SEARCH & WHITE BLUR GLOW
@@ -1541,7 +1543,12 @@
         .cat-section--feature .optics-side {
           display: none !important;
         }
-      
+
+        /* микроскоп правее — на планшете шланг наезжал на описание */
+        .cat-section[data-category="optika"] .optics-product {
+          left: calc(50% + 150px);
+        }
+
       }
       
       
@@ -2284,9 +2291,10 @@
 
 /* ============================================================
    КАРТИНКИ В КАТЕГОРИЯХ — маска слева, чтобы читался текст
+   (телефон и планшет; на компьютере картинка не заходит на текст)
    ============================================================ */
 
-@media (max-width: 640px) {
+@media (max-width: 1100px) {
   .optics-product img,
   .cat-section[data-category="nakonechniki"] .optics-product img,
   .cat-section[data-category="ustanovki"] .optics-product img,
