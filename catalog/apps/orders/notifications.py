@@ -8,11 +8,11 @@ Telegram — тип, номер, статус и ссылка, без ПДн. П
 import logging
 
 from django.conf import settings
-from django.core.mail import EmailMessage
 from django.utils import timezone
 
 from apps.leads.notifications import admin_link, internal_recipients
-from .invoice import buyer_lines, invoice_items
+from .invoice import buyer_lines, invoice_items, invoice_lines
+from .letters import letter, rows
 from .models import Invoice, Order
 from .services import invoice_path, invoice_url, rub_text
 from .telegram import send_telegram
@@ -48,6 +48,9 @@ def send_invoice_emails(order) -> bool:
         pdf = f.read()
     filename = f"schet-{order.number}.pdf"
     sent, failed = False, False
+    # HTML-версия письма — в стиле счёта: шапка с номером, состав, итог, зуб на фоне
+    html = {"order": order, "invoice": invoice, "issued": timezone.localtime(invoice.issued_at),
+            "lines": invoice_lines(order), "total": rub_text(order.total_amount)}
 
     internal = internal_recipients()
     if internal:
@@ -64,8 +67,12 @@ def send_invoice_emails(order) -> bool:
             "",
             f"Заказ в админке: {order_admin_link(order)}",
         ])
-        message = EmailMessage(f"Счёт {invoice.number} — заказ № {order.number} подтверждён",
-                               body, settings.DEFAULT_FROM_EMAIL, internal)
+        message = letter(f"Счёт {invoice.number} — заказ № {order.number} подтверждён", body, internal,
+                         "emails/invoice_internal.html", {
+                             **html, "buyer": rows(buyer_lines(order)), "admin_url": order_admin_link(order),
+                             "delivery": [("Город", order.delivery_city or "—"), ("Адрес", order.delivery_address or "—"),
+                                          ("Комментарий", order.comment or "—")],
+                         })
         message.attach(filename, pdf, "application/pdf")
         try:
             message.send()
@@ -88,8 +95,9 @@ def send_invoice_emails(order) -> bool:
             "",
             "Ай-Дент · Оборудование для стоматологии",
         ])
-        message = EmailMessage(f"Счёт по заказу № {order.number} — Ай-Дент", body,
-                               settings.DEFAULT_FROM_EMAIL, [order.contact_email])
+        message = letter(f"Счёт по заказу № {order.number} — Ай-Дент", body, [order.contact_email],
+                         "emails/invoice_client.html",
+                         {**html, "download_url": f"{settings.SITE_ORIGIN}{invoice_url(order)}"})
         message.attach(filename, pdf, "application/pdf")
         try:
             message.send()
@@ -128,7 +136,9 @@ def notify_status(order_id, status) -> None:
         f"Заказ в админке: {order_admin_link(order)}",
     ])
     try:
-        EmailMessage(f"Заказ № {order.number} {STATUS_WORD[status]} — Ай-Дент", body,
-                     settings.DEFAULT_FROM_EMAIL, recipients).send()
+        letter(f"Заказ № {order.number} {STATUS_WORD[status]} — Ай-Дент", body, recipients, "emails/order_status.html", {
+            "order": order, "word": STATUS_WORD[status], "now": timezone.localtime(), "admin_url": order_admin_link(order),
+            "rows": [("Сумма", rub_text(order.total_amount or 0)), ("Статус", STATUS_WORD[status])],
+        }).send()
     except Exception:
         logger.exception("Заказ %s: письмо о смене статуса не отправлено", order.number)

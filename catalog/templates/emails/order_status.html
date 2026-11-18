@@ -1,0 +1,10 @@
+{% extends "emails/base.html" %}
+{% block kind %}Заказ{% endblock %}
+{% block number %}№ {{ order.number }}{% endblock %}
+{% block date %}{{ now|date:"d.m.Y H:i" }}{% endblock %}
+{% block content %}
+  {% with heading="Заказ "|add:word %}{% include "emails/_intro.html" %}{% endwith %}
+  {% include "emails/_card.html" with rows=rows %}
+  {% include "emails/_button.html" with url=admin_url label="Открыть заказ в админке" %}
+{% endblock %}
+{% block footer_note %}Письмо внутри компании — клиент его не видит.{% endblock %}

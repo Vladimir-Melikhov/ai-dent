@@ -1,0 +1,28 @@
+{# Состав заказа и итог — как таблица и блок «Итого» в счёте и КП #}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%; margin-top:28px; font-family:Manrope, Arial, Helvetica, sans-serif;">
+  <tr>
+    <td style="padding:0 0 8px; border-bottom:1px solid #0f1419; font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#525c6d;">Наименование</td>
+    <td align="right" style="padding:0 0 8px 10px; border-bottom:1px solid #0f1419; font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#525c6d; white-space:nowrap;">Кол-во</td>
+    <td class="hide-sm" align="right" style="padding:0 0 8px 14px; border-bottom:1px solid #0f1419; font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#525c6d; white-space:nowrap;">Цена</td>
+    <td align="right" style="padding:0 0 8px 14px; border-bottom:1px solid #0f1419; font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#525c6d; white-space:nowrap;">Сумма</td>
+  </tr>
+  {% for line in lines %}
+  <tr>
+    <td style="padding:13px 0; border-bottom:1px solid #d6d4d2; font-size:14px; line-height:1.4; color:#0f1419;">
+      {{ line.name }}
+      {% if line.discount %}<div style="margin-top:2px; font-size:11px; color:#525c6d;"><s>{{ line.list_price }}</s> · скидка {{ line.discount }}</div>{% endif %}
+    </td>
+    <td align="right" valign="top" style="padding:13px 0 13px 10px; border-bottom:1px solid #d6d4d2; font-size:14px; color:#0f1419;">{{ line.quantity }}</td>
+    <td class="hide-sm" align="right" valign="top" style="padding:13px 0 13px 14px; border-bottom:1px solid #d6d4d2; font-size:14px; font-weight:700; color:#0f1419; white-space:nowrap;">{{ line.price }}</td>
+    <td align="right" valign="top" style="padding:13px 0 13px 14px; border-bottom:1px solid #d6d4d2; font-size:14px; font-weight:700; color:#0f1419; white-space:nowrap;">{{ line.total }}</td>
+  </tr>
+  {% endfor %}
+</table>
+<table role="presentation" align="right" cellpadding="0" cellspacing="0" border="0"
+       style="width:100%; max-width:300px; margin-top:16px; background:#fbfbfa; background:rgba(255,255,255,.72); border:1px solid #e3e2e0; border-radius:14px;">
+  <tr>
+    <td style="padding:18px 0 18px 22px; font-family:Manrope, Arial, Helvetica, sans-serif; font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:#525c6d;">Итого</td>
+    <td align="right" style="padding:14px 22px 14px 10px; font-family:Manrope, Arial, Helvetica, sans-serif; font-size:24px; font-weight:800; color:#0f1419; white-space:nowrap;">{{ total }}</td>
+  </tr>
+</table>
+<div style="clear:both; height:1px; line-height:1px; font-size:0;">&nbsp;</div>

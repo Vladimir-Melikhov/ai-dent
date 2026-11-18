@@ -328,6 +328,10 @@ EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
 EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
 
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default=EMAIL_HOST_USER)
+# Имя отправителя в почте — «Ай-Дент» по-русски, а не адрес ящика; адрес остаётся тот же (так требует Яндекс)
+EMAIL_FROM_NAME = env("EMAIL_FROM_NAME", default="Ай-Дент")
+if DEFAULT_FROM_EMAIL and "<" not in DEFAULT_FROM_EMAIL and EMAIL_FROM_NAME:
+    DEFAULT_FROM_EMAIL = f"{EMAIL_FROM_NAME} <{DEFAULT_FROM_EMAIL}>"  # кириллицу в заголовке кодирует Django
 
 MANAGER_EMAIL = env("MANAGER_EMAIL", default="")
 # Рассылка для писем со счётом и о смене статуса, через запятую

@@ -1,0 +1,10 @@
+{% extends "emails/base.html" %}
+{% block kind %}Счёт на оплату{% endblock %}
+{% block number %}№ {{ invoice.number }}{% endblock %}
+{% block date %}от {{ issued|date:"d.m.Y" }}{% endblock %}
+{% block content %}
+  {% with heading="Заказ подтверждён" %}{% with text="Ваш заказ № "|add:order.number|add:" подтверждён. Счёт на оплату — во вложении, реквизиты для оплаты указаны в нём." %}{% include "emails/_intro.html" %}{% endwith %}{% endwith %}
+  {% include "emails/_items.html" %}
+  {% include "emails/_button.html" with url=download_url label="Скачать счёт" %}
+{% endblock %}
+{% block footer_note %}Счёт выставлен после подтверждения заказа менеджером.{% endblock %}

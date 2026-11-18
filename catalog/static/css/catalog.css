@@ -879,18 +879,20 @@
   object-position: center;
 }
 
-/* Каталог: пустые поля вокруг товара обрезает catalog.js — товар целиком, крупно,
-   от верхнего края карточки. До обрезки фото скрыто, чтобы не прыгало */
-.catalog-products .product-card__media img {
-  object-fit: contain;
-  object-position: top center;
-  padding: 0 10px;
-  opacity: 0;
-  transition: opacity .2s ease;
-}
+/* iPad: пустые поля вокруг товара обрезает catalog.js — товар целиком, крупно, по центру карточки.
+   До обрезки фото скрыто, чтобы не прыгало. На компьютере и телефоне фото как раньше */
+@media (min-width: 641px) and (max-width: 1100px) {
+  .catalog-products .product-card__media img {
+    object-fit: contain;
+    object-position: center;
+    padding: 14px;
+    opacity: 0;
+    transition: opacity .2s ease;
+  }
 
-.catalog-products .product-card__media img.is-ready {
-  opacity: 1;
+  .catalog-products .product-card__media img.is-ready {
+    opacity: 1;
+  }
 }
 
 .product-card__badge {

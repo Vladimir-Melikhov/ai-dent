@@ -747,9 +747,10 @@ async function trimmedUrl(img) {
   return blob ? URL.createObjectURL(blob) : null;
 }
 
-export function trimImageMargins(images) {
+export function trimImageMargins(images, { active = () => true } = {}) {
   images.forEach((img) => {
     const show = () => img.classList.add("is-ready");
+    if (img.dataset.original && img.src !== img.dataset.original) return show(); // уже обрезано
 
     const run = () => {
       const src = img.currentSrc || img.src;
@@ -757,7 +758,8 @@ export function trimImageMargins(images) {
         trimmedSrc.set(src, trimmedUrl(img).catch(() => null));
       }
       trimmedSrc.get(src).then((url) => {
-        if (!url) return show();
+        if (!url || !active()) return show(); // пока считали, экран повернули — оставляем как есть
+        img.dataset.original = src;
         img.addEventListener("load", show, { once: true });
         img.addEventListener("error", show, { once: true });
         img.src = url;
@@ -769,5 +771,12 @@ export function trimImageMargins(images) {
       img.addEventListener("load", run, { once: true });
       img.addEventListener("error", show, { once: true });
     }
+  });
+}
+
+/* Вернуть исходные фото — там, где их показывают как есть */
+export function restoreImageMargins(images) {
+  images.forEach((img) => {
+    if (img.dataset.original && img.src !== img.dataset.original) img.src = img.dataset.original;
   });
 }

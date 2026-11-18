@@ -1,0 +1,73 @@
+<!doctype html>
+{% comment %}Письма в стиле КП и счёта: серо-бежевый фон, белые карточки, чёрные акценты, бледный зуб справа внизу.
+Вёрстка таблицами и стили в атрибутах — так письмо одинаково выглядит в Яндекс Почте, Gmail и на телефоне.{% endcomment %}
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="x-apple-disable-message-reformatting">
+  <meta name="color-scheme" content="light">
+  <meta name="supported-color-schemes" content="light">
+  <title>{{ subject }}</title>
+  <style>
+    @font-face { font-family: 'Manrope'; font-weight: 400 800; src: url('{{ site_origin }}/static/fonts/manrope-normal-cyrillic.woff2') format('woff2'); unicode-range: U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+    @font-face { font-family: 'Manrope'; font-weight: 400 800; src: url('{{ site_origin }}/static/fonts/manrope-normal-latin.woff2') format('woff2'); }
+    @media (max-width: 520px) {
+      .wrap { padding: 24px 18px 22px !important; }
+      .brand { font-size: 24px !important; }
+      .docno { font-size: 17px !important; }
+      .head-main { display: block !important; width: 100% !important; }
+      .head-side { display: block !important; width: 100% !important; text-align: left !important; padding-top: 14px !important; }
+      .hide-sm { display: none !important; }
+      .foot { display: block !important; width: 100% !important; text-align: left !important; }
+      .foot-side { padding-top: 6px !important; white-space: normal !important; }
+    }
+  </style>
+</head>
+<body style="margin:0; padding:0; background:#f4f3f2; -webkit-text-size-adjust:100%;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%; background:#f4f3f2;">
+    <tr>
+      <td align="center" style="padding:20px 10px;">
+        <table role="presentation" width="620" cellpadding="0" cellspacing="0" border="0"
+               background="{{ tooth_url }}"
+               style="width:100%; max-width:620px; background-color:#f4f3f2; background-image:url('{{ tooth_url }}'); background-repeat:no-repeat; background-position:right bottom;">
+          <tr>
+            <td class="wrap" style="padding:36px 34px 30px; font-family:Manrope, Arial, Helvetica, sans-serif; color:#0f1419;">
+
+              <!-- Шапка: бренд слева, вид документа и номер справа -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td class="head-main" valign="top" style="font-family:Manrope, Arial, Helvetica, sans-serif;">
+                    <div class="brand" style="font-size:30px; line-height:1.1; font-weight:800; letter-spacing:-.02em; color:#0f1419;">Ай-Дент</div>
+                    <div style="margin-top:6px; font-size:10px; line-height:1.3; letter-spacing:.14em; text-transform:uppercase; color:#525c6d;">Оборудование для стоматологии</div>
+                  </td>
+                  <td class="head-side" valign="top" align="right" style="font-family:Manrope, Arial, Helvetica, sans-serif; text-align:right;">
+                    <div style="font-size:10px; line-height:1.3; letter-spacing:.14em; text-transform:uppercase; color:#525c6d;">{% block kind %}{% endblock %}</div>
+                    <div class="docno" style="margin-top:4px; font-size:20px; line-height:1.2; font-weight:800; color:#0f1419;">{% block number %}{% endblock %}</div>
+                    <div style="margin-top:3px; font-size:12px; color:#525c6d;">{% block date %}{% endblock %}</div>
+                  </td>
+                </tr>
+              </table>
+              <div style="height:1px; line-height:1px; font-size:0; background:#0f1419; margin:22px 0 26px;">&nbsp;</div>
+
+              {% block content %}{% endblock %}
+
+              <!-- Подвал -->
+              <div style="height:1px; line-height:1px; font-size:0; background:#d6d4d2; margin:34px 0 14px;">&nbsp;</div>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td class="foot" style="font-family:Manrope, Arial, Helvetica, sans-serif; font-size:11px; line-height:1.5; color:#8a94a6;">{% block footer_note %}{% endblock %}</td>
+                  <td class="foot foot-side" align="right" style="font-family:Manrope, Arial, Helvetica, sans-serif; font-size:11px; line-height:1.5; color:#8a94a6; white-space:nowrap;">
+                    <a href="{{ site_origin }}" style="color:#8a94a6; text-decoration:none;">Ай-Дент · Оборудование для стоматологии</a>
+                  </td>
+                </tr>
+              </table>
+
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

@@ -5,13 +5,27 @@ import {
   productCard,
   bindCartButtons,
   escapeHTML,
-  trimImageMargins
+  trimImageMargins,
+  restoreImageMargins
 } from "./api.js";
 
 import { initShortlist } from "./shortlist.js";
 
 const state = { page: 1 };
 const categoryNames = new Map();
+
+/* Фото в карточках. На компьютере и телефоне — как есть. На iPad пустые поля вокруг товара
+   обрезаются и товар стоит по центру карточки: крупно, и лупы не прилипают к верху.
+   Повернули iPad — фото переключаются сами */
+const TABLET = window.matchMedia("(min-width: 641px) and (max-width: 1100px)");
+
+function fitCardImages() {
+  const images = document.querySelectorAll("#c-products .product-card__media img");
+  if (TABLET.matches) trimImageMargins(images, { active: () => TABLET.matches });
+  else restoreImageMargins(images);
+}
+
+TABLET.addEventListener("change", fitCardImages);
 
 function getElement(id) {
   return document.getElementById(id);
@@ -85,7 +99,7 @@ async function load() {
       ? data.items.map(productCard).join("")
       : '<p class="empty">Ничего не найдено</p>';
 
-    trimImageMargins(grid.querySelectorAll(".product-card__media img"));
+    fitCardImages();
 
     if (count) count.textContent = data.total ?? 0;
 

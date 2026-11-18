@@ -191,3 +191,45 @@ def test_telegram_without_proxy_goes_direct(settings):
     with mock.patch("apps.orders.telegram.urllib.request.build_opener") as build:
         assert send_telegram("привет") is True
     assert "https" not in build.call_args.args[0].proxies or not build.call_args.args[0].proxies["https"].startswith("http://user")
+
+
+def test_pdf_page_has_background_tooth():
+    """Зуб на фоне счёта и КП: картинка на месте и рисуется на странице (раньше PNG удалили — зуб тихо пропал)."""
+    import io
+    import os
+    from unittest import mock
+
+    from reportlab.pdfgen import canvas
+
+    from . import pdf
+
+    assert os.path.exists(pdf.TEETH)
+    c = canvas.Canvas(io.BytesIO())
+    with mock.patch.object(c, "drawImage", wraps=c.drawImage) as draw:
+        pdf.paint_page(c)
+    assert draw.call_count == 1
+
+
+def test_letter_is_html_in_document_style_with_russian_sender(settings):
+    """Письма — в стиле счёта и КП: HTML с шапкой «Ай-Дент», зубом на фоне; отправитель — «Ай-Дент», текст — прежний."""
+    from .letters import letter, rows
+
+    settings.SITE_ORIGIN = "https://aident24.ru"
+    message = letter("Заявка № 7 — Ай-Дент", "текст", ["admin@example.com"], "emails/lead.html", {
+        "lead": type("L", (), {"number": "7", "created_at": None})(), "source": "Форма", "admin_url": "https://x/",
+        "rows": rows(["Имя: Иван", "Телефон: +79991234567"]),
+    })
+    html, mimetype = message.alternatives[0]
+    assert mimetype == "text/html" and message.body == "текст"
+    assert "https://aident24.ru/static/img/email-tooth.png" in html and "Ай-Дент" in html and "+79991234567" in html
+    assert rows(["ООО Улыбка", "ИНН: 123"]) == [("", "ООО Улыбка"), ("ИНН", "123")]
+
+
+def test_email_tooth_image_exists():
+    import os
+
+    from django.conf import settings
+
+    from .letters import TOOTH_PATH
+
+    assert os.path.exists(os.path.join(settings.BASE_DIR, "static", TOOTH_PATH.removeprefix("/static/")))

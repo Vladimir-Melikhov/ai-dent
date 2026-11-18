@@ -1,0 +1,10 @@
+{% extends "emails/base.html" %}
+{% block kind %}Заявка{% endblock %}
+{% block number %}№ {{ lead.number }}{% endblock %}
+{% block date %}{{ lead.created_at|date:"d.m.Y H:i" }}{% endblock %}
+{% block content %}
+  {% with heading="Новая заявка" text="Источник: "|add:source %}{% include "emails/_intro.html" %}{% endwith %}
+  {% include "emails/_card.html" with rows=rows %}
+  {% include "emails/_button.html" with url=admin_url label="Открыть заявку в админке" %}
+{% endblock %}
+{% block footer_note %}Позвоните клиенту — он ждёт звонка.{% endblock %}

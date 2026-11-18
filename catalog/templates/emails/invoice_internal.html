@@ -1,0 +1,12 @@
+{% extends "emails/base.html" %}
+{% block kind %}Счёт на оплату{% endblock %}
+{% block number %}№ {{ invoice.number }}{% endblock %}
+{% block date %}от {{ issued|date:"d.m.Y" }}{% endblock %}
+{% block content %}
+  {% with heading="Заказ № "|add:order.number|add:" подтверждён" text="Счёт выставлен и отправлен клиенту. PDF — во вложении." %}{% include "emails/_intro.html" %}{% endwith %}
+  {% include "emails/_card.html" with title="Покупатель" rows=buyer %}
+  {% include "emails/_card.html" with title="Доставка" rows=delivery %}
+  {% include "emails/_items.html" %}
+  {% include "emails/_button.html" with url=admin_url label="Открыть заказ в админке" %}
+{% endblock %}
+{% block footer_note %}Письмо внутри компании — клиент его не видит.{% endblock %}

@@ -33,7 +33,8 @@ CARD_DARK = colors.HexColor("#e9eef2")
 
 
 FONT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "static", "fonts", "pdf")
-TEETH = os.path.join(os.path.dirname(FONT_DIR), "..", "img", "teeth.png")
+# Зуб на фоне счёта и КП — та же картинка, что на сайте (PNG удалили при переводе картинок в WebP, зуб пропал)
+TEETH = os.path.normpath(os.path.join(os.path.dirname(FONT_DIR), "..", "img", "teeth.webp"))
 
 
 def _fonts():

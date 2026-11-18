@@ -3,8 +3,8 @@
 import logging
 
 from django.conf import settings
-from django.core.mail import EmailMessage
 
+from apps.orders.letters import letter, rows
 from apps.orders.telegram import send_telegram
 
 logger = logging.getLogger(__name__)
@@ -45,6 +45,8 @@ def notify_lead(lead) -> None:
         f"Заявка в админке: {link}",
     ])
     try:
-        EmailMessage(f"Заявка № {lead.number} — Ай-Дент", body, settings.DEFAULT_FROM_EMAIL, recipients).send()
+        letter(f"Заявка № {lead.number} — Ай-Дент", body, recipients, "emails/lead.html", {
+            "lead": lead, "source": lead.get_source_display(), "rows": rows(lead_lines(lead)), "admin_url": link,
+        }).send()
     except Exception:
         logger.exception("Заявка %s: ошибка отправки письма", lead.number)
