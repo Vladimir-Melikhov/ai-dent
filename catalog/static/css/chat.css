@@ -674,7 +674,6 @@
   a.chat-compare__name:hover { text-decoration: underline; }
   .chat-compare__brand { margin-top: 2px; font-size: 11px; color: var(--muted); overflow-wrap: anywhere; }
   .chat-compare__brand b { color: var(--text); font-weight: 700; }
-  .chat-compare__pick { margin-top: 3px; font-size: 11px; font-weight: 700; color: var(--text); }
 
   /* Фото — внизу шапки, у всех колонок на одной линии; пустые поля вокруг товара обрезает api.js */
   .chat-compare__photo {
@@ -754,7 +753,6 @@
     .chat-compare__photo { border-radius: 14px; }
     .chat-compare__name { font-size: 16px; }
     .chat-compare__brand { font-size: 12.5px; }
-    .chat-compare__pick { font-size: 12.5px; }
     .chat-compare__label { padding: 13px 10px 13px 16px; font-size: 14px; }
     .chat-compare__val { padding: 13px 8px; font-size: 15px; }
     .chat-compare__badge { font-size: 12px; }
@@ -1291,7 +1289,50 @@
       padding: 4px 6px 4px 16px;
     }
   }
-  
+
+  /* Планшет (iPad в любом положении) — открытый чат выше, чем на компьютере, но не во весь экран.
+     Первый экран под шапкой — колонка: заголовок сколько займёт (печатается, бывает в две строки),
+     окно чата забирает остальное, снизу остаётся около 9% высоты экрана */
+  @media (min-width: 641px) and (max-width: 1100px), (min-width: 641px) and (hover: none) and (pointer: coarse) {
+    .hero:has(.chat--inline.is-active) {
+      height: calc(100vh - 68px);
+      height: calc(100dvh - 68px);
+      min-height: 420px;
+      padding-top: 8px;
+      padding-bottom: clamp(48px, 9vh, 110px);
+      padding-bottom: clamp(48px, 9dvh, 110px);
+    }
+
+    .hero:has(.chat--inline.is-active) .hero__content {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      padding-top: 4px;
+    }
+
+    .hero:has(.chat--inline.is-active) .hero__title {
+      flex: none;
+      min-height: 0;
+    }
+
+    .hero:has(.chat--inline.is-active) .search-block-glow,
+    .hero:has(.chat--inline.is-active) .search-wrap {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      margin-bottom: 0;
+    }
+
+    .chat--inline.is-active {
+      flex: 1 1 0;
+      height: auto;
+      min-height: 0;
+    }
+  }
+
   /* Телефон — чат на главной */
   @media (max-width: 640px) {
     /* Убираем лишние поля вокруг открытого чата */

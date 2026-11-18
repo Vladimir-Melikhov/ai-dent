@@ -504,7 +504,8 @@ if (root) {
   }
 
   // Сравнение — таблица: слева подписи параметров, в колонках товары (название, бренд · страна, фото).
-  // Товар с меткой из админки («Хит») — серой колонкой с плашкой сверху. Первая строка — цена;
+  // Товар с меткой из админки («Хит») — серой колонкой с плашкой сверху; пометку ИИ («Для терапевта»)
+  // не выводим — свою рекомендацию он объясняет текстом. Первая строка — цена;
   // остальные отличия и общее у всех — под кнопкой «Все характеристики»
   function countryLine(brand, country) {
     return `${escapeHTML(brand || "")}${country ? ` · <b>${escapeHTML(country)}</b>` : ""}`;
@@ -534,7 +535,6 @@ if (root) {
       <div class="chat-compare__info">
         ${link("chat-compare__name", escapeHTML(p.name))}
         <div class="chat-compare__brand">${countryLine(p.brand, p.country)}</div>
-        ${p.pick ? `<div class="chat-compare__pick">${escapeHTML(p.pick)}</div>` : ""}
       </div>
       ${link("chat-compare__photo", p.image ? `<img src="${imageUrl(p.image)}" alt="" loading="lazy" decoding="async">` : "")}
     </div>`;

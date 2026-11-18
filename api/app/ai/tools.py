@@ -198,6 +198,22 @@ def field_of_view(options) -> str:
     return f"{fmt(min(figures))}–{fmt(max(figures))} {unit}".strip()
 
 
+ZOOM_MARK = re.compile(r"(?<=\d)\s*(?:[xхX×]|крат\w*)", re.IGNORECASE)
+ZOOM_ONLY = re.compile(r"[\d.\s/;,–—-]+")
+ZOOM_NUMBER = re.compile(r"\d+(?:\.\d+)?(?!\s*[–—-]\s*\d)(?![\d.])")
+
+
+def zoom_text(value: str) -> str:
+    """Увеличение одним видом: «3» → «3×», «2.5x / 3,0х» → «2.5× / 3.0×», «4–25x» → «4–25×».
+    Если кроме чисел есть слова — значение не трогаем."""
+    if not isinstance(value, str) or value == "—":
+        return value
+    text = ZOOM_MARK.sub("", re.sub(r"(?<=\d),(?=\d)", ".", value)).strip()
+    if not text or not ZOOM_ONLY.fullmatch(text):
+        return value
+    return ZOOM_NUMBER.sub(lambda m: m.group(0) + "×", text)
+
+
 def loupe_specs(product: Product) -> dict[str, str]:
     """Параметры лупы для сравнения — только из обязательных полей карточки товара."""
     specs = {"Увеличение": " / ".join(o.zoom for o in product.loupe_options) or "—",
@@ -216,6 +232,8 @@ def comparison_view(products: list[Product], pick: dict | None = None) -> dict:
     else:
         per_product = [{k: v for k, v in facts(p.characteristics).items() if not any(w in k.lower() for w in HIDDEN_WORDS)}
                        for p in products]
+    # Увеличение в админке вводят по-разному («3», «2.5x», «3,0×») — в таблице один вид
+    per_product = [{k: zoom_text(v) if "увеличен" in k.lower() else v for k, v in table.items()} for table in per_product]
     keys: list[str] = []
     for table in per_product:
         for key in table:

@@ -130,6 +130,17 @@ def test_comparison_same_values_come_as_name_and_value(catalog):
     assert [p["image"] for p in view["products"]] == [None, None]
 
 
+def test_zoom_is_shown_one_way_in_comparison():
+    from app.ai.tools import zoom_text
+
+    # В админке пишут «3», «2.5x», «3,0×» — в сравнении у всех «число×»
+    assert zoom_text("3") == "3×"
+    assert zoom_text("2.5x / 3.0x / 3.5x") == "2.5× / 3.0× / 3.5×"
+    assert zoom_text("3,0×") == "3.0×"
+    assert zoom_text("4–25x") == "4–25×"
+    assert zoom_text("до 6 мм") == "до 6 мм" and zoom_text("—") == "—"
+
+
 def test_facts_flatten_groups_and_drop_marketing_lines():
     from app.ai.tools import facts
 
