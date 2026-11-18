@@ -435,3 +435,24 @@ def test_comparison_of_different_categories_and_three_products():
     assert [p["availability"] for p in view["products"]] == ["в наличии", "в наличии", "под заказ"]
     assert [p["badge"] for p in view["products"]] == ["Хит", "", ""] and [p["image"] for p in view["products"]] == [None] * 3
     assert {r["name"]: r["values"] for r in view["rows"]}["Увеличение"] == ["4–25×", "2.5×", "—"]
+
+
+def test_comparison_only_within_one_category(catalog):
+    """Лупа с микроскопом — только если они в одной категории каталога (общая «Оптика»); из разных — отказ,
+    модель объясняет разницу текстом."""
+    from .conftest import admin_sql
+
+    with pytest.raises(ToolError, match="одной категории"):
+        run_tool("show_comparison", {"product_ids": [catalog["extaro"], catalog["loupe"]]})
+
+    optics = admin_sql("INSERT INTO catalog_category(name, slug, sort_order) VALUES ($1, $2, 0) RETURNING id",
+                       f"Оптика {catalog['tag']}", f"optika-{catalog['tag']}", fetch=True)[0]["id"]
+    loupes = admin_sql("SELECT category_id FROM catalog_product WHERE id = $1", catalog["loupe"], fetch=True)[0]["category_id"]
+    try:
+        admin_sql("UPDATE catalog_category SET parent_id = $1 WHERE id = ANY($2::bigint[])", optics,
+                  [catalog["category"], loupes])
+        output = run_tool("show_comparison", {"product_ids": [catalog["extaro"], catalog["loupe"]]})
+        assert output.widget["product_ids"] == [catalog["extaro"], catalog["loupe"]]
+    finally:
+        admin_sql("UPDATE catalog_category SET parent_id = NULL WHERE parent_id = $1", optics)
+        admin_sql("DELETE FROM catalog_category WHERE id = $1", optics)

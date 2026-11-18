@@ -598,11 +598,31 @@ async def run_show(ctx: ToolContext, args: ShowArgs) -> ToolOutput:
     return ToolOutput(result, widget={"widget": "product_cards", "product_ids": shown})
 
 
+async def root_categories(session: AsyncSession) -> dict[int, int]:
+    """Категория → верхняя категория каталога (лупы и микроскопы в подкатегориях «Оптики» → «Оптика»)."""
+    parents = dict((await session.execute(select(Category.id, Category.parent_id))).all())
+
+    def root(cid: int) -> int:
+        seen = set()
+        while parents.get(cid) and cid not in seen:
+            seen.add(cid)
+            cid = parents[cid]
+        return cid
+
+    return {cid: root(cid) for cid in parents}
+
+
 async def run_compare(ctx: ToolContext, args: CompareArgs) -> ToolOutput:
     ids = list(dict.fromkeys(args.product_ids))
     products = await active_products(ctx.session, ids)
     if len(products) < 2:
         raise ToolError("для сравнения нужно минимум два товара из каталога")
+    # Лупу с наконечником сравнивать нечем — общих параметров нет, в таблице одни прочерки
+    roots = await root_categories(ctx.session)
+    if len({roots.get(p.category_id, p.category_id) for p in products}) > 1:
+        names = ", ".join(dict.fromkeys(p.category.name for p in products))
+        raise ToolError(f"сравнивать можно только товары одной категории каталога, а здесь разные: {names}. "
+                        "Таблицу не показывай — объясни текстом, чем эти товары отличаются по назначению")
     shown = [p.id for p in products]
     pick = {"product_id": args.pick.product_id, "label": args.pick.label.strip()} if (
         args.pick and args.pick.product_id in shown and args.pick.label.strip()) else None
@@ -752,7 +772,8 @@ TOOLS: list[Tool] = [
     Tool(
         name="show_comparison",
         description=(
-            "Показать клиенту сравнение 2–3 товаров: цена, бренд и страна, главные параметры рядом. В pick — "
+            "Показать клиенту сравнение 2–3 товаров одной категории каталога: цена, бренд и страна, главные "
+            "параметры рядом. Товары разных категорий не сравнивай — объясни разницу текстом. В pick — "
             "пометка на одной карточке под задачу клиента (label до 28 символов, например «Для терапевта»): только "
             "когда задача известна и есть основание в базе знаний или каталоге. "
             "Текст сравнения пишешь сам."
